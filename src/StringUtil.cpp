@@ -1,4 +1,4 @@
-﻿#include "StringUtil.h"
+﻿#include "StringUtil.hpp"
 
 /**
  * @brief Tokenizes a string based on a delimiter

@@ -5,10 +5,15 @@ set(CMAKE_CXX_STANDARD 23)
 
 set(INCLUDE_FILES 
     ${CMAKE_SOURCE_DIR}/include/Argon/Argon.hpp
+    ${CMAKE_SOURCE_DIR}/include/Argon/Option.hpp
+    ${CMAKE_SOURCE_DIR}/include/Argon/StringUtil.hpp
+    ${CMAKE_SOURCE_DIR}/include/Argon/Traits.hpp
 )
 
 set(SOURCE_FILES
     ${CMAKE_SOURCE_DIR}/src/Argon.cpp
+    ${CMAKE_SOURCE_DIR}/src/Option.cpp
+    ${CMAKE_SOURCE_DIR}/src/StringUtil.cpp
 )
 
 add_library(Argon ${SOURCE_FILES})
@@ -17,7 +22,6 @@ target_sources(Argon PUBLIC ${INCLUDE_FILES})
 target_include_directories(Argon PUBLIC
     ${CMAKE_SOURCE_DIR}/include/Argon
 )
-
 
 set_target_properties(Argon PROPERTIES POSITION_INDEPENDENT_CODE ON)
 

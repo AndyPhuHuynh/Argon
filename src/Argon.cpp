@@ -3,7 +3,7 @@
 #include <iostream>
 
 #include "Option.hpp"
-#include <StringUtil.h>
+#include <StringUtil.hpp>
 
 Argon::Parser::Parser(const Parser& parser) {
     for (auto& option : parser.options) {

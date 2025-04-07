@@ -6,7 +6,7 @@
 #include <vector>
 
 #include "Argon.hpp"
-#include "StringUtil.h"
+#include "StringUtil.hpp"
 #include "Traits.hpp"
 
 namespace Argon {

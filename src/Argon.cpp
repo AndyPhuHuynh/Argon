@@ -3,51 +3,62 @@
 #include <iostream>
 
 #include "Option.hpp"
+#include <StringUtil.h>
 
-/**
- * @brief Tokenizes a string based on a delimiter
- * @param str The string that will be tokenized
- * @param delimiter The character used as the delimiter
- * @return A vector of the tokens in the tokenized string
- */
-static std::vector<std::string> SplitString(const std::string& str, const char delimiter) {
-    std::vector<std::string> tokens;
-    int prevIndex = 0;
-    const int length = static_cast<int>(str.length());
-    for (int i = 0; i < length; i++) {
-        if (str[i] == delimiter) {
-            // Add token only if it's non-empty
-            if (prevIndex != i) {
-                tokens.push_back(str.substr(prevIndex, i - prevIndex));
-            }
-            // Skip consecutive delimiters
-            while (i < length && str[i] == delimiter) {
-                i++;
-            }
-            prevIndex = i;
+Argon::Parser::Parser(const Parser& parser) {
+    for (auto& option : parser.options) {
+        this->options.push_back(option->clone());
+    }
+}
+
+Argon::Parser::Parser(Parser&& parser) noexcept {
+    options = std::move(parser.options);
+}
+
+Argon::Parser& Argon::Parser::operator=(const Parser& parser) {
+    if (this != &parser) {
+        // Cleanup existing object
+        for (auto& option : parser.options) {
+            delete option;
+        }
+        options.clear();
+
+        // Copy from old object 
+        options.reserve(parser.options.size());
+        for (auto& option : parser.options) {
+            options.push_back(option->clone());
         }
     }
+    return *this;
+}
 
-    // Add the last token if its non-empty
-    if (prevIndex < length) {
-        tokens.push_back(str.substr(prevIndex));
+Argon::Parser& Argon::Parser::operator=(Parser&& parser) noexcept {
+    if (this != &parser) {
+        // Cleanup existing object
+        for (auto& option : parser.options) {
+            delete option;
+        }
+        // Move from old object
+        options = std::move(parser.options);
     }
-    
-    return tokens;
+    return *this;
+}
+
+Argon::Parser::~Parser() {
+    for (auto& option : options) {
+        delete option;
+    }
 }
 
 void Argon::Parser::addOption(const IOption& option) {
     options.push_back(option.clone());
-}
+ }
 
-void Argon::Parser::addOption(const std::shared_ptr<IOption>& option) {
-    options.push_back(option);
-}
-
-bool Argon::Parser::tokenInOptions(const std::string& token) {
+bool Argon::Parser::getOption(const std::string& token, IOption*& out) {
     for (auto& option : options) {
-        for (const auto& tag : option->tags) {
+        for (const auto& tag : option->get_flags()) {
             if (token == tag) {
+                out = option;
                 return true;
             }
         }
@@ -55,22 +66,8 @@ bool Argon::Parser::tokenInOptions(const std::string& token) {
     return false;
 }
 
-Argon::IOption& Argon::Parser::searchOptions(const std::string& token) {
-    for (auto& option : options) {
-        for (const auto& tag : option->tags) {
-            if (token == tag) {
-                return *option;
-            }
-        }
-    }
-    std::cerr << token << " not found\n";
-    // TODO: FIX
-    exit(1);
-}
-
-
 void Argon::Parser::parseString(const std::string& str) {
-    std::vector<std::string> tokens = SplitString(str, ' ');
+    std::vector<std::string> tokens = StringUtil::split_string(str, ' ');
 
     if (tokens.empty()) {
         return;
@@ -79,12 +76,22 @@ void Argon::Parser::parseString(const std::string& str) {
     size_t tokenIndex = 0;
     while (tokenIndex < tokens.size()) {
         std::string& token = tokens[tokenIndex++];
-        if (!tokenInOptions(token)) {
-            continue;   
+
+        IOption *option = nullptr;
+        if (!getOption(token, option)) {
+            continue;
         }
-        IOption& option = searchOptions(token);
+        
         std::string& nextToken = tokens[tokenIndex++];
-        option.setValue(nextToken);
+        option->set_value(token, nextToken);
+    }
+
+    for (auto& option : options) {
+        if (!option->has_error()) {
+            return;
+        }
+
+        std::cout << option->get_error() << "\n";
     }
 }
 

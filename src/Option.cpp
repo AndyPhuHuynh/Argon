@@ -1,4 +1,4 @@
-﻿#include "Option.hpp"
+﻿#include "Argon/Option.hpp"
 
 #include <iostream>
 
@@ -11,6 +11,12 @@ Argon::Parser Argon::IOption::operator|(const IOption& other) {
     Parser parser;
     parser.addOption(*this);
     parser.addOption(other);
+    return parser;
+}
+
+Argon::IOption::operator Argon::Parser() const {
+    Parser parser;
+    parser.addOption(*this);
     return parser;
 }
 
@@ -30,4 +36,17 @@ const std::string& Argon::IOption::get_error() const {
 
 bool Argon::IOption::has_error() const {
     return !m_error.empty();
+}
+
+bool Argon::parseBool(const std::string& arg, bool& out) {
+    std::string boolStr = arg;
+    StringUtil::to_lower(boolStr);
+    if (boolStr == "true") {
+        out = true;
+        return true;
+    } else if (boolStr == "false") {
+        out = false;
+        return true;
+    }
+    return false;
 }

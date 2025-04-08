@@ -1,4 +1,6 @@
-﻿#include "StringUtil.hpp"
+﻿#include "Argon/StringUtil.hpp"
+
+#include <algorithm>
 
 /**
  * @brief Tokenizes a string based on a delimiter
@@ -52,4 +54,12 @@ std::string Argon::StringUtil::format_with_underscores(const int64_t value) {
         insertPosition -= 3;
     }
     return num;
+}
+
+void Argon::StringUtil::to_lower(std::string& str) {
+    std::ranges::transform(str, str.begin(), [](const unsigned char c) { return std::tolower(c); });
+}
+
+void Argon::StringUtil::to_upper(std::string& str) {
+    std::ranges::transform(str, str.begin(), [](const unsigned char c) { return std::toupper(c); });
 }

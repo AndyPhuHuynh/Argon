@@ -1,6 +1,7 @@
 ﻿#pragma once
 
 #include <functional>
+#include <iostream>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -21,6 +22,7 @@ namespace Argon {
         
         IOption& operator[](const std::string& tag);
         Parser operator| (const IOption& other);
+        operator Parser() const;
 
         const std::vector<std::string>& get_flags() const;
         void print_flags() const;
@@ -61,10 +63,12 @@ namespace Argon {
     };
 
     template<typename T>
-    bool parseIntegralType(const std::string& arg, T& out);
+    bool parseNonBoolIntegralType(const std::string& arg, T& out);
+    bool parseBool(const std::string& arg, bool& out);
 }
 
 // Template Implementations
+
 namespace Argon {
     template <typename Derived>
     IOption* OptionBase<Derived>::clone() const {
@@ -100,9 +104,13 @@ namespace Argon {
         if (convert != nullptr) {
             success = convert(arg, m_value);
         }
-        // Parse as integral if valid
-        else if constexpr (std::is_integral_v<T>) {
-            success = parseIntegralType<T>(arg, m_value);
+        // Parse as non-bool integral if valid
+        else if constexpr (is_non_bool_integral<T>) {
+            success = parseNonBoolIntegralType<T>(arg, m_value);
+        }
+        // Parse as boolean if T is a boolean
+        else if constexpr (std::is_same_v<T, bool>) {
+            success = parseBool(arg, m_value);
         }
         // Use stream extraction if custom conversion not supplied and type is not integral
         else if constexpr (has_stream_extraction<T>::value) {
@@ -135,17 +143,20 @@ namespace Argon {
         ss << "Invalid value for flag \'" << this->m_usedFlag << "\': "
             << "expected " << type_name<T>();
 
-        if constexpr (std::is_integral_v<T>) {
+        if constexpr (is_non_bool_integral<T>) {
             ss << " in the range of [" << StringUtil::format_with_commas(static_cast<int64_t>(std::numeric_limits<T>::min())) <<
                 " to " << StringUtil::format_with_commas(static_cast<int64_t>(std::numeric_limits<T>::max())) << "]";
+        } else if constexpr (std::is_same_v<T, bool>) {
+            ss << " true or false";
         }
-
+        
         ss << ", got: " << invalidArg;
         this->m_error = ss.str();
     }
 
     template <typename T>
-    bool parseIntegralType(const std::string& arg, T& out) {
+    bool parseNonBoolIntegralType(const std::string& arg, T& out) {
+        static_assert(is_non_bool_integral<T>);
         T min = std::numeric_limits<T>::min();
         T max = std::numeric_limits<T>::max();
         

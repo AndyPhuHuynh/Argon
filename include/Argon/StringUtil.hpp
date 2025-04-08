@@ -9,4 +9,8 @@ namespace Argon::StringUtil {
     std::string format_with_commas(int64_t value);
 
     std::string format_with_underscores(int64_t value);
+
+    void to_lower(std::string& str);
+
+    void to_upper(std::string& str);
 }

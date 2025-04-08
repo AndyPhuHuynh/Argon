@@ -1,9 +1,9 @@
-#include "Argon.hpp"
+#include "Argon/Argon.hpp"
 
 #include <iostream>
 
-#include "Option.hpp"
-#include <StringUtil.hpp>
+#include "Argon/Option.hpp"
+#include "Argon/StringUtil.hpp"
 
 Argon::Parser::Parser(const Parser& parser) {
     for (auto& option : parser.options) {
@@ -35,7 +35,7 @@ Argon::Parser& Argon::Parser::operator=(const Parser& parser) {
 Argon::Parser& Argon::Parser::operator=(Parser&& parser) noexcept {
     if (this != &parser) {
         // Cleanup existing object
-        for (auto& option : parser.options) {
+        for (auto& option : options) {
             delete option;
         }
         // Move from old object
@@ -88,7 +88,7 @@ void Argon::Parser::parseString(const std::string& str) {
 
     for (auto& option : options) {
         if (!option->has_error()) {
-            return;
+            continue;
         }
 
         std::cout << option->get_error() << "\n";

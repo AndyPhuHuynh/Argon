@@ -1,12 +1,12 @@
-#include <Argon.hpp>
+#include <Argon/Argon.hpp>
 
 #include <iostream>
 
-#include "Option.hpp"
+#include "Argon/Option.hpp"
 
 int main() {
     using namespace Argon;
-
+    
     unsigned int width;
     float height;
     double depth;
@@ -76,4 +76,10 @@ int main() {
     std::string studentString = "--student 100";
     studentParser.parseString(studentString);
     printStudent(testStudent);
+
+    bool boolTest = true;
+    std::cout << "boolTest: " << boolTest << "\n";
+    Parser boolParser = Option(&boolTest)["-b"]["--bool"];
+    boolParser.parseString("--bool trueasdfads");
+    std::cout << "boolTest: " << boolTest << "\n";
 }

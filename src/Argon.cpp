@@ -67,6 +67,16 @@ bool Argon::Parser::getOption(const std::string& token, IOption*& out) {
 }
 
 void Argon::Parser::parseString(const std::string& str) {
+    scanner = Scanner(str);
+    parseStatement();
+    for (auto& option : options) {
+        if (!option->has_error()) {
+            continue;
+        }
+
+        std::cout << option->get_error() << "\n";
+    }
+    return;
     std::vector<std::string> tokens = StringUtil::split_string(str, ' ');
 
     if (tokens.empty()) {
@@ -93,6 +103,52 @@ void Argon::Parser::parseString(const std::string& str) {
 
         std::cout << option->get_error() << "\n";
     }
+}
+
+void Argon::Parser::parseStatement() {
+    bool stop = false;
+    
+    while (!stop) {
+        // OptionGroup
+        if (scanner.seeTokenKind(LBRACK)) {
+            parseOptionGroup();
+        }
+        // Option
+        else if (scanner.seeTokenKind(IDENTIFIER)) {
+            parseOption();
+        } 
+        // Error
+        else {
+            
+        }
+        stop = scanner.seeTokenKind(END) || scanner.seeTokenKind(RBRACK);
+    }
+}
+
+void Argon::Parser::parseOption() {
+    Token tag = scanner.getNextToken();
+    Token value = scanner.getNextToken();
+
+    if (tag.kind != IDENTIFIER) {
+        std::cerr << "Error: Expected an identifier token for tag\n";
+    }
+    if (value.kind != IDENTIFIER) {
+        std::cerr << "Error: Expected an identifier token for value\n";
+    }
+    
+    // TODO: If value is not valid, don't parse it
+    IOption *option = nullptr;
+    if (!getOption(tag.image, option)) {
+        std::cerr << "Invalid flag\n";
+    } else {
+        option->set_value(tag.image, value.image);
+    }
+}
+
+void Argon::Parser::parseOptionGroup() {
+    Token lbrack = scanner.getNextToken();
+    parseStatement();
+    Token rbrack = scanner.getNextToken();
 }
 
 Argon::Parser& Argon::Parser::operator|(const IOption& option) {

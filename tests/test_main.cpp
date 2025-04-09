@@ -1,7 +1,8 @@
-#include <Argon/Argon.hpp>
+#include "Testing.hpp"
 
 #include <iostream>
 
+#include <Argon/Argon.hpp>
 #include "Argon/Option.hpp"
 
 int main() {
@@ -82,4 +83,6 @@ int main() {
     Parser boolParser = Option(&boolTest)["-b"]["--bool"];
     boolParser.parseString("--bool trueasdfads");
     std::cout << "boolTest: " << boolTest << "\n";
+
+    runScannerTests();
 }

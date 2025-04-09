@@ -1,0 +1,20 @@
+----------------------
+Lexical Grammar
+----------------------
+
+LBRACK      ::= "["
+RBRACK      ::= "]"
+
+IDENTIFIER  ::= ( "a"..."z" | "A"..."Z" | "0"..."9")
+                { "a"..."z" | "A"..."Z" | "0"..."9"}
+
+
+----------------------
+Syntactic Grammar
+----------------------
+
+statement   ::= ( option | optionGroup ) { option | optionGroup }
+
+option      ::=  IDENTIFIER IDENTIFIER
+
+optionGroup ::= LBRACK statement RBRACK

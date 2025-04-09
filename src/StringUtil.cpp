@@ -57,9 +57,11 @@ std::string Argon::StringUtil::format_with_underscores(const int64_t value) {
 }
 
 void Argon::StringUtil::to_lower(std::string& str) {
-    std::ranges::transform(str, str.begin(), [](const unsigned char c) { return std::tolower(c); });
+    std::ranges::transform(str, str.begin(),
+        [](const unsigned char c) { return static_cast<char>(std::tolower(c)); });
 }
 
 void Argon::StringUtil::to_upper(std::string& str) {
-    std::ranges::transform(str, str.begin(), [](const unsigned char c) { return std::toupper(c); });
+    std::ranges::transform(str, str.begin(),
+        [](const unsigned char c) { return static_cast<char>(std::toupper(c)); });
 }

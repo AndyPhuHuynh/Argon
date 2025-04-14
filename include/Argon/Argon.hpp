@@ -1,8 +1,10 @@
 #pragma once
 
+#include <memory>
 #include <string>
 #include <vector>
 
+#include "Ast.hpp"
 #include "Scanner.hpp"
 
 namespace Argon {
@@ -15,7 +17,7 @@ namespace Argon {
         std::vector<IOption*> options;
 
     private:
-        Scanner scanner;
+        Scanner scanner = Scanner();
     public:
         Parser() = default;
         Parser(const Parser& parser);
@@ -25,13 +27,14 @@ namespace Argon {
         ~Parser();
         
         void addOption(const IOption& option);
-        bool getOption(const std::string& token, IOption*& out);
+        IOption *getOption(const std::string& flag);
+        static IOption *getOption(const std::vector<IOption*>& options, const std::string& flag);
         void parseString(const std::string& str);
 
-        void parseStatement();
-        void parseOption();
-        void parseOptionGroup();
-
+        StatementAst parseStatement();
+        std::unique_ptr<OptionAst> parseOption();
+        std::unique_ptr<OptionGroupAst> parseOptionGroup();
+        
         Parser& operator|(const IOption& option);
     };
 }

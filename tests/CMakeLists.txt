@@ -1,10 +1,11 @@
 set (INCLUDE_FILES
-    ${CMAKE_CURRENT_SOURCE_DIR}/Testing.hpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/testing.hpp
 )
 
 set (SOURCE_FILES
-    ${CMAKE_CURRENT_SOURCE_DIR}/ScannerTest.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/test_main.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/main_test.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/scanner_test.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/options_test.cpp
 )
 
 add_executable(ArgonTests ${SOURCE_FILES})

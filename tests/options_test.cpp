@@ -1,36 +1,30 @@
-#include "Testing.hpp"
+﻿#include "testing.hpp"
 
-#include <iostream>
-
-#include <Argon/Argon.hpp>
+#include "Argon/Argon.hpp"
 #include "Argon/Option.hpp"
 
-int main() {
-    using namespace Argon;
-    
-    unsigned int width;
+using namespace Argon;
+
+void Test1() {
+    unsigned int width = 0;
     float height;
     double depth;
     int test;
     
-    // Option<int> opt1 = Option<int>()["-w"]["--width"];
     Option opt2 = Option(&height)["-h"]["--height"];
     Option opt3 = Option(&depth)["-d"]["--depth"];
-    
-    std::string test1 = "test1";
-    std::string test2 = "-w";
-    std::string test3 = "-h";
-    std::string test4 = "--width --height";
 
     Parser parser = Option(&width)["-w"]["--width"] | opt2 | opt3 | Option(&test)["-t"]["--test"];
-    std::string test5 = "--width -100 --height 50.1 --depth 69.123456 -t 152";
-    parser.parseString(test5);
+    std::string str = "--width -100 --height 50.1 --depth 69.123456 -t 152";
+    parser.parseString(str);
 
-    std::cout << "Width: " << width << "\n";
-    std::cout << "Height: " << height << "\n";
-    std::cout << "Depth: " << depth << "\n";
-    std::cout << "Test: " << test << "\n";
+    bool success =  (height >= 50 && height <= 50.1) &&
+                    (depth >= 69.1 && depth <= 69.2) &&
+                    test == 152;
+    check(success, "Option Test 1");
+}
 
+void StructTest() {
     struct Student {
         std::string name;
         int age;
@@ -72,17 +66,16 @@ int main() {
     
     Student testStudent{};
     Option studentOption = Option<Student>(&testStudent, studentFromString, studentError)["-s"]["--student"];
-    Parser studentParser = studentOption | opt2;
+    Parser studentParser = studentOption;
 
-    std::string studentString = "--student 100";
+    std::string studentString = "--student 3";
     studentParser.parseString(studentString);
-    printStudent(testStudent);
 
-    bool boolTest = true;
-    std::cout << "boolTest: " << boolTest << "\n";
-    Parser boolParser = Option(&boolTest)["-b"]["--bool"];
-    boolParser.parseString("--bool trueasdfads");
-    std::cout << "boolTest: " << boolTest << "\n";
+    bool success = testStudent.name == "Sally" && testStudent.age == 3;
+    check(success, "Option custom struct");
+}
 
-    runScannerTests();
+void runOptionsTests() {
+    Test1();
+    StructTest();
 }

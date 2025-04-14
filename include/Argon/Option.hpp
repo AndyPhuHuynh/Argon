@@ -11,17 +11,26 @@
 #include "Traits.hpp"
 
 namespace Argon {
+    class IOption;
+    template <typename T> class Option;
+    class OptionGroup;
+    
     class IOption {
     protected:
         std::vector<std::string> m_flags;
         std::string m_usedFlag;
         std::string m_error;
-    public:
+        
         IOption() = default;
+    public:
+        IOption(const IOption&);
+        IOption& operator=(const IOption&);
+        IOption(IOption&&) noexcept;
+        IOption& operator=(IOption&&) noexcept;
         virtual ~IOption() = default;
         
         IOption& operator[](const std::string& tag);
-        Parser operator| (const IOption& other);
+        Parser operator|(const IOption& other);
         operator Parser() const;
 
         const std::vector<std::string>& get_flags() const;
@@ -30,19 +39,29 @@ namespace Argon {
         bool has_error() const;
         
         virtual IOption* clone() const = 0;
-        virtual void set_value(const std::string& flag, const std::string& str) = 0;
-        virtual void set_error(const std::string& invalidArg) = 0;
     };
     
     template <typename Derived>
-    class OptionBase : public IOption {
+    class OptionComponent : public IOption {
+        friend Derived;
+
+        OptionComponent() = default;
     public:
         IOption* clone() const override;
         Derived& operator[](const std::string& tag);
     };
     
+    class OptionBase {
+    public:
+        OptionBase() = default;
+        virtual ~OptionBase() = default;
+        
+        virtual void set_value(const std::string& flag, const std::string& value) = 0;
+        virtual void set_error(const std::string& invalidArg) = 0;
+    };
+    
     template <typename T>
-    class Option final : public OptionBase<Option<T>> {
+    class Option : public OptionBase, public OptionComponent<Option<T>> {
         T m_value;
         T *m_out = nullptr;
         std::function<bool(const std::string&, T&)> convert = nullptr;
@@ -62,6 +81,19 @@ namespace Argon {
         void set_error(const std::string& invalidArg) override;
     };
 
+    class OptionGroup : public OptionComponent<OptionGroup> {
+        std::vector<IOption*> m_options;
+    public:
+        OptionGroup& operator+(const IOption& other);
+
+        void add_option(const IOption* option);
+        IOption *get_option(const std::string& flag);
+        const std::vector<IOption*>& get_options() const;
+        
+        void set_option_value(const std::string& flag, const std::string& optionFlag, const std::string& value);
+        void set_error(const std::string& invalidArg);
+    };
+    
     template<typename T>
     bool parseNonBoolIntegralType(const std::string& arg, T& out);
     bool parseBool(const std::string& arg, bool& out);
@@ -71,30 +103,31 @@ namespace Argon {
 
 namespace Argon {
     template <typename Derived>
-    IOption* OptionBase<Derived>::clone() const {
+    IOption* OptionComponent<Derived>::clone() const {
         return new Derived(static_cast<const Derived&>(*this));
     }
 
     template <typename Derived>
-    Derived& OptionBase<Derived>::operator[](const std::string& tag) {
+    Derived& OptionComponent<Derived>::operator[](const std::string& tag) {
         m_flags.push_back(tag);
         return static_cast<Derived&>(*this);
     }
 
     template <typename T>
-    Option<T>::Option(T* out): m_out(out) {
+    Option<T>::Option(T* out) : OptionBase(), m_out(out) {
         static_assert(has_stream_extraction<T>::value,
             "Type T must have a conversion function or support stream extraction for parsing.");
     }
 
     template <typename T>
-    Option<T>::Option(T* out, std::function<bool(const std::string&, T&)> convert): m_out(out), convert(convert) {}
+    Option<T>::Option(T* out, std::function<bool(const std::string&, T&)> convert)
+        : OptionBase(), m_out(out), convert(convert) {}
 
     template <typename T>
     Option<T>::Option(T* out,
         const std::function<bool(const std::string&, T&)>& convert,
         const std::function<std::string(const std::string&, const std::string&)>& error_msg)
-        : m_out(out), convert(convert), generate_error_msg(error_msg) {}
+        : OptionBase(), m_out(out), convert(convert), generate_error_msg(error_msg) {}
 
     template <typename T>
     void Option<T>::set_value(const std::string& flag, const std::string& arg) {
@@ -154,7 +187,7 @@ namespace Argon {
         this->m_error = ss.str();
     }
 
-    template <typename T>
+    template <typename T> 
     bool parseNonBoolIntegralType(const std::string& arg, T& out) {
         static_assert(is_non_bool_integral<T>);
         T min = std::numeric_limits<T>::min();

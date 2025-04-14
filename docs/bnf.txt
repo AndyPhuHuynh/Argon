@@ -15,6 +15,6 @@ Syntactic Grammar
 
 statement   ::= ( option | optionGroup ) { option | optionGroup }
 
-option      ::=  IDENTIFIER IDENTIFIER
+option      ::= IDENTIFIER IDENTIFIER
 
-optionGroup ::= LBRACK statement RBRACK
+optionGroup ::= IDENTIFIER LBRACK statement RBRACK

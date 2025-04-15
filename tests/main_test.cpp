@@ -2,8 +2,8 @@
 
 #include <iostream>
 
-#include "Argon/Argon.hpp"
 #include "Argon/Option.hpp"
+#include "Argon/Parser.hpp" 
 
 static void boolTest() {
     using namespace Argon;
@@ -25,6 +25,9 @@ int main() {
     int age;
     std::string major;
 
+    std::string minor;
+    std::string instrumentName;
+    
     // Parser parser = Option(&name)["--name"]
     //                 | Option(&age)["--age"]
     //                 | Option(&major)["--major"];
@@ -32,12 +35,17 @@ int main() {
     Parser parser = Option(&name)["--name"]
                     | OptionGroup()["--group"]
                         + Option(&age)["--age"]
-                        + Option(&major)["--major"];
+                        + Option(&major)["--major"]
+                        + (OptionGroup()["--nested"]
+                            + Option(&minor)["--minor"]
+                            + Option(&instrumentName)["--name"]);
     
-    std::string str = "--name John --group [--age 20 --major CS]";
+    std::string str = "--name John --group [--age 20aasdf --major CS --nested [--minor music --name violin --null hi]]";
     parser.parseString(str);
     
     std::cout << "name: " << name << "\n";
     std::cout << "age: " << age << "\n";
     std::cout << "major: " << major << "\n";
+    std::cout << "minor: " << minor << "\n";
+    std::cout << "instrument: " << instrumentName << "\n";
 }

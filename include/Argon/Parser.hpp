@@ -13,11 +13,11 @@ namespace Argon {
     class Option;
     
     class Parser {
-    public:
-        std::vector<IOption*> options;
-
-    private:
-        Scanner scanner = Scanner();
+        std::vector<IOption*> m_options;
+        Scanner m_scanner = Scanner();
+        
+        std::vector<std::string> m_errors;
+        std::vector<std::pair<std::string, bool>> m_groupParseStack;
     public:
         Parser() = default;
         Parser(const Parser& parser);
@@ -29,8 +29,12 @@ namespace Argon {
         void addOption(const IOption& option);
         IOption *getOption(const std::string& flag);
         static IOption *getOption(const std::vector<IOption*>& options, const std::string& flag);
-        void parseString(const std::string& str);
 
+        void addError(const std::string& error);
+        void addGroupToParseStack(const std::string& flag);
+        void popGroupParseStack();
+        
+        void parseString(const std::string& str);
         StatementAst parseStatement();
         std::unique_ptr<OptionAst> parseOption();
         std::unique_ptr<OptionGroupAst> parseOptionGroup();

@@ -1,4 +1,4 @@
-#include "Argon/Argon.hpp"
+#include "Argon/Parser.hpp"
 
 #include <algorithm>
 #include <iostream>
@@ -7,27 +7,27 @@
 #include "Argon/StringUtil.hpp"
 
 Argon::Parser::Parser(const Parser& parser) {
-    for (auto& option : parser.options) {
-        this->options.push_back(option->clone());
+    for (auto& option : parser.m_options) {
+        this->m_options.push_back(option->clone());
     }
 }
 
 Argon::Parser::Parser(Parser&& parser) noexcept {
-    options = std::move(parser.options);
+    m_options = std::move(parser.m_options);
 }
 
 Argon::Parser& Argon::Parser::operator=(const Parser& parser) {
     if (this != &parser) {
         // Cleanup existing object
-        for (auto& option : parser.options) {
+        for (auto& option : parser.m_options) {
             delete option;
         }
-        options.clear();
+        m_options.clear();
 
         // Copy from old object 
-        options.reserve(parser.options.size());
-        for (auto& option : parser.options) {
-            options.push_back(option->clone());
+        m_options.reserve(parser.m_options.size());
+        for (auto& option : parser.m_options) {
+            m_options.push_back(option->clone());
         }
     }
     return *this;
@@ -36,27 +36,27 @@ Argon::Parser& Argon::Parser::operator=(const Parser& parser) {
 Argon::Parser& Argon::Parser::operator=(Parser&& parser) noexcept {
     if (this != &parser) {
         // Cleanup existing object
-        for (auto& option : options) {
+        for (auto& option : m_options) {
             delete option;
         }
         // Move from old object
-        options = std::move(parser.options);
+        m_options = std::move(parser.m_options);
     }
     return *this;
 }
 
 Argon::Parser::~Parser() {
-    for (auto& option : options) {
+    for (auto& option : m_options) {
         delete option;
     }
 }
 
 void Argon::Parser::addOption(const IOption& option) {
-    options.push_back(option.clone());
+    m_options.push_back(option.clone());
  }
 
 Argon::IOption *Argon::Parser::getOption(const std::string& flag) {
-    return getOption(options, flag);
+    return getOption(m_options, flag);
 }
 
 Argon::IOption* Argon::Parser::getOption(const std::vector<IOption*>& options, const std::string& flag) {
@@ -66,20 +66,60 @@ Argon::IOption* Argon::Parser::getOption(const std::vector<IOption*>& options, c
     return it == options.end() ? nullptr : *it;
 }
 
+void Argon::Parser::addError(const std::string& error) {
+    if (m_groupParseStack.empty()) {
+        m_errors.push_back(error);
+        return;
+    }
+    
+    std::string tabs;
+    auto& [flag, used] = m_groupParseStack.back();
+    if (!used) {
+        for (auto& [prevFlag, prevUsed] : m_groupParseStack) {
+            if (!prevUsed) {
+                prevUsed = true;
+                std::string err = tabs;
+                err.append("Error parsing group '")
+                   .append(prevFlag)
+                   .append("':");
+                m_errors.push_back(std::move(err));       
+            }
+            tabs += "\t";
+        }
+    }
+    m_errors.push_back(tabs + error);
+}
+
+void Argon::Parser::addGroupToParseStack(const std::string& flag) {
+    m_groupParseStack.emplace_back(flag, false);
+}
+
+void Argon::Parser::popGroupParseStack() {
+    if (!m_groupParseStack.empty()) {
+        m_groupParseStack.pop_back();
+    }
+}
+
 void Argon::Parser::parseString(const std::string& str) {
-    scanner = Scanner(str);
+    m_scanner = Scanner(str);
     StatementAst ast = parseStatement();
-    ast.analyze(options);
+    ast.analyze(*this, m_options);
+
+    if (!m_errors.empty()) {
+        for (auto& error : m_errors) {
+            std::cout << error << std::endl;
+        }
+    }
 }
 
 Argon::StatementAst Argon::Parser::parseStatement() {
     StatementAst statement;
     bool stop = false;
     while (!stop) {
-        scanner.recordPosition();
-        Token token1 = scanner.getNextToken();
-        Token token2 = scanner.getNextToken();
-        scanner.rewind();
+        m_scanner.recordPosition();
+        Token token1 = m_scanner.getNextToken();
+        Token token2 = m_scanner.getNextToken();
+        m_scanner.rewind();
 
         if (token1.kind != IDENTIFIER) {
             std::cerr << "Identifier expected!\n";
@@ -97,14 +137,14 @@ Argon::StatementAst Argon::Parser::parseStatement() {
         else {
             std::cerr << "Error!\n";
         }
-        stop = scanner.seeTokenKind(END) || scanner.seeTokenKind(RBRACK);
+        stop = m_scanner.seeTokenKind(END) || m_scanner.seeTokenKind(RBRACK);
     }
     return statement;
 }
 
 std::unique_ptr<Argon::OptionAst> Argon::Parser::parseOption() {
-    Token tag = scanner.getNextToken();
-    Token value = scanner.getNextToken();
+    Token tag = m_scanner.getNextToken();
+    Token value = m_scanner.getNextToken();
 
     if (tag.kind != IDENTIFIER) {
         std::cerr << "Error: Expected an identifier token for tag\n";
@@ -118,15 +158,15 @@ std::unique_ptr<Argon::OptionAst> Argon::Parser::parseOption() {
 }
 
 std::unique_ptr<Argon::OptionGroupAst> Argon::Parser::parseOptionGroup() {
-    Token tag = scanner.getNextToken();
-    Token lbrack = scanner.getNextToken();
+    Token tag = m_scanner.getNextToken();
+    Token lbrack = m_scanner.getNextToken();
 
     std::unique_ptr<OptionGroupAst> optionGroup = std::make_unique<OptionGroupAst>(tag.image);
     
     // TODO: Right now, this can immediately stop if there is '[]' with no options inside
     while (true) {
-        scanner.recordPosition();
-        Token token1 = scanner.getNextToken();
+        m_scanner.recordPosition();
+        Token token1 = m_scanner.getNextToken();
 
         if (token1.kind == RBRACK) {
             break;
@@ -137,11 +177,12 @@ std::unique_ptr<Argon::OptionGroupAst> Argon::Parser::parseOptionGroup() {
             std::cerr << "Error: Expected an identifier token for tag\n";
         }
 
-        Token token2 = scanner.getNextToken();
+        Token token2 = m_scanner.getNextToken();
         if (token2.kind == IDENTIFIER) {
-            scanner.rewind();
+            m_scanner.rewind();
             optionGroup->addOption(parseOption());
-        } else if (token2.kind == RBRACK) {
+        } else if (token2.kind == LBRACK) {
+            m_scanner.rewind();
             optionGroup->addOption(parseOptionGroup());
         } else if (token2.kind == END) {
             std::cerr << "Error identifier or LBRACK expected!\n";

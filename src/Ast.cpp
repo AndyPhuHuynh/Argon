@@ -8,18 +8,23 @@ Argon::OptionBaseAst::OptionBaseAst(std::string name) : flag(std::move(name)) {}
 
 Argon::OptionAst::OptionAst(const std::string& name, std::string value) : OptionBaseAst(name), value(std::move(value)) {}
 
-void Argon::OptionAst::analyze(const std::vector<IOption*>& options) {
+void Argon::OptionAst::analyze(Parser& parser, const std::vector<IOption*>& options) {
     IOption *iOption = Parser::getOption(options, flag);
     if (!iOption) {
-        std::cerr << "Error: Option '" << flag << "' not found!\n";
+        parser.addError("Option '" + flag + "' not found");
+        return;
     }
     
     OptionBase *optionBase = dynamic_cast<OptionBase*>(iOption);
     if (!optionBase) {
-        std::cerr << "Error: Option '" << flag << "' is not an option!\n";
+        parser.addError("Flag '" + flag + "' is not an option");
+        return;
     }
 
     optionBase->set_value(flag, value);
+    if (iOption->has_error()) {
+        parser.addError(iOption->get_error());
+    }
 }
 
 // OptionGroupAst
@@ -30,20 +35,26 @@ void Argon::OptionGroupAst::addOption(std::unique_ptr<OptionBaseAst> option) {
     m_options.push_back(std::move(option)); 
 }
 
-void Argon::OptionGroupAst::analyze(const std::vector<IOption*>& options) {
+void Argon::OptionGroupAst::analyze(Parser& parser, const std::vector<IOption*>& options) {
+    parser.addGroupToParseStack(flag);
+    
     IOption *iOption = Parser::getOption(options, flag);
     if (!iOption) {
-        std::cerr << "Error: Option '" << flag << "' not found!\n";
+        parser.addError("Option '" + flag + "' not found");
+        return;
     }
     
     OptionGroup *optionGroup = dynamic_cast<OptionGroup*>(iOption);
     if (!optionGroup) {
-        std::cerr << "Error: Option '" << flag << "' is not an option group!\n";
+        parser.addError("Flag '" + flag + "' is not an option group");
+        return;
     }
     
     for (const auto& option : m_options) {
-        option->analyze(optionGroup->get_options());
+        option->analyze(parser, optionGroup->get_options());
     }
+
+    parser.popGroupParseStack();
 }
 
 // StatementAst
@@ -52,8 +63,8 @@ void Argon::StatementAst::addOption(std::unique_ptr<OptionBaseAst> option) {
     m_options.push_back(std::move(option));    
 }
 
-void Argon::StatementAst::analyze(const std::vector<IOption*>& options) {
+void Argon::StatementAst::analyze(Parser& parser, const std::vector<IOption*>& options) {
     for (const auto& option : m_options) {
-        option->analyze(options);
+        option->analyze(parser, options);
     }
 }

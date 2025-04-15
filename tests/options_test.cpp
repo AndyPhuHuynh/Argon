@@ -1,6 +1,6 @@
 ﻿#include "testing.hpp"
 
-#include "Argon/Argon.hpp"
+#include "Argon/Parser.hpp"
 #include "Argon/Option.hpp"
 
 using namespace Argon;

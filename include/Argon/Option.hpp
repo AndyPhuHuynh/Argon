@@ -6,7 +6,7 @@
 #include <string>
 #include <vector>
 
-#include "Argon.hpp"
+#include "Parser.hpp"
 #include "StringUtil.hpp"
 #include "Traits.hpp"
 
@@ -18,7 +18,6 @@ namespace Argon {
     class IOption {
     protected:
         std::vector<std::string> m_flags;
-        std::string m_usedFlag;
         std::string m_error;
         
         IOption() = default;
@@ -57,7 +56,6 @@ namespace Argon {
         virtual ~OptionBase() = default;
         
         virtual void set_value(const std::string& flag, const std::string& value) = 0;
-        virtual void set_error(const std::string& invalidArg) = 0;
     };
     
     template <typename T>
@@ -78,7 +76,7 @@ namespace Argon {
 
     private:
         void set_value(const std::string& flag, const std::string& arg) override;
-        void set_error(const std::string& invalidArg) override;
+        void set_error(const std::string& flag, const std::string& invalidArg);
     };
 
     class OptionGroup : public OptionComponent<OptionGroup> {
@@ -86,12 +84,9 @@ namespace Argon {
     public:
         OptionGroup& operator+(const IOption& other);
 
-        void add_option(const IOption* option);
+        void add_option(const IOption& option);
         IOption *get_option(const std::string& flag);
         const std::vector<IOption*>& get_options() const;
-        
-        void set_option_value(const std::string& flag, const std::string& optionFlag, const std::string& value);
-        void set_error(const std::string& invalidArg);
     };
     
     template<typename T>
@@ -131,7 +126,6 @@ namespace Argon {
 
     template <typename T>
     void Option<T>::set_value(const std::string& flag, const std::string& arg) {
-        this->m_usedFlag = flag;
         bool success;
         // Use custom conversion function if supplied
         if (convert != nullptr) {
@@ -158,22 +152,22 @@ namespace Argon {
         }
         // Set error if not successful
         if (!success) {
-            set_error(arg);
+            set_error(flag, arg);
         }
         *m_out = m_value;
     }
 
     template <typename T>
-    void Option<T>::set_error(const std::string& invalidArg) {
+    void Option<T>::set_error(const std::string& flag, const std::string& invalidArg) {
         // Generate custom error message if provided
         if (generate_error_msg != nullptr) {
-            this->m_error = generate_error_msg(this->m_usedFlag, invalidArg);
+            this->m_error = generate_error_msg(flag, invalidArg);
             return;
         }
         
         // Else generate default message
         std::stringstream ss;
-        ss << "Invalid value for flag \'" << this->m_usedFlag << "\': "
+        ss << "Invalid value for flag \'" << flag << "\': "
             << "expected " << type_name<T>();
 
         if constexpr (is_non_bool_integral<T>) {
@@ -195,14 +189,16 @@ namespace Argon {
         
         try {
             if (std::is_unsigned_v<T>) {
-                unsigned long long result = std::stoull(arg);
-                if (result > max) {
+                size_t pos;
+                unsigned long long result = std::stoull(arg, &pos);
+                if (result > max || pos != arg.size()) {
                     return false;
                 }
                 out = static_cast<T>(result);
             } else {
-                long long result = std::stoll(arg);
-                if (result < min || result > max) {
+                size_t pos;
+                long long result = std::stoll(arg, &pos);
+                if (result < min || result > max || pos != arg.size()) {
                     return false;
                 }
                 out = static_cast<T>(result);

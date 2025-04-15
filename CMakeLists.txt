@@ -8,18 +8,18 @@ source_group("Documentation" FILES ${DOC_FILES})
 add_custom_target(Documentation SOURCES ${DOC_FILES})
 
 set(INCLUDE_FILES 
-    ${CMAKE_SOURCE_DIR}/include/Argon/Argon.hpp
     ${CMAKE_SOURCE_DIR}/include/Argon/Ast.hpp
     ${CMAKE_SOURCE_DIR}/include/Argon/Option.hpp
+    ${CMAKE_SOURCE_DIR}/include/Argon/Parser.hpp
     ${CMAKE_SOURCE_DIR}/include/Argon/Scanner.hpp
     ${CMAKE_SOURCE_DIR}/include/Argon/StringUtil.hpp
     ${CMAKE_SOURCE_DIR}/include/Argon/Traits.hpp
 )
 
 set(SOURCE_FILES
-    ${CMAKE_SOURCE_DIR}/src/Argon.cpp
     ${CMAKE_SOURCE_DIR}/src/Ast.cpp
     ${CMAKE_SOURCE_DIR}/src/Option.cpp
+    ${CMAKE_SOURCE_DIR}/src/Parser.cpp
     ${CMAKE_SOURCE_DIR}/src/Scanner.cpp
     ${CMAKE_SOURCE_DIR}/src/StringUtil.cpp
 )

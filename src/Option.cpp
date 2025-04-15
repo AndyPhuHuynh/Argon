@@ -5,14 +5,12 @@
 
 Argon::IOption::IOption(const IOption& other) {
     m_flags = other.m_flags;
-    m_usedFlag = other.m_usedFlag;
     m_error = other.m_error;
 }
 
 Argon::IOption& Argon::IOption::operator=(const IOption& other) {
     if (this != &other) {
         m_flags = other.m_flags;
-        m_usedFlag = other.m_usedFlag;
         m_error = other.m_error;
     }
     return *this;
@@ -21,7 +19,6 @@ Argon::IOption& Argon::IOption::operator=(const IOption& other) {
 Argon::IOption::IOption(IOption&& other) noexcept {
     if (this != &other) {
         m_flags = std::move(other.m_flags);
-        m_usedFlag = std::move(other.m_usedFlag);
         m_error = std::move(other.m_error);
     }
 }
@@ -29,7 +26,6 @@ Argon::IOption::IOption(IOption&& other) noexcept {
 Argon::IOption& Argon::IOption::operator=(IOption&& other) noexcept {
     if (this != &other) {
         m_flags = std::move(other.m_flags);
-        m_usedFlag = std::move(other.m_usedFlag);
         m_error = std::move(other.m_error);
     }
     return *this;
@@ -72,8 +68,12 @@ bool Argon::IOption::has_error() const {
 }
 
 Argon::OptionGroup& Argon::OptionGroup::operator+(const IOption& other) {
-    m_options.push_back(other.clone());
+    add_option(other);
     return *this;
+}
+
+void Argon::OptionGroup::add_option(const IOption& option) {
+    m_options.push_back(option.clone());
 }
 
 Argon::IOption *Argon::OptionGroup::get_option(const std::string& flag) {
@@ -85,23 +85,6 @@ Argon::IOption *Argon::OptionGroup::get_option(const std::string& flag) {
 
 const std::vector<Argon::IOption*>& Argon::OptionGroup::get_options() const {
     return m_options;
-}
-
-void Argon::OptionGroup::set_option_value(const std::string& flag, const std::string& optionFlag,
-                                          const std::string& value) {
-    IOption *iOption = get_option(optionFlag);
-    if (!iOption) {
-        std::cerr << "Option " << optionFlag << " not found\n";
-        return;
-    }
-
-    OptionBase *option = dynamic_cast<OptionBase*>(iOption);
-    if (!option) {
-        std::cerr << "Option " << optionFlag << " is not an OptionBase\n";
-        return;
-    }
-
-    option->set_value(optionFlag, value);
 }
 
 bool Argon::parseBool(const std::string& arg, bool& out) {

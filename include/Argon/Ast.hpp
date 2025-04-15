@@ -6,13 +6,14 @@
 
 namespace Argon {
     class IOption;
+    class Parser;
     class OptionAst;
     class OptionGroupAst;
     class StatementAst;
 
     class Ast {
     public:
-        virtual void analyze(const std::vector<IOption*>& options) = 0;
+        virtual void analyze(Parser& parser, const std::vector<IOption*>& options) = 0;
     protected:
         virtual ~Ast() = default;
     };
@@ -32,7 +33,7 @@ namespace Argon {
         OptionAst(const std::string& name, std::string value);
         ~OptionAst() override = default;
 
-        void analyze(const std::vector<IOption*>& options) override;
+        void analyze(Parser& parser, const std::vector<IOption*>& options) override;
     };
 
     class OptionGroupAst : public OptionBaseAst {
@@ -48,7 +49,7 @@ namespace Argon {
         ~OptionGroupAst() override = default;
         
         void addOption(std::unique_ptr<OptionBaseAst> option);
-        void analyze(const std::vector<IOption*>& options) override;
+        void analyze(Parser& parser, const std::vector<IOption*>& options) override;
     private:
         std::vector<std::unique_ptr<OptionBaseAst>> m_options;
     };
@@ -67,7 +68,7 @@ namespace Argon {
         ~StatementAst() override = default;
         
         void addOption(std::unique_ptr<OptionBaseAst> option);
-        void analyze(const std::vector<IOption*>& options) override;
+        void analyze(Parser& parser, const std::vector<IOption*>& options) override;
     private:
         std::vector<std::unique_ptr<OptionBaseAst>> m_options;
     };

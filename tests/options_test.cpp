@@ -5,7 +5,7 @@
 
 using namespace Argon;
 
-void Test1() {
+static void Test1() {
     unsigned int width = 0;
     float height;
     double depth;
@@ -24,7 +24,7 @@ void Test1() {
     check(success, "Option Test 1");
 }
 
-void StructTest() {
+static void StructTest() {
     struct Student {
         std::string name;
         int age;

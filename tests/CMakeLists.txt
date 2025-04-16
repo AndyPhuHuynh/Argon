@@ -3,6 +3,7 @@ set (INCLUDE_FILES
 )
 
 set (SOURCE_FILES
+    ${CMAKE_CURRENT_SOURCE_DIR}/error_tests.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/main_test.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/scanner_test.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/options_test.cpp

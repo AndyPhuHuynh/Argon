@@ -4,7 +4,7 @@
 #include <vector>
 
 namespace Argon {
-    enum TokenKind : uint8_t {
+    enum class TokenKind : uint8_t {
         NONE = 0,
         LBRACK,
         RBRACK,
@@ -15,10 +15,13 @@ namespace Argon {
     struct Token {
         TokenKind kind;
         std::string image;
+        int position = 0;
 
         Token() = default;
         Token(TokenKind kind);
         Token(TokenKind kind, std::string image);
+        Token(TokenKind kind, int position);
+        Token(TokenKind kind, std::string image, int position);
         bool operator==(std::vector<Token>::const_reference token) const;
     };
 

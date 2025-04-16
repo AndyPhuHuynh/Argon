@@ -25,3 +25,4 @@ inline int reportTestStatus() {
 
 void runScannerTests();
 void runOptionsTests();
+void runErrorTests();

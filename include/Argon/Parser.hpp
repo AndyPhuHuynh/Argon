@@ -1,10 +1,12 @@
 #pragma once
 
 #include <memory>
+#include <set>
 #include <string>
 #include <vector>
 
 #include "Ast.hpp"
+#include "Error.hpp"
 #include "Scanner.hpp"
 
 namespace Argon {
@@ -15,8 +17,9 @@ namespace Argon {
     class Parser {
         std::vector<IOption*> m_options;
         Scanner m_scanner = Scanner();
-        
-        std::vector<std::string> m_errors;
+
+        ErrorGroup m_rootErrorGroup;
+        std::multiset<ErrorMessage> m_errors;
         std::vector<std::pair<std::string, bool>> m_groupParseStack;
     public:
         Parser() = default;
@@ -30,7 +33,7 @@ namespace Argon {
         IOption *getOption(const std::string& flag);
         static IOption *getOption(const std::vector<IOption*>& options, const std::string& flag);
 
-        void addError(const std::string& error);
+        void addError(const std::string& error, int pos);
         void addGroupToParseStack(const std::string& flag);
         void popGroupParseStack();
         

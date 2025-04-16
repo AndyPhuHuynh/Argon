@@ -18,9 +18,11 @@ static void boolTest() {
 int main() {
     using namespace Argon;
     
+    runErrorTests();
+    return 0;
     runScannerTests();
     runOptionsTests();
-
+    
     std::string name;
     int age;
     std::string major;

@@ -29,8 +29,10 @@ namespace Argon {
     class OptionAst : public OptionBaseAst {
     public:
         std::string value;
+        int flagPos;
+        int valuePos;
         
-        OptionAst(const std::string& name, std::string value);
+        OptionAst(const std::string& name, std::string value, int flagPos, int valuePos);
         ~OptionAst() override = default;
 
         void analyze(Parser& parser, const std::vector<IOption*>& options) override;
@@ -38,7 +40,9 @@ namespace Argon {
 
     class OptionGroupAst : public OptionBaseAst {
     public:
-        OptionGroupAst(const std::string& name);
+        int flagPos;
+        
+        OptionGroupAst(const std::string& name, int flagPos);
         
         OptionGroupAst(const OptionGroupAst&) = delete;
         OptionGroupAst& operator=(const OptionGroupAst&) = delete;

@@ -13,18 +13,18 @@ static void Test1() {
     Token token = scanner.getNextToken();
     std::vector<Token> tokens;
 
-    while (token.kind != END) {
+    while (token.kind != TokenKind::END) {
         tokens.push_back(token);
         token = scanner.getNextToken();
     }
 
     std::vector<Token> expected = {
-        {IDENTIFIER, "hello"},
-        {IDENTIFIER, "world!"},
-        {LBRACK},
-        {IDENTIFIER, "inside"},
-        {IDENTIFIER, "brackets"},
-        {RBRACK},
+        {TokenKind::IDENTIFIER, "hello"},
+        {TokenKind::IDENTIFIER, "world!"},
+        {TokenKind::LBRACK},
+        {TokenKind::IDENTIFIER, "inside"},
+        {TokenKind::IDENTIFIER, "brackets"},
+        {TokenKind::RBRACK},
     };
 
     bool equals = true;
@@ -45,21 +45,21 @@ static void Test2() {
     Token token = scanner.getNextToken();
     std::vector<Token> tokens;
 
-    while (token.kind != END) {
+    while (token.kind != TokenKind::END) {
         tokens.push_back(token);
         token = scanner.getNextToken();
     }
 
     std::vector<Token> expected = {
-        {IDENTIFIER, "hello"},
-        {IDENTIFIER, "world!"},
-        {LBRACK},
-        {LBRACK},   
-        {LBRACK},   
-        {LBRACK},   
-        {IDENTIFIER, "inside"},
-        {IDENTIFIER, "brackets"},
-        {RBRACK},
+        {TokenKind::IDENTIFIER, "hello"},
+        {TokenKind::IDENTIFIER, "world!"},
+        {TokenKind::LBRACK},
+        {TokenKind::LBRACK},   
+        {TokenKind::LBRACK},   
+        {TokenKind::LBRACK},   
+        {TokenKind::IDENTIFIER, "inside"},
+        {TokenKind::IDENTIFIER, "brackets"},
+        {TokenKind::RBRACK},
     };
 
     bool equals = true;

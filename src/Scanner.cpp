@@ -9,15 +9,22 @@ Argon::Token::Token(const TokenKind kind) : kind(kind) {
 
 Argon::Token::Token(const TokenKind kind, std::string image) : kind(kind), image(std::move(image)) {}
 
+Argon::Token::Token(const TokenKind kind, const int position) : kind(kind), position(position) {
+    image = getDefaultImage(kind);
+}
+
+Argon::Token::Token(const TokenKind kind, std::string image, const int position)
+    : kind(kind), image(std::move(image)), position(position) {}
+
 bool Argon::Token::operator==(std::vector<Token>::const_reference token) const {
     return kind == token.kind && image == token.image;
 }
 
 std::string Argon::getDefaultImage(const TokenKind kind) {
     static const std::unordered_map<TokenKind, std::string> kindToImage = {
-        { LBRACK, "[" },
-        { RBRACK, "]" },
-        { END, "" }
+        { TokenKind::LBRACK, "[" },
+        { TokenKind::RBRACK, "]" },
+        { TokenKind::END, "" }
     };
 
     return kindToImage.contains(kind) ? kindToImage.at(kind) : "";
@@ -46,6 +53,7 @@ char Argon::Scanner::nextChar() {
 }
 
 Argon::Token Argon::Scanner::getNextToken() {
+    int position = static_cast<int>(m_bufferPos);
     char ch = nextChar();
     while (true) {
         if (ch == ' ') {
@@ -53,11 +61,11 @@ Argon::Token Argon::Scanner::getNextToken() {
             continue;
         }
         else if (ch == EOF) {
-            return {END};
+            return {TokenKind::END, -1};
         } else if (ch == '[') {
-            return {LBRACK};
+            return {TokenKind::LBRACK, position};
         } else if (ch == ']') {
-            return {RBRACK};
+            return {TokenKind::RBRACK, position};
         }
         // Token is identifier
         else {
@@ -69,7 +77,7 @@ Argon::Token Argon::Scanner::getNextToken() {
                 ss << ch;
                 ch = peekChar();
             }
-            return {IDENTIFIER, ss.str()};
+            return {TokenKind::IDENTIFIER, ss.str(), position};
         }
     }
 }

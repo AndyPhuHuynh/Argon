@@ -4,7 +4,6 @@
 #include <iostream>
 
 #include "Argon/Option.hpp"
-#include "Argon/StringUtil.hpp"
 
 Argon::Parser::Parser(const Parser& parser) {
     for (auto& option : parser.m_options) {
@@ -66,9 +65,9 @@ Argon::IOption* Argon::Parser::getOption(const std::vector<IOption*>& options, c
     return it == options.end() ? nullptr : *it;
 }
 
-void Argon::Parser::addError(const std::string& error) {
+void Argon::Parser::addError(const std::string& error, int pos) {
     if (m_groupParseStack.empty()) {
-        m_errors.push_back(error);
+        m_errors.emplace(error, pos);
         return;
     }
     
@@ -82,12 +81,12 @@ void Argon::Parser::addError(const std::string& error) {
                 err.append("Error parsing group '")
                    .append(prevFlag)
                    .append("':");
-                m_errors.push_back(std::move(err));       
+                m_errors.emplace(std::move(err), pos);       
             }
             tabs += "\t";
         }
     }
-    m_errors.push_back(tabs + error);
+    m_errors.emplace(tabs + error, pos);
 }
 
 void Argon::Parser::addGroupToParseStack(const std::string& flag) {
@@ -107,7 +106,7 @@ void Argon::Parser::parseString(const std::string& str) {
 
     if (!m_errors.empty()) {
         for (auto& error : m_errors) {
-            std::cout << error << std::endl;
+            std::cout << error.msg << ", at column: " << error.pos << std::endl;
         }
     }
 }
@@ -121,23 +120,23 @@ Argon::StatementAst Argon::Parser::parseStatement() {
         Token token2 = m_scanner.getNextToken();
         m_scanner.rewind();
 
-        if (token1.kind != IDENTIFIER) {
+        if (token1.kind != TokenKind::IDENTIFIER) {
             std::cerr << "Identifier expected!\n";
         } 
         
         // OptionGroup
-        if (token2.kind == LBRACK) {
+        if (token2.kind == TokenKind::LBRACK) {
             statement.addOption(parseOptionGroup());
         }
         // Option
-        else if (token2.kind == IDENTIFIER) {
+        else if (token2.kind == TokenKind::IDENTIFIER) {
             statement.addOption(parseOption());
         } 
         // Error
         else {
-            std::cerr << "Error!\n";
+            std::cerr << "Error parsing statement, not an option or option group!\n";
         }
-        stop = m_scanner.seeTokenKind(END) || m_scanner.seeTokenKind(RBRACK);
+        stop = m_scanner.seeTokenKind(TokenKind::END) || m_scanner.seeTokenKind(TokenKind::RBRACK);
     }
     return statement;
 }
@@ -146,14 +145,14 @@ std::unique_ptr<Argon::OptionAst> Argon::Parser::parseOption() {
     Token tag = m_scanner.getNextToken();
     Token value = m_scanner.getNextToken();
 
-    if (tag.kind != IDENTIFIER) {
+    if (tag.kind != TokenKind::IDENTIFIER) {
         std::cerr << "Error: Expected an identifier token for tag\n";
     }
-    if (value.kind != IDENTIFIER) {
+    if (value.kind != TokenKind::IDENTIFIER) {
         std::cerr << "Error: Expected an identifier token for value\n";
     }
 
-    return std::make_unique<OptionAst>(tag.image, value.image);
+    return std::make_unique<OptionAst>(tag.image, value.image, tag.position, value.position);
     // TODO: check if value is identifier
 }
 
@@ -161,30 +160,30 @@ std::unique_ptr<Argon::OptionGroupAst> Argon::Parser::parseOptionGroup() {
     Token tag = m_scanner.getNextToken();
     Token lbrack = m_scanner.getNextToken();
 
-    std::unique_ptr<OptionGroupAst> optionGroup = std::make_unique<OptionGroupAst>(tag.image);
+    std::unique_ptr<OptionGroupAst> optionGroup = std::make_unique<OptionGroupAst>(tag.image, tag.position);
     
     // TODO: Right now, this can immediately stop if there is '[]' with no options inside
     while (true) {
         m_scanner.recordPosition();
         Token token1 = m_scanner.getNextToken();
 
-        if (token1.kind == RBRACK) {
+        if (token1.kind == TokenKind::RBRACK) {
             break;
-        } else if (token1.kind == END) {
+        } else if (token1.kind == TokenKind::END) {
             std::cerr << "Error RBRACK expected!\n";
             break;
-        } else if (token1.kind != IDENTIFIER) {
+        } else if (token1.kind != TokenKind::IDENTIFIER) {
             std::cerr << "Error: Expected an identifier token for tag\n";
         }
 
         Token token2 = m_scanner.getNextToken();
-        if (token2.kind == IDENTIFIER) {
+        if (token2.kind == TokenKind::IDENTIFIER) {
             m_scanner.rewind();
             optionGroup->addOption(parseOption());
-        } else if (token2.kind == LBRACK) {
+        } else if (token2.kind == TokenKind::LBRACK) {
             m_scanner.rewind();
             optionGroup->addOption(parseOptionGroup());
-        } else if (token2.kind == END) {
+        } else if (token2.kind == TokenKind::END) {
             std::cerr << "Error identifier or LBRACK expected!\n";
         }
     }

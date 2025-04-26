@@ -18,10 +18,9 @@ static void boolTest() {
 int main() {
     using namespace Argon;
     
-    runErrorTests();
-    return 0;
-    runScannerTests();
-    runOptionsTests();
+    // runErrorTests();
+    // runScannerTests();
+    // runOptionsTests();
     
     std::string name;
     int age;
@@ -42,7 +41,8 @@ int main() {
                             + Option(&minor)["--minor"]
                             + Option(&instrumentName)["--name"]);
     
-    std::string str = "--name John --group [--age 20aasdf --major CS --nested [--minor music --name violin --null hi]]";
+    std::string str = "--wtf true --name John --group [--age 20aasdf --major CS --nested [--minor music --name violin --null hi --null2 what]] -top-level huh";
+    // std::string str = "--name John --outside asdfasd --group [--age 20aasdf --major CS --nested [--minor music --name violin --null hi] --back asdfas] --outter2 asdfas";
     parser.parseString(str);
     
     std::cout << "name: " << name << "\n";

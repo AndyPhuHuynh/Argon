@@ -40,7 +40,8 @@ namespace Argon {
 
     class OptionGroupAst : public OptionBaseAst {
     public:
-        int flagPos;
+        int flagPos = -1;
+        int endPos = -1;
         
         OptionGroupAst(const std::string& name, int flagPos);
         

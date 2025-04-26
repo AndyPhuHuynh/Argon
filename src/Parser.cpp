@@ -65,50 +65,20 @@ Argon::IOption* Argon::Parser::getOption(const std::vector<IOption*>& options, c
     return it == options.end() ? nullptr : *it;
 }
 
-void Argon::Parser::addError(const std::string& error, int pos) {
-    if (m_groupParseStack.empty()) {
-        m_errors.emplace(error, pos);
-        return;
-    }
-    
-    std::string tabs;
-    auto& [flag, used] = m_groupParseStack.back();
-    if (!used) {
-        for (auto& [prevFlag, prevUsed] : m_groupParseStack) {
-            if (!prevUsed) {
-                prevUsed = true;
-                std::string err = tabs;
-                err.append("Error parsing group '")
-                   .append(prevFlag)
-                   .append("':");
-                m_errors.emplace(std::move(err), pos);       
-            }
-            tabs += "\t";
-        }
-    }
-    m_errors.emplace(tabs + error, pos);
+void Argon::Parser::addError(const std::string& error, const int pos) {
+    m_rootErrorGroup.addErrorMessage(error, pos);
 }
 
-void Argon::Parser::addGroupToParseStack(const std::string& flag) {
-    m_groupParseStack.emplace_back(flag, false);
-}
-
-void Argon::Parser::popGroupParseStack() {
-    if (!m_groupParseStack.empty()) {
-        m_groupParseStack.pop_back();
-    }
+void Argon::Parser::addErrorGroup(const std::string& groupName, const int startPos, const int endPos) {
+    m_rootErrorGroup.addErrorGroup(groupName, startPos, endPos);
 }
 
 void Argon::Parser::parseString(const std::string& str) {
     m_scanner = Scanner(str);
     StatementAst ast = parseStatement();
     ast.analyze(*this, m_options);
-
-    if (!m_errors.empty()) {
-        for (auto& error : m_errors) {
-            std::cout << error.msg << ", at column: " << error.pos << std::endl;
-        }
-    }
+    // m_rootErrorGroup.printErrors();
+    m_rootErrorGroup.useTestPrint();
 }
 
 Argon::StatementAst Argon::Parser::parseStatement() {
@@ -168,6 +138,7 @@ std::unique_ptr<Argon::OptionGroupAst> Argon::Parser::parseOptionGroup() {
         Token token1 = m_scanner.getNextToken();
 
         if (token1.kind == TokenKind::RBRACK) {
+            optionGroup->endPos = token1.position;
             break;
         } else if (token1.kind == TokenKind::END) {
             std::cerr << "Error RBRACK expected!\n";
@@ -188,6 +159,7 @@ std::unique_ptr<Argon::OptionGroupAst> Argon::Parser::parseOptionGroup() {
         }
     }
 
+    m_rootErrorGroup.addErrorGroup(optionGroup->flag, optionGroup->flagPos, optionGroup->endPos);
     return optionGroup;
 }
 

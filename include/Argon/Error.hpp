@@ -8,6 +8,12 @@
 namespace Argon {
     struct ErrorMessage;
     class ErrorGroup;
+
+    using ErrorVariant = std::variant<ErrorMessage, ErrorGroup>;
+    struct StringGroup {
+        std::vector<std::string> groups;
+        std::vector<std::string> errors;
+    };
     
     struct ErrorMessage {
         std::string msg;
@@ -21,7 +27,7 @@ namespace Argon {
 
     class ErrorGroup {
         std::string m_groupName;
-        std::vector<std::variant<ErrorMessage, ErrorGroup>> m_errors;
+        std::vector<ErrorVariant> m_errors;
         int m_startPos;
         int m_endPos;
     public:
@@ -32,6 +38,14 @@ namespace Argon {
         void addErrorGroup(const std::string& name, int startPos, int endPos);
 
         const std::string& getGroupName() const;
-        const std::vector<std::variant<ErrorMessage, ErrorGroup>>& getErrors() const;
+        const std::vector<ErrorVariant>& getErrors() const;
+
+        void printErrors() const;
+        void useTestPrint() const;
+    private:
+        void printErrors(const std::string& groupSoFar) const;
+        void testPrint(std::vector<StringGroup>& groups, const std::string& groupNames, bool isRoot) const;
+
+        void chat() const;
     };
 }

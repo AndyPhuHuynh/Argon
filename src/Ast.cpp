@@ -38,8 +38,6 @@ void Argon::OptionGroupAst::addOption(std::unique_ptr<OptionBaseAst> option) {
 }
 
 void Argon::OptionGroupAst::analyze(Parser& parser, const std::vector<IOption*>& options) {
-    parser.addGroupToParseStack(flag);
-    
     IOption *iOption = Parser::getOption(options, flag);
     if (!iOption) {
         parser.addError("Option '" + flag + "' not found", flagPos);
@@ -55,8 +53,6 @@ void Argon::OptionGroupAst::analyze(Parser& parser, const std::vector<IOption*>&
     for (const auto& option : m_options) {
         option->analyze(parser, optionGroup->get_options());
     }
-
-    parser.popGroupParseStack();
 }
 
 // StatementAst

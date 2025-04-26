@@ -18,9 +18,7 @@ namespace Argon {
         std::vector<IOption*> m_options;
         Scanner m_scanner = Scanner();
 
-        ErrorGroup m_rootErrorGroup;
-        std::multiset<ErrorMessage> m_errors;
-        std::vector<std::pair<std::string, bool>> m_groupParseStack;
+        ErrorGroup m_rootErrorGroup = ErrorGroup("Top-Level", -1, -1);
     public:
         Parser() = default;
         Parser(const Parser& parser);
@@ -34,8 +32,7 @@ namespace Argon {
         static IOption *getOption(const std::vector<IOption*>& options, const std::string& flag);
 
         void addError(const std::string& error, int pos);
-        void addGroupToParseStack(const std::string& flag);
-        void popGroupParseStack();
+        void addErrorGroup(const std::string& groupName, int startPos, int endPos);
         
         void parseString(const std::string& str);
         StatementAst parseStatement();

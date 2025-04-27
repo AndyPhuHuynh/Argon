@@ -77,8 +77,8 @@ void Argon::Parser::parseString(const std::string& str) {
     m_scanner = Scanner(str);
     StatementAst ast = parseStatement();
     ast.analyze(*this, m_options);
-    // m_rootErrorGroup.printErrors();
-    m_rootErrorGroup.useTestPrint();
+    // m_rootErrorGroup.printErrorsFlatMode();
+    m_rootErrorGroup.printErrorsTreeMode();
 }
 
 Argon::StatementAst Argon::Parser::parseStatement() {

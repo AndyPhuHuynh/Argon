@@ -39,13 +39,8 @@ namespace Argon {
 
         const std::string& getGroupName() const;
         const std::vector<ErrorVariant>& getErrors() const;
-
-        void printErrors() const;
-        void useTestPrint() const;
-    private:
-        void printErrors(const std::string& groupSoFar) const;
-        void testPrint(std::vector<StringGroup>& groups, const std::string& groupNames, bool isRoot) const;
-
-        void chat() const;
+        
+        void printErrorsFlatMode() const;
+        void printErrorsTreeMode() const;
     };
 }

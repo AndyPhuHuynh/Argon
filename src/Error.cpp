@@ -1,6 +1,8 @@
 ﻿#include "Argon/Error.hpp"
 
 #include <iostream>
+#include <sstream>
+#include <print>
 
 static bool inRange(const int value, const int min, const int max) {
     return value >= min && value <= max;
@@ -154,100 +156,9 @@ const std::vector<std::variant<Argon::ErrorMessage, Argon::ErrorGroup>>& Argon::
     return m_errors;
 }
 
-void Argon::ErrorGroup::printErrors() const {
-    printErrors("");
-}
-
-void Argon::ErrorGroup::useTestPrint() const {
-    chat();
-    return;
-    // std::vector<StringGroup> groups;
-    // testPrint(groups, "", true);
-    // int groupsSize = static_cast<int>(groups.size());
-    // for (int i = 0; i < groupsSize; i++) {
-    //     for (const auto& msg : groups[i]) {
-    //         std::cout << msg << "\n";
-    //     }
-    //     if (i < groupsSize - 1) {
-    //         std::cout << "\n";
-    //     }
-    // }
-}
-
-void Argon::ErrorGroup::printErrors(const std::string& groupSoFar) const {
-    std::string newGroupName = groupSoFar + " > " + m_groupName;
-
-    bool printedGroupName = false;
-    
-    for (auto& error : m_errors) {
-        if (std::holds_alternative<ErrorMessage>(error)) {
-            if (!printedGroupName) {
-                printedGroupName = true;
-                std::cout << "[" << newGroupName << "]" << '\n';
-            }
-            std::cout << " - " << std::get<ErrorMessage>(error).msg << "\n";
-        }
-        if (std::holds_alternative<ErrorGroup>(error)) {
-            const ErrorGroup& group = std::get<ErrorGroup>(error);
-            group.printErrors(newGroupName);
-            printedGroupName = false;
-        }
-    }
-}
-
-// void Argon::ErrorGroup::printErrors(const std::string& groupSoFar) const {
-//     std::string newGroupName = groupSoFar + " > " + m_groupName;
-//
-//     bool printedGroupName = false;
-//     
-//     for (auto& error : m_errors) {
-//         if (std::holds_alternative<ErrorMessage>(error)) {
-//             if (!printedGroupName) {
-//                 printedGroupName = true;
-//                 std::cout << "[" << newGroupName << "]" << '\n';
-//             }
-//             std::cout << "- " << std::get<ErrorMessage>(error).msg << "\n";
-//         }
-//         if (std::holds_alternative<ErrorGroup>(error)) {
-//             const ErrorGroup& group = std::get<ErrorGroup>(error);
-//             group.printErrors(newGroupName);
-//             printedGroupName = false;
-//         }
-//     }
-// }
-
-void Argon::ErrorGroup::testPrint(std::vector<StringGroup>& groups, const std::string& groupNames, bool isRoot) const {
-    std::string newGroupName = groupNames + " > " + m_groupName;
-
-    bool printedGroupName = false;
-    StringGroup stringGroup;
-    
-    for (auto& error : m_errors) {
-        if (std::holds_alternative<ErrorMessage>(error)) {
-            if (!printedGroupName) {
-                printedGroupName = true;
-                stringGroup.groups.emplace_back("[" + newGroupName + "]");
-            }
-            stringGroup.errors.emplace_back(" - " + std::get<ErrorMessage>(error).msg);
-        }
-        if (std::holds_alternative<ErrorGroup>(error)) {
-            if (!stringGroup.errors.empty()) {
-                groups.push_back(stringGroup);
-                stringGroup.errors.clear();
-            }
-            const ErrorGroup& group = std::get<ErrorGroup>(error);
-            group.testPrint(groups, newGroupName, false);
-            printedGroupName = false;
-        }
-    }
-
-    if (!stringGroup.errors.empty()) {
-        groups.push_back(stringGroup);
-    }
-}
-
-void Argon::ErrorGroup::chat() const {
-    auto printRecursive = [](const ErrorGroup& group, const std::string& parentGroups, const bool isRootGroup, bool isFirstPrint, auto&& printRecursiveRef) -> void {
+void Argon::ErrorGroup::printErrorsFlatMode() const {
+    constexpr auto printRecursive = [](std::stringstream& stream, const ErrorGroup& group, const std::string& parentGroups,
+        const bool isRootGroup, bool isFirstPrint, auto&& printRecursiveRef) -> void {
         std::string currentGroupPath;
         if (isRootGroup) {
             currentGroupPath = group.getGroupName();
@@ -256,38 +167,76 @@ void Argon::ErrorGroup::chat() const {
         }
 
         std::vector<std::string> messages;
-        
+
+        // Loop through all errors
         for (const auto& error : group.getErrors()) {
-            std::visit([&](const auto& e) {
-                using T = std::decay_t<decltype(e)>;
+            std::visit([&]<typename T>(const T& e) {
+                // If it's an error message, add to messages
                 if constexpr (std::is_same_v<T, ErrorMessage>) {
                     messages.emplace_back(e.msg);
-                } else if constexpr (std::is_same_v<T, ErrorGroup>) {
+                }
+                // If it's a group recursively print
+                else if constexpr (std::is_same_v<T, ErrorGroup>) {
+                    // Print out messages in current group
                     if (!messages.empty()) {
                         if (!isFirstPrint) {
-                            std::cout << "\n";
+                            stream << "\n";
                         }
-                        std::cout << "[" << currentGroupPath << "]\n";
+                        stream << std::format("[{}]\n", currentGroupPath);
                         for (const auto& msg : messages) {
-                            std::cout << " - " << msg << "\n";
+                            stream << std::format(" - {}\n", msg);
                         }
                         messages.clear();
                         isFirstPrint = false;
                     }
-                    printRecursiveRef(e, isRootGroup ? "" : currentGroupPath, false, isFirstPrint, printRecursiveRef);
+                    // Recurse
+                    printRecursiveRef(stream, e, isRootGroup ? "" : currentGroupPath, false, isFirstPrint, printRecursiveRef);
                 }
             }, error);
         }
+        // Print remaining messages
         if (!messages.empty()) {
             if (!isFirstPrint) {
-                std::cout << "\n";
+                stream << "\n";
             }
-            std::cout << "[" << currentGroupPath << "]\n";
+            stream << std::format("[{}]\n", currentGroupPath);
             for (const auto& msg : messages) {
-                std::cout << " - " << msg << "\n";
+                stream << std::format(" - {}\n", msg);
             }
         }
     };
 
-    printRecursive(*this, "", true, true, printRecursive);
+    std::stringstream ss;
+    printRecursive(ss, *this, "", true, true, printRecursive);
+    std::print("{}", ss.str());
+}
+
+void Argon::ErrorGroup::printErrorsTreeMode() const {
+    constexpr auto printRecursive = [](std::stringstream& stream, const ErrorGroup& group, const std::string& prefix, auto&& printRecursiveRef) ->void {
+        const auto& errors = group.getErrors();
+        for (size_t i = 0; i < errors.size(); ++i) {
+            auto& error = errors[i];
+            std::visit([&]<typename T>(const T& e) {
+                if constexpr (std::is_same_v<T, ErrorMessage>) {
+                    if (i == errors.size() - 1) {
+                        stream << std::format("{}└── {}\n", prefix, e.msg);
+                    } else {
+                        stream << std::format("{}├── {}\n", prefix, e.msg);
+                    }
+                } else if constexpr (std::is_same_v<T, ErrorGroup>) {
+                    
+                    if (i == errors.size() - 1) {
+                        stream << std::format("{}└── [{}]\n", prefix, e.getGroupName());
+                        printRecursiveRef(stream, e, prefix + "    ", printRecursiveRef);
+                    } else {
+                        stream << std::format("{}├── [{}]\n", prefix, e.getGroupName());
+                        printRecursiveRef(stream, e, prefix + "│   ", printRecursiveRef);
+                    }
+                }
+            }, error);
+        }
+    };
+    std::stringstream ss;
+    printRecursive(ss, *this, "", printRecursive);
+    std::print("{}", ss.str());
 }

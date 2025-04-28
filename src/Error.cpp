@@ -1,8 +1,8 @@
 ﻿#include "Argon/Error.hpp"
 
+#include <format>
 #include <iostream>
 #include <sstream>
-#include <print>
 
 static bool inRange(const int value, const int min, const int max) {
     return value >= min && value <= max;
@@ -208,7 +208,7 @@ void Argon::ErrorGroup::printErrorsFlatMode() const {
 
     std::stringstream ss;
     printRecursive(ss, *this, "", true, true, printRecursive);
-    std::print("{}", ss.str());
+    std::cout << ss.str();
 }
 
 void Argon::ErrorGroup::printErrorsTreeMode() const {
@@ -238,5 +238,5 @@ void Argon::ErrorGroup::printErrorsTreeMode() const {
     };
     std::stringstream ss;
     printRecursive(ss, *this, "", printRecursive);
-    std::print("{}", ss.str());
+    std::cout << ss.str();
 }

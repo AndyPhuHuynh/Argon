@@ -28,6 +28,8 @@ set(SOURCE_FILES
 
 add_library(Argon ${SOURCE_FILES})
 
+target_compile_features(Argon PUBLIC cxx_std_23)
+
 target_sources(Argon PUBLIC ${INCLUDE_FILES})
 target_include_directories(Argon PUBLIC
     ${CMAKE_SOURCE_DIR}/include

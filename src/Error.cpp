@@ -19,9 +19,23 @@ Argon::ErrorGroup::ErrorGroup(std::string groupName, const int startPos, const i
     
 }
 
+Argon::ErrorGroup::ErrorGroup(std::string groupName, const int startPos, const int endPos, ErrorGroup* parent)
+: m_groupName(std::move(groupName)), m_startPos(startPos), m_endPos(endPos), m_parent(parent) {
+    
+}
+
+void Argon::ErrorGroup::setHasErrors() {
+    ErrorGroup *group = this;
+    while (group != nullptr) {
+        group->m_hasErrors = true;
+        group = group->m_parent;
+    }
+}
+
 void Argon::ErrorGroup::addErrorMessage(const std::string& msg, int pos) {
     if (m_errors.empty()) {
         m_errors.emplace_back(std::in_place_type<ErrorMessage>, msg, pos);
+        setHasErrors();
         return;
     }
     
@@ -46,6 +60,7 @@ void Argon::ErrorGroup::addErrorMessage(const std::string& msg, int pos) {
     // If index is zero just insert it at 0
     if (index == 0) {
         m_errors.emplace(m_errors.begin(), std::in_place_type<ErrorMessage>, msg, pos);
+        setHasErrors();
         return;
     }
     
@@ -65,14 +80,16 @@ void Argon::ErrorGroup::addErrorMessage(const std::string& msg, int pos) {
     // Else insert at that index
     if (index >= static_cast<int>(m_errors.size())) {
         m_errors.emplace_back(std::in_place_type<ErrorMessage>, msg, pos);
+        setHasErrors();
     } else {
         m_errors.emplace(m_errors.begin() + index, std::in_place_type<ErrorMessage>, msg, pos);
+        setHasErrors();
     }
 }
 
 void Argon::ErrorGroup::addErrorGroup(const std::string& name, int startPos, int endPos) {
     if (m_errors.empty()) {
-        m_errors.emplace_back(std::in_place_type<ErrorGroup>, name, startPos, endPos);
+        m_errors.emplace_back(std::in_place_type<ErrorGroup>, name, startPos, endPos, this);
         return;
     }
     
@@ -114,7 +131,7 @@ void Argon::ErrorGroup::addErrorGroup(const std::string& name, int startPos, int
 
     // If the previous item was not a group OR if it was a group and the error we want to add is not in its bounds
     // Check for every item after index and insert it into the new group, if its fully within bounds
-    ErrorGroup groupToAdd(name, startPos, endPos);
+    ErrorGroup groupToAdd(name, startPos, endPos, this);
     
     while (index < static_cast<int>(m_errors.size())) {
         if (std::holds_alternative<ErrorMessage>(m_errors[index])) {
@@ -148,6 +165,22 @@ void Argon::ErrorGroup::addErrorGroup(const std::string& name, int startPos, int
     }
 }
 
+void Argon::ErrorGroup::removeErrorGroup(int startPos) {
+    auto it = std::ranges::find_if(m_errors, [startPos](const ErrorVariant& item) {
+        if (std::holds_alternative<ErrorGroup>(item)) {
+            const ErrorGroup& errorGroup = std::get<ErrorGroup>(item);
+            if (errorGroup.m_startPos == startPos) {
+                return true;
+            }
+        }
+        return false;
+    });
+
+    if (it != m_errors.end()) {
+        m_errors.erase(it);
+    }
+}
+
 const std::string& Argon::ErrorGroup::getGroupName() const {
     return m_groupName;
 }
@@ -157,8 +190,9 @@ const std::vector<std::variant<Argon::ErrorMessage, Argon::ErrorGroup>>& Argon::
 }
 
 void Argon::ErrorGroup::printErrorsFlatMode() const {
-    constexpr auto printRecursive = [](std::stringstream& stream, const ErrorGroup& group, const std::string& parentGroups,
-        const bool isRootGroup, bool isFirstPrint, auto&& printRecursiveRef) -> void {
+    constexpr auto printRecursive = [](std::stringstream& stream, const ErrorGroup& group,
+                                       const std::string& parentGroups, const bool isRootGroup, bool isFirstPrint,
+                                       auto&& printRecursiveRef) -> void {
         std::string currentGroupPath;
         if (isRootGroup) {
             currentGroupPath = group.getGroupName();
@@ -212,31 +246,63 @@ void Argon::ErrorGroup::printErrorsFlatMode() const {
 }
 
 void Argon::ErrorGroup::printErrorsTreeMode() const {
-    constexpr auto printRecursive = [](std::stringstream& stream, const ErrorGroup& group, const std::string& prefix, auto&& printRecursiveRef) ->void {
+    constexpr auto printRecursive = [](std::stringstream& stream, const ErrorGroup& group, const std::string& prefix,
+                                       const bool isFirstPrint, auto&& printRecursiveRef) -> void {
+        if (isFirstPrint) {
+            stream << std::format("[{}]\n", group.getGroupName());
+        }
         const auto& errors = group.getErrors();
+        size_t lastErrorIndex = group.getIndexOfLastHasError();
         for (size_t i = 0; i < errors.size(); ++i) {
             auto& error = errors[i];
             std::visit([&]<typename T>(const T& e) {
                 if constexpr (std::is_same_v<T, ErrorMessage>) {
-                    if (i == errors.size() - 1) {
+                    if (i == lastErrorIndex) {
                         stream << std::format("{}└── {}\n", prefix, e.msg);
-                    } else {
+                    } else {    
                         stream << std::format("{}├── {}\n", prefix, e.msg);
                     }
                 } else if constexpr (std::is_same_v<T, ErrorGroup>) {
+                    if (!e.m_hasErrors) {
+                        return;
+                    }
                     
-                    if (i == errors.size() - 1) {
+                    if (i == lastErrorIndex) {
                         stream << std::format("{}└── [{}]\n", prefix, e.getGroupName());
-                        printRecursiveRef(stream, e, prefix + "    ", printRecursiveRef);
+                        printRecursiveRef(stream, e, prefix + "    ", false, printRecursiveRef);
                     } else {
                         stream << std::format("{}├── [{}]\n", prefix, e.getGroupName());
-                        printRecursiveRef(stream, e, prefix + "│   ", printRecursiveRef);
+                        printRecursiveRef(stream, e, prefix + "│   ", false, printRecursiveRef);
                     }
                 }
             }, error);
         }
     };
+
+    if (!m_hasErrors) {
+        return;
+    }
+    
     std::stringstream ss;
-    printRecursive(ss, *this, "", printRecursive);
+    printRecursive(ss, *this, "", true, printRecursive);
     std::cout << ss.str();
+}
+
+size_t Argon::ErrorGroup::getIndexOfLastHasError() const {
+    size_t index = m_errors.size() - 1;
+    while (index-- > 0) {
+        ErrorVariant errorVariant = m_errors[index];
+        bool found = std::visit([]<typename T>(const T& e) -> bool {
+            if constexpr (std::is_same_v<T, ErrorMessage>) {
+                return true;
+            } else {
+                return e.m_hasErrors;
+            }
+        }, errorVariant);
+
+        if (found) {
+            return index;
+        }
+    }
+    return 0;
 }

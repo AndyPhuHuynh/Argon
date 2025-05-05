@@ -12,7 +12,7 @@ Argon::OptionAst::OptionAst(const std::string& name, std::string value, const in
 void Argon::OptionAst::analyze(Parser& parser, const std::vector<IOption*>& options) {
     IOption *iOption = Parser::getOption(options, flag);
     if (!iOption) {
-        parser.addError("Option '" + flag + "' not found", flagPos);
+        parser.addError("Unknown option: '" + flag + "'", flagPos);
         return;
     }
     
@@ -40,12 +40,14 @@ void Argon::OptionGroupAst::addOption(std::unique_ptr<OptionBaseAst> option) {
 void Argon::OptionGroupAst::analyze(Parser& parser, const std::vector<IOption*>& options) {
     IOption *iOption = Parser::getOption(options, flag);
     if (!iOption) {
-        parser.addError("Option '" + flag + "' not found", flagPos);
+        parser.removeErrorGroup(flagPos);
+        parser.addError("Unknown option group: '" + flag + "'", flagPos);
         return;
     }
     
     OptionGroup *optionGroup = dynamic_cast<OptionGroup*>(iOption);
     if (!optionGroup) {
+        parser.removeErrorGroup(flagPos);
         parser.addError("Flag '" + flag + "' is not an option group", flagPos);
         return;
     }

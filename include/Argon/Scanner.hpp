@@ -44,7 +44,10 @@ namespace Argon {
         char peekChar();
         char nextChar();
         Token getNextToken();
-
+        
+        void scanUntilSee(const std::initializer_list<TokenKind>& kinds);
+        Token scanUntilGet(const std::initializer_list<TokenKind>& kinds);
+        
         void recordPosition();
         void rewind();
     };

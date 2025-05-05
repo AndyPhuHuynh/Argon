@@ -28,19 +28,27 @@ namespace Argon {
     class ErrorGroup {
         std::string m_groupName;
         std::vector<ErrorVariant> m_errors;
-        int m_startPos;
-        int m_endPos;
+        int m_startPos = -1;
+        int m_endPos = -1;
+        bool m_hasErrors = false;
+        ErrorGroup *m_parent = nullptr;
     public:
         ErrorGroup() = default;
         ErrorGroup(std::string groupName, int startPos, int endPos);
+        ErrorGroup(std::string groupName, int startPos, int endPos, ErrorGroup* parent);
 
+        void setHasErrors();
+        
         void addErrorMessage(const std::string& msg, int pos);
         void addErrorGroup(const std::string& name, int startPos, int endPos);
+        void removeErrorGroup(int startPos);
 
         const std::string& getGroupName() const;
         const std::vector<ErrorVariant>& getErrors() const;
         
         void printErrorsFlatMode() const;
         void printErrorsTreeMode() const;
+    private:
+        size_t getIndexOfLastHasError () const; 
     };
 }

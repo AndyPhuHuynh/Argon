@@ -31,10 +31,10 @@ std::string Argon::getDefaultImage(const TokenKind kind) {
 }
 
 bool Argon::Scanner::seeTokenKind(const TokenKind kind) {
-    recordPosition();
+    uint32_t currentPos = m_bufferPos;
     Token nextToken = getNextToken();
     bool found = nextToken.kind == kind;
-    rewind();
+    m_bufferPos = currentPos;
     return found;
 }
 
@@ -81,6 +81,30 @@ Argon::Token Argon::Scanner::getNextToken() {
         }
     }
 }
+
+void Argon::Scanner::scanUntilSee(const std::initializer_list<TokenKind>& kinds) {
+    Token token;
+    while (true) {
+        bool found = false;
+        for (auto kind : kinds) {
+            if (seeTokenKind(kind)) {
+                found = true;
+                break;
+            }
+        }
+        
+        if (found || seeTokenKind(TokenKind::END)) {
+            return;
+        }
+        getNextToken();
+    }
+}
+
+Argon::Token Argon::Scanner::scanUntilGet(const std::initializer_list<TokenKind>& kinds) {
+    scanUntilSee(kinds);
+    return getNextToken();
+}
+
 
 void Argon::Scanner::recordPosition() {
     m_rewindPos = m_bufferPos;

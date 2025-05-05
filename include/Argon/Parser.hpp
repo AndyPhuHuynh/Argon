@@ -1,7 +1,6 @@
 #pragma once
 
 #include <memory>
-#include <set>
 #include <string>
 #include <vector>
 
@@ -18,7 +17,8 @@ namespace Argon {
         std::vector<IOption*> m_options;
         Scanner m_scanner = Scanner();
 
-        ErrorGroup m_rootErrorGroup = ErrorGroup("Top-Level", -1, -1);
+        ErrorGroup m_syntaxErrors = ErrorGroup("Syntax Errors", -1, -1);
+        ErrorGroup m_analysisErrors = ErrorGroup("Analysis Errors", -1, -1);
     public:
         Parser() = default;
         Parser(const Parser& parser);
@@ -33,6 +33,7 @@ namespace Argon {
 
         void addError(const std::string& error, int pos);
         void addErrorGroup(const std::string& groupName, int startPos, int endPos);
+        void removeErrorGroup(int startPos);
         
         void parseString(const std::string& str);
         StatementAst parseStatement();

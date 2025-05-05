@@ -66,19 +66,24 @@ Argon::IOption* Argon::Parser::getOption(const std::vector<IOption*>& options, c
 }
 
 void Argon::Parser::addError(const std::string& error, const int pos) {
-    m_rootErrorGroup.addErrorMessage(error, pos);
+    m_analysisErrors.addErrorMessage(error, pos);
 }
 
 void Argon::Parser::addErrorGroup(const std::string& groupName, const int startPos, const int endPos) {
-    m_rootErrorGroup.addErrorGroup(groupName, startPos, endPos);
+    m_analysisErrors.addErrorGroup(groupName, startPos, endPos);
+}
+
+void Argon::Parser::removeErrorGroup(const int startPos) {
+    m_analysisErrors.removeErrorGroup(startPos);
 }
 
 void Argon::Parser::parseString(const std::string& str) {
     m_scanner = Scanner(str);
     StatementAst ast = parseStatement();
     ast.analyze(*this, m_options);
-    // m_rootErrorGroup.printErrorsFlatMode();
-    m_rootErrorGroup.printErrorsTreeMode();
+    m_syntaxErrors.printErrorsTreeMode();
+    m_analysisErrors.printErrorsTreeMode();
+    // m_analysisErrors.printErrorsFlatMode();
 }
 
 Argon::StatementAst Argon::Parser::parseStatement() {
@@ -86,68 +91,119 @@ Argon::StatementAst Argon::Parser::parseStatement() {
     bool stop = false;
     while (!stop) {
         m_scanner.recordPosition();
-        Token token1 = m_scanner.getNextToken();
-        Token token2 = m_scanner.getNextToken();
-        m_scanner.rewind();
 
+        // Get first token
+        Token token1 = m_scanner.getNextToken();
+
+        bool token1Error = false;
         if (token1.kind != TokenKind::IDENTIFIER) {
-            std::cerr << "Identifier expected!\n";
+            token1Error = true;
+            m_syntaxErrors.addErrorMessage(
+                std::format("Expected option or option group, got {} at position {}", token1.image, token1.position),
+                token1.position);
+            m_scanner.scanUntilSee({TokenKind::IDENTIFIER});
+            m_scanner.recordPosition();
+            token1 = m_scanner.getNextToken();
         } 
+        
+        if (token1.kind == TokenKind::END) {
+            break;
+        }
+
+        // Get second token
+        Token token2 = m_scanner.getNextToken();
+
+        if (token2.kind != TokenKind::IDENTIFIER && token2.kind != TokenKind::LBRACK) {
+            if (!token1Error) {
+                m_syntaxErrors.addErrorMessage(
+                    std::format("Expected option or option group, got {} at position {}", token2.image, token2.position),
+                    token2.position);
+            }
+            token2 = m_scanner.scanUntilGet({TokenKind::IDENTIFIER, TokenKind::LBRACK});
+        } 
+
+        if (token2.kind == TokenKind::END) {
+            break;
+        }
         
         // OptionGroup
         if (token2.kind == TokenKind::LBRACK) {
+            m_scanner.rewind();
             statement.addOption(parseOptionGroup());
         }
         // Option
         else if (token2.kind == TokenKind::IDENTIFIER) {
+            m_scanner.rewind();
             statement.addOption(parseOption());
-        } 
-        // Error
-        else {
-            std::cerr << "Error parsing statement, not an option or option group!\n";
         }
-        stop = m_scanner.seeTokenKind(TokenKind::END) || m_scanner.seeTokenKind(TokenKind::RBRACK);
+        
+        stop = m_scanner.seeTokenKind(TokenKind::END);
     }
     return statement;
 }
 
 std::unique_ptr<Argon::OptionAst> Argon::Parser::parseOption() {
-    Token tag = m_scanner.getNextToken();
+    Token flag = m_scanner.getNextToken();
+    if (flag.kind != TokenKind::IDENTIFIER) {
+        m_syntaxErrors.addErrorMessage(std::format("Expected flag name, got {} at position {}", flag.image, flag.position), flag.position);
+        flag = m_scanner.scanUntilGet({TokenKind::IDENTIFIER});
+    }
+    
     Token value = m_scanner.getNextToken();
-
-    if (tag.kind != TokenKind::IDENTIFIER) {
-        std::cerr << "Error: Expected an identifier token for tag\n";
-    }
     if (value.kind != TokenKind::IDENTIFIER) {
-        std::cerr << "Error: Expected an identifier token for value\n";
+        m_syntaxErrors.addErrorMessage(std::format("Expected flag value, got {} at position {}", value.image, value.position), value.position);
+        value = m_scanner.scanUntilGet({TokenKind::IDENTIFIER});
     }
 
-    return std::make_unique<OptionAst>(tag.image, value.image, tag.position, value.position);
+    return std::make_unique<OptionAst>(flag.image, value.image, flag.position, value.position);
     // TODO: check if value is identifier
 }
 
 std::unique_ptr<Argon::OptionGroupAst> Argon::Parser::parseOptionGroup() {
-    Token tag = m_scanner.getNextToken();
+    // Get flag
+    Token flag = m_scanner.getNextToken();
+    if (flag.kind != TokenKind::IDENTIFIER) {
+        m_syntaxErrors.addErrorMessage(std::format("Expected flag name, got {} at position {}", flag.image, flag.position), flag.position);
+        flag = m_scanner.scanUntilGet({TokenKind::IDENTIFIER});
+    }
+    
+    // Get lbrack
     Token lbrack = m_scanner.getNextToken();
+    if (lbrack.kind != TokenKind::LBRACK) {
+        m_syntaxErrors.addErrorMessage(std::format("Expected '[', got {} at position {}", lbrack.image, lbrack.position), lbrack.position);
+        lbrack = m_scanner.scanUntilGet({TokenKind::LBRACK});
+    }
 
-    std::unique_ptr<OptionGroupAst> optionGroup = std::make_unique<OptionGroupAst>(tag.image, tag.position);
+    std::unique_ptr<OptionGroupAst> optionGroup = std::make_unique<OptionGroupAst>(flag.image, flag.position);
     
     // TODO: Right now, this can immediately stop if there is '[]' with no options inside
     while (true) {
+        // Get flag
         m_scanner.recordPosition();
         Token token1 = m_scanner.getNextToken();
 
+        if (token1.kind != TokenKind::RBRACK && token1.kind != TokenKind::IDENTIFIER) {
+            m_syntaxErrors.addErrorMessage(std::format("Expected flag name, got {} at position {}", token1.image, token1.position), token1.position);
+            m_scanner.scanUntilGet({TokenKind::IDENTIFIER, TokenKind::LBRACK});
+        }
+        
         if (token1.kind == TokenKind::RBRACK) {
             optionGroup->endPos = token1.position;
-            break;
+            m_analysisErrors.addErrorGroup(optionGroup->flag, optionGroup->flagPos, optionGroup->endPos);
+            return optionGroup;
         } else if (token1.kind == TokenKind::END) {
-            std::cerr << "Error RBRACK expected!\n";
-            break;
-        } else if (token1.kind != TokenKind::IDENTIFIER) {
-            std::cerr << "Error: Expected an identifier token for tag\n";
-        }
+            m_syntaxErrors.addErrorMessage("No matching ']' found for group " + flag.image, token1.position);
+            return optionGroup;
+        } 
 
+        // Get value for option/lbrack for option group
         Token token2 = m_scanner.getNextToken();
+
+        if (token2.kind != TokenKind::LBRACK && token2.kind != TokenKind::IDENTIFIER) {
+            m_syntaxErrors.addErrorMessage(std::format("Expected option value or '[', got {} at position {}", token2.image, token2.position), token2.position);
+            m_scanner.scanUntilGet({TokenKind::IDENTIFIER, TokenKind::LBRACK});
+        }
+        
         if (token2.kind == TokenKind::IDENTIFIER) {
             m_scanner.rewind();
             optionGroup->addOption(parseOption());
@@ -155,12 +211,13 @@ std::unique_ptr<Argon::OptionGroupAst> Argon::Parser::parseOptionGroup() {
             m_scanner.rewind();
             optionGroup->addOption(parseOptionGroup());
         } else if (token2.kind == TokenKind::END) {
-            std::cerr << "Error identifier or LBRACK expected!\n";
+            m_syntaxErrors.addErrorMessage(
+                    std::format("Expected option or option group, got {} at position {}", token2.image, token2.position),
+                    token2.position);
+            m_syntaxErrors.addErrorMessage("No matching ']' found for group " + flag.image, token1.position);
+            return optionGroup;
         }
     }
-
-    m_rootErrorGroup.addErrorGroup(optionGroup->flag, optionGroup->flagPos, optionGroup->endPos);
-    return optionGroup;
 }
 
 Argon::Parser& Argon::Parser::operator|(const IOption& option) {

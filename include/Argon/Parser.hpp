@@ -29,7 +29,6 @@ namespace Argon {
         
         void addOption(const IOption& option);
         IOption *getOption(const std::string& flag);
-        static IOption *getOption(const std::vector<IOption*>& options, const std::string& flag);
 
         void addError(const std::string& error, int pos);
         void addErrorGroup(const std::string& groupName, int startPos, int endPos);
@@ -37,9 +36,13 @@ namespace Argon {
         
         void parseString(const std::string& str);
         StatementAst parseStatement();
-        std::unique_ptr<OptionAst> parseOption();
-        std::unique_ptr<OptionGroupAst> parseOptionGroup();
+        std::unique_ptr<OptionAst> parseOption(const std::vector<std::string>& sameLevelFlags);
+        std::unique_ptr<OptionGroupAst> parseOptionGroup(
+            const std::vector<IOption*>& sameLevelOptions,
+            const std::vector<std::string>& sameLevelFlags);
         
         Parser& operator|(const IOption& option);
     };
+
+    IOption *getOption(const std::vector<IOption*>& options, const std::string& flag);
 }

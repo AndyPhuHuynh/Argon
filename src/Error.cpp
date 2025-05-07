@@ -289,7 +289,7 @@ void Argon::ErrorGroup::printErrorsTreeMode() const {
 }
 
 size_t Argon::ErrorGroup::getIndexOfLastHasError() const {
-    size_t index = m_errors.size() - 1;
+    size_t index = m_errors.size();
     while (index-- > 0) {
         ErrorVariant errorVariant = m_errors[index];
         bool found = std::visit([]<typename T>(const T& e) -> bool {

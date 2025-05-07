@@ -10,7 +10,7 @@ Argon::OptionAst::OptionAst(const std::string& name, std::string value, const in
     : OptionBaseAst(name), value(std::move(value)), flagPos(flagPos), valuePos(valuePos) {}
 
 void Argon::OptionAst::analyze(Parser& parser, const std::vector<IOption*>& options) {
-    IOption *iOption = Parser::getOption(options, flag);
+    IOption *iOption = getOption(options, flag);
     if (!iOption) {
         parser.addError("Unknown option: '" + flag + "'", flagPos);
         return;
@@ -34,11 +34,14 @@ Argon::OptionGroupAst::OptionGroupAst(const std::string& name, const int flagPos
     : OptionBaseAst(name), flagPos(flagPos) {}
 
 void Argon::OptionGroupAst::addOption(std::unique_ptr<OptionBaseAst> option) {
+    if (option == nullptr) {
+        return;
+    }
     m_options.push_back(std::move(option)); 
 }
 
 void Argon::OptionGroupAst::analyze(Parser& parser, const std::vector<IOption*>& options) {
-    IOption *iOption = Parser::getOption(options, flag);
+    IOption *iOption = getOption(options, flag);
     if (!iOption) {
         parser.removeErrorGroup(flagPos);
         parser.addError("Unknown option group: '" + flag + "'", flagPos);
@@ -60,6 +63,9 @@ void Argon::OptionGroupAst::analyze(Parser& parser, const std::vector<IOption*>&
 // StatementAst
 
 void Argon::StatementAst::addOption(std::unique_ptr<OptionBaseAst> option) {
+    if (option == nullptr) {
+        return;
+    }
     m_options.push_back(std::move(option));    
 }
 

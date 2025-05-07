@@ -15,7 +15,7 @@ static void boolTest() {
     std::cout << "boolTest: " << boolTest << "\n";
 }
 
-static void studentTest() {
+static void StudentTest() {
     using namespace Argon;
 
     // std::string name;
@@ -65,7 +65,7 @@ static void studentTest() {
     std::cout << "instrument: " << instrumentName << "\n";    
 }
 
-static void unknownGroup() {
+static void UnknownGroup() {
     using namespace Argon;
 
     std::string name;
@@ -88,10 +88,54 @@ static void unknownGroup() {
     parser.parseString(input);
 }
 
+static void MissingFlag() {
+    using namespace Argon;
+
+    std::string name;
+    int age;
+    std::string major;
+    Parser parser = Option(&name)["--name"]
+                    | Option(&age)["--age"]
+                    | Option(&major)["--major"];
+
+    std::string input = "--name --age 10 --major music";
+    parser.parseString(input);
+
+    std::cout << std::format("Name: {}\n Age: {}\nMajor: {}\n", name, age, major);
+}
+
+static void MissingFlagNested() {
+    using namespace Argon;
+
+    std::string name;
+    int age;
+    std::string major;
+
+    std::string minor;
+    std::string instrumentName;
+    
+    Parser parser = Option(&name)["--name"]
+                    | OptionGroup()["--group"]
+                        + Option(&age)["--age"]
+                        + Option(&major)["--major"]
+                        + (OptionGroup()["--nested"]
+                            + Option(&minor)["--minor"]
+                            + Option(&instrumentName)["--name"]);
+
+    
+    std::string input = "--name John --group [--age --major music]";
+    parser.parseString(input);
+    std::cout << "Name: " << name << "\n";
+    std::cout << "Age: " << age << "\n";
+    std::cout << "Major: " << major << "\n";
+}
+
 int main() {
     using namespace Argon;
-    // unknownGroup();
-    studentTest();
+    // MissingFlag();
+    MissingFlagNested();
+    // UnknownGroup();
+    // StudentTest();
     // runErrorTests();
     return 0;
     std::string name;

@@ -93,6 +93,8 @@ namespace Argon {
     template<typename T>
     bool parseNonBoolIntegralType(const std::string& arg, T& out);
     bool parseBool(const std::string& arg, bool& out);
+
+    std::vector<std::string> getLocalFlags(const std::vector<IOption*>& options);
 }
 
 // Template Implementations

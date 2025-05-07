@@ -99,3 +99,12 @@ bool Argon::parseBool(const std::string& arg, bool& out) {
     }
     return false;
 }
+
+std::vector<std::string> Argon::getLocalFlags(const std::vector<IOption*>& options) {
+    std::vector<std::string> flags;
+    for (const auto& iOption : options) {
+        auto optionFlags = iOption->get_flags();
+        flags.insert(flags.end(), optionFlags.begin(), optionFlags.end());
+    }
+    return flags;
+}

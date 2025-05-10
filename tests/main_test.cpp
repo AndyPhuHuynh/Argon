@@ -53,10 +53,10 @@ static void StudentTest() {
                             + Option(&minor)["--minor"]
                             + Option(&instrumentName)["--name"]);
     
-    // std::string str = "--wtf true --name John --group [--age 20aasdf --major CS --nested [--minor music --name violin --null hi --null2 what] --back test] -top-level huh";
+    std::string str = "--wtf true --name John --group [--age 20aasdf --major CS --nested [--minor music --name violin --null hi --null2 what] --back test] -top-level huh";
     // std::string str = "--name John --outside asdfasd --group [--age 20aasdf --major CS --nested [--minor music --name violin --null hi] --back asdfas] --outter2 asdfas";
     std::string working = "--name John --group [--age 20asdf --major CS --nested [--minor music --name violin]]";
-    parser.parseString(working);
+    parser.parseString(str);
     
     std::cout << "name: " << name << "\n";
     std::cout << "age: " << age << "\n";
@@ -133,9 +133,9 @@ static void MissingFlagNested() {
 int main() {
     using namespace Argon;
     // MissingFlag();
-    MissingFlagNested();
+    // MissingFlagNested();
     // UnknownGroup();
-    // StudentTest();
+    StudentTest();
     // runErrorTests();
     return 0;
     std::string name;

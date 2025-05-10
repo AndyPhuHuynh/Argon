@@ -4,6 +4,40 @@
 #include <iostream>
 #include <sstream>
 
+#if defined(_WIN32)
+#include <windows.h>
+#endif
+
+bool terminalSupportsUTF8() {
+#if defined(_WIN32) 
+    // Check if the output is a console
+    HANDLE hOut = GetStdHandle(STD_OUTPUT_HANDLE);
+    if (hOut == INVALID_HANDLE_VALUE || hOut == nullptr) {
+        return false;
+    }
+
+    // Not a console (e.g., redirected to file)
+    DWORD mode;
+    if (!GetConsoleMode(hOut, &mode)) {
+        return false; 
+    }
+
+    // Check the code page
+    UINT codePage = GetConsoleOutputCP();
+    if (codePage != 65001) {
+        return false;  // Not UTF-8
+    }
+
+    return true;
+#else
+    const char* lang = std::getenv("LANG");
+    const char* lc_ctype = std::getenv("LC_CTYPE");
+
+    std::string encoding = (lc_ctype ? lc_ctype : (lang ? lang : ""));
+    return encoding.find("UTF-8") != std::string::npos || encoding.find("utf8") != std::string::npos;
+#endif
+}
+
 static bool inRange(const int value, const int min, const int max) {
     return value >= min && value <= max;
 }
@@ -86,70 +120,73 @@ void Argon::ErrorGroup::addErrorMessage(const std::string& msg, int pos) {
         setHasErrors();
     }
 }
+void Argon::ErrorGroup::addErrorGroup(const std::string& name, const int startPos, const int endPos) {
+    ErrorGroup groupToAdd = ErrorGroup(name, startPos, endPos, this);
+    addErrorGroup(groupToAdd);
+}
 
-void Argon::ErrorGroup::addErrorGroup(const std::string& name, int startPos, int endPos) {
+void Argon::ErrorGroup::addErrorGroup(ErrorGroup& groupToAdd) {
     if (m_errors.empty()) {
-        m_errors.emplace_back(std::in_place_type<ErrorGroup>, name, startPos, endPos, this);
+        m_errors.emplace_back(std::move(groupToAdd));
         return;
     }
-    
-    int index = 0;
-    for (; index < static_cast<int>(m_errors.size()); index++) {
-        ErrorVariant& item = m_errors[index];
+
+    // Find the sorted index of the start position
+    int insertIndex = 0;
+    for (; insertIndex < static_cast<int>(m_errors.size()); insertIndex++) {
+        ErrorVariant& item = m_errors[insertIndex];
 
         if (std::holds_alternative<ErrorMessage>(item)) {
             ErrorMessage& errorMsg = std::get<ErrorMessage>(item);
-            if (errorMsg.pos > startPos) {
+            if (errorMsg.pos > groupToAdd.m_startPos) {
                 break;
             }
         } else if (std::holds_alternative<ErrorGroup>(item)) {
             ErrorGroup& errorGroup = std::get<ErrorGroup>(item);
-            if (errorGroup.m_startPos > startPos) {
+            if (errorGroup.m_startPos > groupToAdd.m_startPos) {
                 break;
             }
         }
     }
     
-    // Index is now the index of the item positioned ahead of where we want
-    if (index != 0) {
+    if (insertIndex != 0) {
         // Else check the previous index
-        ErrorVariant& item = m_errors[index - 1];
+        ErrorVariant& item = m_errors[insertIndex - 1];
     
         // If error group, check if it's within the bounds, if it is, insert into that group
         if (std::holds_alternative<ErrorGroup>(item)) {
             ErrorGroup& errorGroup = std::get<ErrorGroup>(item);
 
-            if (inRange(startPos, errorGroup.m_startPos, errorGroup.m_endPos)) {
-                errorGroup.addErrorGroup(name, startPos, endPos);
-            } else if ((inRange(startPos, errorGroup.m_startPos, errorGroup.m_endPos) && endPos > errorGroup.m_endPos) ||
-                       (inRange(endPos, errorGroup.m_startPos, errorGroup.m_endPos) && startPos < errorGroup.m_startPos)) {
-                std::cerr << "Error adding error group, bounds overlap!\n";
+            bool fullyInRange = inRange(groupToAdd.m_startPos, errorGroup.m_startPos, errorGroup.m_endPos) &&
+                                inRange(groupToAdd.m_endPos, errorGroup.m_startPos, errorGroup.m_endPos);
+            if (fullyInRange) {
+                errorGroup.addErrorGroup(groupToAdd);
+            } else {
+                std::cerr << "Error adding error group, not fully in range!\n";
             }
+            return;
         }
-        return;
     }
 
     // If the previous item was not a group OR if it was a group and the error we want to add is not in its bounds
     // Check for every item after index and insert it into the new group, if its fully within bounds
-    ErrorGroup groupToAdd(name, startPos, endPos, this);
-    
-    while (index < static_cast<int>(m_errors.size())) {
-        if (std::holds_alternative<ErrorMessage>(m_errors[index])) {
-            ErrorMessage& errorMsg = std::get<ErrorMessage>(m_errors[index]);
-            if (inRange(errorMsg.pos, startPos, endPos)) {
-                groupToAdd.addErrorMessage(errorMsg.msg, startPos);
-                m_errors.erase(m_errors.begin() + index);
+    while (insertIndex < static_cast<int>(m_errors.size())) {
+        if (std::holds_alternative<ErrorMessage>(m_errors[insertIndex])) {
+            ErrorMessage& errorMsg = std::get<ErrorMessage>(m_errors[insertIndex]);
+            if (inRange(errorMsg.pos, groupToAdd.m_startPos, groupToAdd.m_endPos)) {
+                groupToAdd.addErrorMessage(errorMsg.msg, errorMsg.pos);
+                m_errors.erase(m_errors.begin() + insertIndex);
             } else {
                 break;
             }
-        } else if (std::holds_alternative<ErrorGroup>(m_errors[index])) {
-            ErrorGroup& errorGroup = std::get<ErrorGroup>(m_errors[index]);
-            if (inRange(errorGroup.m_startPos, startPos, endPos) &&
-                inRange(errorGroup.m_endPos, startPos, endPos)) {
-                groupToAdd.addErrorGroup(errorGroup.m_groupName, errorGroup.m_startPos, errorGroup.m_endPos);
-                m_errors.erase(m_errors.begin() + index);
-            } else if ((inRange(errorGroup.m_startPos, startPos, endPos) && !inRange(errorGroup.m_endPos, startPos, endPos)) ||
-                (inRange(errorGroup.m_endPos, startPos, endPos) && !inRange(errorGroup.m_startPos, startPos, endPos))) {
+        } else if (std::holds_alternative<ErrorGroup>(m_errors[insertIndex])) {
+            ErrorGroup& errorGroup = std::get<ErrorGroup>(m_errors[insertIndex]);
+            if (inRange(errorGroup.m_startPos, groupToAdd.m_startPos, groupToAdd.m_endPos) &&
+                inRange(errorGroup.m_endPos, groupToAdd.m_startPos, groupToAdd.m_endPos)) {
+                groupToAdd.addErrorGroup(errorGroup);
+                m_errors.erase(m_errors.begin() + insertIndex);
+            } else if ((inRange(errorGroup.m_startPos, groupToAdd.m_startPos, groupToAdd.m_endPos) && !inRange(errorGroup.m_endPos, groupToAdd.m_startPos, groupToAdd.m_endPos)) ||
+                (inRange(errorGroup.m_endPos, groupToAdd.m_startPos, groupToAdd.m_endPos) && !inRange(errorGroup.m_startPos, groupToAdd.m_startPos, groupToAdd.m_endPos))) {
                 std::cerr << "Error adding error group, bounds overlap!\n";
             } else {
                 break;
@@ -158,10 +195,10 @@ void Argon::ErrorGroup::addErrorGroup(const std::string& name, int startPos, int
     }
     
     // Insert group at index
-    if (index >= static_cast<int>(m_errors.size())) {
+    if (insertIndex >= static_cast<int>(m_errors.size())) {
         m_errors.emplace_back(std::move(groupToAdd));
     } else {
-        m_errors.insert(m_errors.begin() + index, std::move(groupToAdd));
+        m_errors.insert(m_errors.begin() + insertIndex, std::move(groupToAdd));
     }
 }
 
@@ -247,7 +284,7 @@ void Argon::ErrorGroup::printErrorsFlatMode() const {
 
 void Argon::ErrorGroup::printErrorsTreeMode() const {
     constexpr auto printRecursive = [](std::stringstream& stream, const ErrorGroup& group, const std::string& prefix,
-                                       const bool isFirstPrint, auto&& printRecursiveRef) -> void {
+                                       const bool isFirstPrint, const bool useUnicode, auto&& printRecursiveRef) -> void {
         if (isFirstPrint) {
             stream << std::format("[{}]\n", group.getGroupName());
         }
@@ -258,9 +295,11 @@ void Argon::ErrorGroup::printErrorsTreeMode() const {
             std::visit([&]<typename T>(const T& e) {
                 if constexpr (std::is_same_v<T, ErrorMessage>) {
                     if (i == lastErrorIndex) {
-                        stream << std::format("{}└── {}\n", prefix, e.msg);
+                        useUnicode ? stream << std::format("{}└── {}\n", prefix, e.msg) :
+                                     stream << std::format("{}'-- {}\n", prefix, e.msg);
                     } else {    
-                        stream << std::format("{}├── {}\n", prefix, e.msg);
+                        useUnicode ? stream << std::format("{}├── {}\n", prefix, e.msg) :
+                                     stream << std::format("{}|-- {}\n", prefix, e.msg);
                     }
                 } else if constexpr (std::is_same_v<T, ErrorGroup>) {
                     if (!e.m_hasErrors) {
@@ -268,11 +307,17 @@ void Argon::ErrorGroup::printErrorsTreeMode() const {
                     }
                     
                     if (i == lastErrorIndex) {
-                        stream << std::format("{}└── [{}]\n", prefix, e.getGroupName());
-                        printRecursiveRef(stream, e, prefix + "    ", false, printRecursiveRef);
+                        useUnicode ? stream << std::format("{}└── [{}]\n", prefix, e.getGroupName()) :
+                                     stream << std::format("{}'-- [{}]\n", prefix, e.getGroupName());
+                        printRecursiveRef(stream, e, prefix + "    ", false, useUnicode, printRecursiveRef);
                     } else {
-                        stream << std::format("{}├── [{}]\n", prefix, e.getGroupName());
-                        printRecursiveRef(stream, e, prefix + "│   ", false, printRecursiveRef);
+                        if (useUnicode) {
+                            stream << std::format("{}├── [{}]\n", prefix, e.getGroupName());
+                            printRecursiveRef(stream, e, prefix + "│   ", false, useUnicode, printRecursiveRef);
+                        } else {
+                            stream << std::format("{}|-- [{}]\n", prefix, e.getGroupName());
+                            printRecursiveRef(stream, e, prefix + "|   ", false, useUnicode, printRecursiveRef);
+                        }
                     }
                 }
             }, error);
@@ -284,7 +329,7 @@ void Argon::ErrorGroup::printErrorsTreeMode() const {
     }
     
     std::stringstream ss;
-    printRecursive(ss, *this, "", true, printRecursive);
+    printRecursive(ss, *this, "", true, terminalSupportsUTF8(), printRecursive);
     std::cout << ss.str();
 }
 

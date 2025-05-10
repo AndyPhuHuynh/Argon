@@ -49,6 +49,7 @@ namespace Argon {
         void printErrorsFlatMode() const;
         void printErrorsTreeMode() const;
     private:
+        void addErrorGroup(ErrorGroup& groupToAdd);
         size_t getIndexOfLastHasError () const; 
     };
 }

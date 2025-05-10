@@ -153,7 +153,7 @@ std::unique_ptr<Argon::OptionAst> Argon::Parser::parseOption(const std::vector<s
 
     // If the flag is not valid
     if (!std::ranges::contains(sameLevelFlags, flag.image)) {
-        m_analysisErrors.addErrorMessage(std::format("Unknown flag: '{}'", flag.image), flag.position);
+        m_analysisErrors.addErrorMessage(std::format("Unknown flag: '{}' at position {}", flag.image, flag.position), flag.position);
         error = true;
     }
     
@@ -167,7 +167,7 @@ std::unique_ptr<Argon::OptionAst> Argon::Parser::parseOption(const std::vector<s
 
     // If value matches a flag
     if (std::ranges::contains(sameLevelFlags, value.image)) {
-        m_syntaxErrors.addErrorMessage(std::format("No value provided for flag '{}'", flag.image), value.position);
+        m_syntaxErrors.addErrorMessage(std::format("No value provided for flag '{}' at position {}", flag.image, flag.position), value.position);
         m_scanner.rewind();
         error = true;
     }
@@ -187,13 +187,13 @@ std::unique_ptr<Argon::OptionGroupAst> Argon::Parser::parseOptionGroup(
     bool validFlag = true;
     // If the flag is not valid
     if (!std::ranges::contains(sameLevelFlags, flag.image)) {
-        m_analysisErrors.addErrorMessage(std::format("Unknown flag: '{}'", flag.image), flag.position);
+        m_analysisErrors.addErrorMessage(std::format("Unknown flag: '{}' at position {}", flag.image, flag.position), flag.position);
         validFlag = false;
     }
 
     OptionGroup *groupOption = dynamic_cast<OptionGroup*>(Argon::getOption(sameLevelOptions, flag.image));
     if (groupOption == nullptr && validFlag) {
-        m_analysisErrors.addErrorMessage(std::format("Flag '{}' is not an option group", flag.image), flag.position);
+        m_analysisErrors.addErrorMessage(std::format("Flag '{}' at position {} is not an option group", flag.image, flag.position), flag.position);
         validFlag = false;
     }
     
@@ -209,6 +209,7 @@ std::unique_ptr<Argon::OptionGroupAst> Argon::Parser::parseOptionGroup(
         Token end = m_scanner.scanUntilGet({TokenKind::RBRACK});
         if (end.kind == TokenKind::END) {
             m_syntaxErrors.addErrorMessage("No matching ']' found for flag " + flag.image, end.position);
+            m_syntaxErrors.addErrorMessage(std::format("No matching ']' found for flag {} at position {}", flag.image, flag.position), end.position);
         }
         return nullptr;
     }
@@ -233,6 +234,8 @@ std::unique_ptr<Argon::OptionGroupAst> Argon::Parser::parseOptionGroup(
             m_analysisErrors.addErrorGroup(optionGroup->flag, optionGroup->flagPos, optionGroup->endPos);
             return optionGroup;
         } else if (token1.kind == TokenKind::END) {
+            optionGroup->endPos = token1.position;
+            m_analysisErrors.addErrorGroup(optionGroup->flag, optionGroup->flagPos, optionGroup->endPos);
             m_syntaxErrors.addErrorMessage("No matching ']' found for group " + flag.image, token1.position);
             return optionGroup;
         } 

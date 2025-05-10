@@ -10,6 +10,7 @@ add_custom_target(Documentation SOURCES ${DOC_FILES})
 set(INCLUDE_FILES 
     ${CMAKE_SOURCE_DIR}/include/Argon/Ast.hpp
     ${CMAKE_SOURCE_DIR}/include/Argon/Error.hpp
+    ${CMAKE_SOURCE_DIR}/include/Argon/MultiOption.hpp
     ${CMAKE_SOURCE_DIR}/include/Argon/Option.hpp
     ${CMAKE_SOURCE_DIR}/include/Argon/Parser.hpp
     ${CMAKE_SOURCE_DIR}/include/Argon/Scanner.hpp
@@ -45,7 +46,7 @@ install(FILES ${INCLUDE_FILES} DESTINATION include/Argon)
 install (DIRECTORY ${CMAKE_SOURCE_DIR}/docs DESTINATION docs)
 
 IF(MSVC)
-    target_compile_options(Argon PRIVATE /W4)
+    target_compile_options(Argon PRIVATE /W4 /utf-8)
 ELSE()
     target_compile_options(Argon PRIVATE -Wall -Wpedantic)
 ENDIF()

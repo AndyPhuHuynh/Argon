@@ -67,6 +67,10 @@ bool Argon::IOption::has_error() const {
     return !m_error.empty();
 }
 
+void Argon::IOption::clear_error() {
+    m_error.clear();
+}
+
 Argon::OptionGroup& Argon::OptionGroup::operator+(const IOption& other) {
     add_option(other);
     return *this;

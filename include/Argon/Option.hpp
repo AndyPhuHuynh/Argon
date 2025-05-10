@@ -37,6 +37,7 @@ namespace Argon {
         void print_flags() const;
         const std::string& get_error() const;
         bool has_error() const;
+        void clear_error();
         
         virtual IOption* clone() const = 0;
     };
@@ -58,22 +59,25 @@ namespace Argon {
         
         virtual void set_value(const std::string& flag, const std::string& value) = 0;
     };
-    
+
     template <typename T>
-    class Option : public OptionBase, public OptionComponent<Option<T>> {
-        T m_value;
-        T *m_out = nullptr;
+    struct Converter {
         std::function<bool(const std::string&, T&)> convert = nullptr;
         std::function<std::string(const std::string&, const std::string&)> generate_error_msg = nullptr;
+    };
+    
+    template <typename T>
+    class Option : public OptionBase, public OptionComponent<Option<T>>, public Converter<T> {
+        T m_value;
+        T *m_out = nullptr;
     public:
         explicit Option(T* out);
         
-        explicit Option(T* out,
-            std::function<bool(const std::string&, T&)> convert);
+        Option(T* out, std::function<bool(const std::string&, T&)> conversion_func);
         
-        explicit Option(T* out,
-            const std::function<bool(const std::string&, T&)>& convert,
-            const std::function<std::string(const std::string&, const std::string&)>& error_msg);
+        Option(T* out,
+            const std::function<bool(const std::string&, T&)>& conversion_func,
+            const std::function<std::string(const std::string&, const std::string&)>& generate_error_msg_func);
 
     private:
         void set_value(const std::string& flag, const std::string& arg) override;
@@ -116,23 +120,28 @@ namespace Argon {
         static_assert(has_stream_extraction<T>::value,
             "Type T must have a conversion function or support stream extraction for parsing.");
     }
-
+    
     template <typename T>
-    Option<T>::Option(T* out, std::function<bool(const std::string&, T&)> convert)
-        : OptionBase(), m_out(out), convert(convert) {}
+    Option<T>::Option(T* out, std::function<bool(const std::string&, T&)> conversion_func)
+        : OptionBase(), m_out(out) {
+        this->convert = conversion_func;
+    }
 
     template <typename T>
     Option<T>::Option(T* out,
-        const std::function<bool(const std::string&, T&)>& convert,
-        const std::function<std::string(const std::string&, const std::string&)>& error_msg)
-        : OptionBase(), m_out(out), convert(convert), generate_error_msg(error_msg) {}
+        const std::function<bool(const std::string&, T&)>& conversion_func,
+        const std::function<std::string(const std::string&, const std::string&)>& generate_error_msg_func)
+        : OptionBase(), m_out(out) {
+        this->convert = conversion_func;
+        this->generate_error_msg = generate_error_msg_func;
+    }
 
     template <typename T>
     void Option<T>::set_value(const std::string& flag, const std::string& arg) {
         bool success;
         // Use custom conversion function if supplied
-        if (convert != nullptr) {
-            success = convert(arg, m_value);
+        if (this->convert != nullptr) {
+            success = this->convert(arg, m_value);
         }
         // Parse as non-bool integral if valid
         else if constexpr (is_non_bool_integral<T>) {
@@ -163,8 +172,8 @@ namespace Argon {
     template <typename T>
     void Option<T>::set_error(const std::string& flag, const std::string& invalidArg) {
         // Generate custom error message if provided
-        if (generate_error_msg != nullptr) {
-            this->m_error = generate_error_msg(flag, invalidArg);
+        if (this->generate_error_msg != nullptr) {
+            this->m_error = this->generate_error_msg(flag, invalidArg);
             return;
         }
         

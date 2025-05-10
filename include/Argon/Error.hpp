@@ -35,7 +35,6 @@ namespace Argon {
     public:
         ErrorGroup() = default;
         ErrorGroup(std::string groupName, int startPos, int endPos);
-        ErrorGroup(std::string groupName, int startPos, int endPos, ErrorGroup* parent);
 
         void setHasErrors();
         
@@ -49,7 +48,9 @@ namespace Argon {
         void printErrorsFlatMode() const;
         void printErrorsTreeMode() const;
     private:
+        ErrorGroup(std::string groupName, int startPos, int endPos, ErrorGroup* parent);
+        
         void addErrorGroup(ErrorGroup& groupToAdd);
-        size_t getIndexOfLastHasError () const; 
+        size_t getIndexOfLastHasError() const; 
     };
 }

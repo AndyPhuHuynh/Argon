@@ -2,6 +2,7 @@
 
 #include <iostream>
 
+#include "Argon/MultiOption.hpp"
 #include "Argon/Option.hpp"
 #include "Argon/Parser.hpp" 
 
@@ -128,6 +129,21 @@ static void MissingFlagNested() {
     std::cout << "Name: " << name << "\n";
     std::cout << "Age: " << age << "\n";
     std::cout << "Major: " << major << "\n";
+}
+
+void MultiOptionTest() {
+    using namespace Argon;
+
+    std::string name;
+    Option opt = Option(&name)["--name"];
+    
+    std::vector<int> options;
+
+    auto conv = [] (const std::string& input, int& output) {
+        output = 2;
+    };
+    
+    MultiOption multi = MultiOption(&options)["--options"];
 }
 
 int main() {

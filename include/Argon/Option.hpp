@@ -1,7 +1,7 @@
 ﻿#pragma once
 
+#include <algorithm>
 #include <functional>
-#include <iostream>
 #include <limits>
 #include <sstream>
 #include <string>
@@ -61,27 +61,35 @@ namespace Argon {
     };
 
     template <typename T>
+    using ConversionFn = std::function<bool(const std::string&, T&)>;
+    using GenerateErrorMsgFn = std::function<std::string(const std::string&, const std::string&)>;
+    
+    template <typename T>
     struct Converter {
-        std::function<bool(const std::string&, T&)> convert = nullptr;
-        std::function<std::string(const std::string&, const std::string&)> generate_error_msg = nullptr;
+        ConversionFn<T> conversion_fn = nullptr;
+        GenerateErrorMsgFn generate_error_msg_fn = nullptr;
+    private:
+        std::string m_error;
+        void generate_error_msg(const std::string& flag, const std::string& invalidArg);
+    public:
+        void convert(const std::string& flag, const std::string& value, T& outValue);
+        bool has_error();
+        std::string get_error();
     };
     
     template <typename T>
-    class Option : public OptionBase, public OptionComponent<Option<T>>, public Converter<T> {
-        T m_value;
+    class Option : public OptionBase, public OptionComponent<Option<T>> {
+        Converter<T> converter;
         T *m_out = nullptr;
     public:
         explicit Option(T* out);
         
-        Option(T* out, std::function<bool(const std::string&, T&)> conversion_func);
+        Option(T* out, const ConversionFn<T>& conversion_func);
         
-        Option(T* out,
-            const std::function<bool(const std::string&, T&)>& conversion_func,
-            const std::function<std::string(const std::string&, const std::string&)>& generate_error_msg_func);
+        Option(T* out, const ConversionFn<T>& conversion_func, const GenerateErrorMsgFn& generate_error_msg_func);
 
     private:
-        void set_value(const std::string& flag, const std::string& arg) override;
-        void set_error(const std::string& flag, const std::string& invalidArg);
+        void set_value(const std::string& flag, const std::string& value) override;
     };
 
     class OptionGroup : public OptionComponent<OptionGroup> {
@@ -116,64 +124,10 @@ namespace Argon {
     }
 
     template <typename T>
-    Option<T>::Option(T* out) : OptionBase(), m_out(out) {
-        static_assert(has_stream_extraction<T>::value,
-            "Type T must have a conversion function or support stream extraction for parsing.");
-    }
-    
-    template <typename T>
-    Option<T>::Option(T* out, std::function<bool(const std::string&, T&)> conversion_func)
-        : OptionBase(), m_out(out) {
-        this->convert = conversion_func;
-    }
-
-    template <typename T>
-    Option<T>::Option(T* out,
-        const std::function<bool(const std::string&, T&)>& conversion_func,
-        const std::function<std::string(const std::string&, const std::string&)>& generate_error_msg_func)
-        : OptionBase(), m_out(out) {
-        this->convert = conversion_func;
-        this->generate_error_msg = generate_error_msg_func;
-    }
-
-    template <typename T>
-    void Option<T>::set_value(const std::string& flag, const std::string& arg) {
-        bool success;
-        // Use custom conversion function if supplied
-        if (this->convert != nullptr) {
-            success = this->convert(arg, m_value);
-        }
-        // Parse as non-bool integral if valid
-        else if constexpr (is_non_bool_integral<T>) {
-            success = parseNonBoolIntegralType<T>(arg, m_value);
-        }
-        // Parse as boolean if T is a boolean
-        else if constexpr (std::is_same_v<T, bool>) {
-            success = parseBool(arg, m_value);
-        }
-        // Use stream extraction if custom conversion not supplied and type is not integral
-        else if constexpr (has_stream_extraction<T>::value) {
-            std::istringstream iss(arg);
-            iss >> m_value;
-            success = !iss.fail() && iss.eof();
-        }
-        // Should never reach this
-        else {
-            throw std::runtime_error("Type does not support stream extraction,"
-                                     "was not an integral type, and no converter was provided.");
-        }
-        // Set error if not successful
-        if (!success) {
-            set_error(flag, arg);
-        }
-        *m_out = m_value;
-    }
-
-    template <typename T>
-    void Option<T>::set_error(const std::string& flag, const std::string& invalidArg) {
+    void Converter<T>::generate_error_msg(const std::string& flag, const std::string& invalidArg) {
         // Generate custom error message if provided
-        if (this->generate_error_msg != nullptr) {
-            this->m_error = this->generate_error_msg(flag, invalidArg);
+        if (this->generate_error_msg_fn != nullptr) {
+            this->m_error = this->generate_error_msg_fn(flag, invalidArg);
             return;
         }
         
@@ -191,6 +145,76 @@ namespace Argon {
         
         ss << ", got: " << invalidArg;
         this->m_error = ss.str();
+    }
+
+    template <typename T>
+    void Converter<T>::convert(const std::string& flag, const std::string& value, T& outValue) {
+        m_error.clear();
+        bool success;
+        // Use custom conversion function if supplied
+        if (this->conversion_fn != nullptr) {
+            success = this->conversion_fn(value, outValue);
+        }
+        // Parse as non-bool integral if valid
+        else if constexpr (is_non_bool_integral<T>) {
+            success = parseNonBoolIntegralType<T>(value, outValue);
+        }
+        // Parse as boolean if T is a boolean
+        else if constexpr (std::is_same_v<T, bool>) {
+            success = parseBool(value, outValue);
+        }
+        // Use stream extraction if custom conversion not supplied and type is not integral
+        else if constexpr (has_stream_extraction<T>::value) {
+            std::istringstream iss(value);
+            iss >> outValue;
+            success = !iss.fail() && iss.eof();
+        }
+        // Should never reach this
+        else {
+            throw std::runtime_error("Type does not support stream extraction,"
+                                     "was not an integral type, and no converter was provided.");
+        }
+        // Set error if not successful
+        if (!success) {
+            generate_error_msg(flag, value);
+        }
+    }
+
+    template <typename T>
+    bool Converter<T>::has_error() {
+        return m_error.empty();
+    }
+
+    template <typename T>
+    std::string Converter<T>::get_error() {
+        return m_error;
+    }
+
+    template <typename T>
+    Option<T>::Option(T* out) : OptionBase(), m_out(out) {
+        static_assert(has_stream_extraction<T>::value,
+            "Type T must have a conversion function or support stream extraction for parsing.");
+    }
+    
+    template <typename T>
+    Option<T>::Option(T* out, const ConversionFn<T>& conversion_func)
+        : OptionBase(), m_out(out) {
+        converter.conversion_fn = conversion_func;
+    }
+
+    template <typename T>
+    Option<T>::Option(T* out, const ConversionFn<T>& conversion_func, const GenerateErrorMsgFn& generate_error_msg_func)
+        : OptionBase(), m_out(out) {
+        converter.conversion_fn = conversion_func;
+        converter.generate_error_msg_fn = generate_error_msg_func;
+    }
+
+    template <typename T>
+    void Option<T>::set_value(const std::string& flag, const std::string& value) {
+        converter.convert(flag, value, *m_out);
+        if (converter.has_error()) {
+            this->m_error = converter.get_error();
+        }
     }
 
     template <typename T> 

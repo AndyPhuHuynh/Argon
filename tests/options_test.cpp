@@ -66,7 +66,7 @@ static void StructTest() {
     
     Student testStudent{};
     Option studentOption = Option<Student>(&testStudent, studentFromString, studentError)["-s"]["--student"];
-    Parser studentParser = studentOption;
+    Parser studentParser = static_cast<Parser>(studentOption);
 
     std::string studentString = "--student 3";
     studentParser.parseString(studentString);

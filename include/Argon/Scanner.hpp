@@ -31,17 +31,14 @@ namespace Argon {
     class Scanner {
         std::string m_buffer;
         uint32_t m_bufferPos = 0;
-        bool m_readFromSee;
-        Token m_seeToken;
 
         uint32_t m_rewindPos = 0;
     public:
         Scanner() = default;
-        Scanner(std::string buffer) : m_buffer(std::move(buffer)) {}
+        explicit Scanner(std::string buffer) : m_buffer(std::move(buffer)) {}
 
         bool seeTokenKind(TokenKind kind);
-        bool haveTokenKind(Token token);
-        char peekChar();
+        char peekChar() const;
         char nextChar();
         Token getNextToken();
         

@@ -7,7 +7,7 @@
 using namespace Argon;
 
 static void Test1() {
-    std::string str = "hello world! [inside brackets]";
+    const std::string str = "hello world! [inside brackets]";
     Scanner scanner(str);
 
     Token token = scanner.getNextToken();
@@ -18,7 +18,7 @@ static void Test1() {
         token = scanner.getNextToken();
     }
 
-    std::vector<Token> expected = {
+    const std::vector<Token> expected = {
         {TokenKind::IDENTIFIER, "hello"},
         {TokenKind::IDENTIFIER, "world!"},
         {TokenKind::LBRACK},
@@ -39,7 +39,7 @@ static void Test1() {
 }
 
 static void Test2() {
-    std::string str = "hello world!                  [[[[inside brackets]";
+    const std::string str = "hello world!                  [[[[inside brackets]";
     Scanner scanner(str);
 
     Token token = scanner.getNextToken();

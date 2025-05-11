@@ -26,7 +26,7 @@ void Argon::Context::addOption(const IOption& option) {
 }
 
 Argon::IOption* Argon::Context::getOption(const std::string& flag) {
-    auto it = std::ranges::find_if(m_options, [&flag](const auto& option) {
+    const auto it = std::ranges::find_if(m_options, [&flag](const auto& option) {
        return std::ranges::contains(option->get_flags(), flag); 
     });
     return it == m_options.end() ? nullptr : it->get();

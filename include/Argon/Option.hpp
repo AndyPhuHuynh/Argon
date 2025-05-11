@@ -1,6 +1,5 @@
 ﻿#pragma once
 
-#include <algorithm>
 #include <functional>
 #include <limits>
 #include <sstream>
@@ -29,9 +28,9 @@ namespace Argon {
         IOption& operator=(IOption&&) noexcept;
         virtual ~IOption() = default;
         
-        IOption& operator[](const std::string& tag);
-        Parser operator|(const IOption& other);
-        operator Parser() const;
+        // IOption& operator[](const std::string& tag);
+        Parser operator|(const IOption& other) const;
+        explicit operator Parser() const;
 
         const std::vector<std::string>& get_flags() const;
         void print_flags() const;
@@ -73,7 +72,7 @@ namespace Argon {
         void generate_error_msg(const std::string& flag, const std::string& invalidArg);
     public:
         void convert(const std::string& flag, const std::string& value, T& outValue);
-        bool has_error();
+        bool has_error() const;
         std::string get_error();
     };
     
@@ -179,7 +178,7 @@ namespace Argon {
     }
 
     template <typename T>
-    bool Converter<T>::has_error() {
+    bool Converter<T>::has_error() const {
         return !m_error.empty();
     }
 

@@ -13,7 +13,7 @@ static void boolTest() {
     
     bool boolTest = true;
     std::cout << "boolTest: " << boolTest << "\n";
-    Parser boolParser = Option(&boolTest)["-b"]["--bool"];
+    Parser boolParser = static_cast<Parser>(Option(&boolTest)["-b"]["--bool"]);
     boolParser.parseString("--bool trueasdfads");
     std::cout << "boolTest: " << boolTest << "\n";
 }

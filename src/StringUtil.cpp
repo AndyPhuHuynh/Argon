@@ -1,6 +1,7 @@
 ﻿#include "Argon/StringUtil.hpp"
 
 #include <algorithm>
+#include <cstdint>
 
 /**
  * @brief Tokenizes a string based on a delimiter

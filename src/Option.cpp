@@ -31,12 +31,7 @@ Argon::IOption& Argon::IOption::operator=(IOption&& other) noexcept {
     return *this;
 }
 
-Argon::IOption& Argon::IOption::operator[](const std::string& tag) {
-    m_flags.push_back(tag);
-    return *this;
-}
-
-Argon::Parser Argon::IOption::operator|(const IOption& other) {
+Argon::Parser Argon::IOption::operator|(const IOption& other) const {
     Parser parser;
     parser.addOption(*this);
     parser.addOption(other);

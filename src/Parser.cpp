@@ -85,7 +85,7 @@ Argon::StatementAst Argon::Parser::parseStatement() {
     return statement;
 }
 
-std::unique_ptr<Argon::OptionAst> Argon::Parser::parseOption(const Context& context) {
+std::unique_ptr<Argon::OptionAst> Argon::Parser::parseOption(Context& context) {
     bool error = false;
     // Get flag
     Token flag = m_scanner.getNextToken();
@@ -98,6 +98,10 @@ std::unique_ptr<Argon::OptionAst> Argon::Parser::parseOption(const Context& cont
     if (!context.containsLocalFlag(flag.image)) {
         m_analysisErrors.addErrorMessage(std::format("Unknown flag: '{}' at position {}", flag.image, flag.position), flag.position);
         error = true;
+    }
+    
+    if (OptionBase *option = context.getOptionDynamic<OptionBase>(flag.image)) {
+        
     }
     
     // Get value
@@ -115,7 +119,7 @@ std::unique_ptr<Argon::OptionAst> Argon::Parser::parseOption(const Context& cont
         error = true;
     }
     
-    return error ? nullptr : std::make_unique<OptionAst>(flag.image, value.image, flag.position, value.position);
+    return error ? nullptr : std::make_unique<OptionAst>(flag, value);
 }
 
 std::unique_ptr<Argon::OptionGroupAst> Argon::Parser::parseOptionGroup(Context& context) {
@@ -148,15 +152,15 @@ std::unique_ptr<Argon::OptionGroupAst> Argon::Parser::parseOptionGroup(Context& 
 
     // Early return if invalid flag
     if (!validFlag) {
-        Token end = m_scanner.scanUntilGet({TokenKind::RBRACK});
+        const Token end = m_scanner.scanUntilGet({TokenKind::RBRACK});
         if (end.kind == TokenKind::END) {
             m_syntaxErrors.addErrorMessage("No matching ']' found for flag " + flag.image, end.position);
             m_syntaxErrors.addErrorMessage(std::format("No matching ']' found for flag {} at position {}", flag.image, flag.position), end.position);
         }
         return nullptr;
     }
-    
-    std::unique_ptr<OptionGroupAst> optionGroupAst = std::make_unique<OptionGroupAst>(flag.image, flag.position);
+
+    auto optionGroupAst = std::make_unique<OptionGroupAst>(flag);
     
     // TODO: Right now, this can immediately stop if there is '[]' with no options inside
     while (true) {
@@ -173,11 +177,11 @@ std::unique_ptr<Argon::OptionGroupAst> Argon::Parser::parseOptionGroup(Context& 
         
         if (token1.kind == TokenKind::RBRACK) {
             optionGroupAst->endPos = token1.position;
-            m_analysisErrors.addErrorGroup(optionGroupAst->flag, optionGroupAst->flagPos, optionGroupAst->endPos);
+            m_analysisErrors.addErrorGroup(optionGroupAst->flag.value, optionGroupAst->flag.pos, optionGroupAst->endPos);
             return optionGroupAst;
         } else if (token1.kind == TokenKind::END) {
             optionGroupAst->endPos = token1.position;
-            m_analysisErrors.addErrorGroup(optionGroupAst->flag, optionGroupAst->flagPos, optionGroupAst->endPos);
+            m_analysisErrors.addErrorGroup(optionGroupAst->flag.value, optionGroupAst->flag.pos, optionGroupAst->endPos);
             m_syntaxErrors.addErrorMessage("No matching ']' found for group " + flag.image, token1.position);
             return optionGroupAst;
         } 

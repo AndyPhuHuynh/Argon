@@ -11,7 +11,7 @@
 bool terminalSupportsUTF8() {
 #if defined(_WIN32) 
     // Check if the output is a console
-    HANDLE hOut = GetStdHandle(STD_OUTPUT_HANDLE);
+    const HANDLE hOut = GetStdHandle(STD_OUTPUT_HANDLE);
     if (hOut == INVALID_HANDLE_VALUE || hOut == nullptr) {
         return false;
     }
@@ -23,8 +23,7 @@ bool terminalSupportsUTF8() {
     }
 
     // Check the code page
-    UINT codePage = GetConsoleOutputCP();
-    if (codePage != 65001) {
+    if (const UINT codePage = GetConsoleOutputCP(); codePage != 65001) {
         return false;  // Not UTF-8
     }
 
@@ -137,12 +136,12 @@ void Argon::ErrorGroup::addErrorGroup(ErrorGroup& groupToAdd) {
         ErrorVariant& item = m_errors[insertIndex];
 
         if (std::holds_alternative<ErrorMessage>(item)) {
-            ErrorMessage& errorMsg = std::get<ErrorMessage>(item);
+            const ErrorMessage& errorMsg = std::get<ErrorMessage>(item);
             if (errorMsg.pos > groupToAdd.m_startPos) {
                 break;
             }
         } else if (std::holds_alternative<ErrorGroup>(item)) {
-            ErrorGroup& errorGroup = std::get<ErrorGroup>(item);
+            const ErrorGroup& errorGroup = std::get<ErrorGroup>(item);
             if (errorGroup.m_startPos > groupToAdd.m_startPos) {
                 break;
             }

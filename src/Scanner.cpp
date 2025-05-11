@@ -38,7 +38,7 @@ bool Argon::Scanner::seeTokenKind(const TokenKind kind) {
     return found;
 }
 
-char Argon::Scanner::peekChar() {
+char Argon::Scanner::peekChar() const {
     if (m_bufferPos >= m_buffer.size()) {
         return EOF;
     }

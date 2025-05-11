@@ -4,6 +4,8 @@
 #include <string>
 #include <vector>
 
+#include "Scanner.hpp"
+
 namespace Argon {
     class IOption;
     class Parser;
@@ -11,7 +13,12 @@ namespace Argon {
     class OptionGroupAst;
     class StatementAst;
     class Context;
-
+    
+    struct Value {
+        std::string value;
+        int pos;
+    };
+    
     class Ast {
     public:
         virtual void analyze(Parser& parser, Context& context) = 0;
@@ -21,30 +28,32 @@ namespace Argon {
 
     class OptionBaseAst : public Ast {
     public:
-        std::string flag;
+        Value flag;
+        
         ~OptionBaseAst() override = default;
     protected:
-        OptionBaseAst(std::string name);
+        explicit OptionBaseAst(const Token& flagToken);
     };
     
     class OptionAst : public OptionBaseAst {
     public:
-        std::string value;
-        int flagPos;
-        int valuePos;
+        Value value;
         
-        OptionAst(const std::string& name, std::string value, int flagPos, int valuePos);
+        OptionAst(const Token& flagToken, const Token& valueToken);
         ~OptionAst() override = default;
 
         void analyze(Parser& parser, Context& context) override;
     };
 
+    class MultiOptionAst : public OptionBaseAst {
+        std::vector<Value> values;
+    };
+    
     class OptionGroupAst : public OptionBaseAst {
     public:
-        int flagPos = -1;
         int endPos = -1;
         
-        OptionGroupAst(const std::string& name, int flagPos);
+        OptionGroupAst(const Token& flagToken);
         
         OptionGroupAst(const OptionGroupAst&) = delete;
         OptionGroupAst& operator=(const OptionGroupAst&) = delete;

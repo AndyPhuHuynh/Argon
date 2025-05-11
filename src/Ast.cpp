@@ -1,38 +1,44 @@
-﻿#include "Argon/Ast.hpp"
+﻿#include <utility>
+
+#include "Argon/Ast.hpp"
 
 #include "Argon/Context.hpp"
 #include "Argon/Option.hpp"
 
-Argon::OptionBaseAst::OptionBaseAst(std::string name) : flag(std::move(name)) {}
+Argon::OptionBaseAst::OptionBaseAst(const Token& flagToken) {
+    flag = { .value = flagToken.image, .pos = flagToken.position };
+}
 
 // OptionAst
 
-Argon::OptionAst::OptionAst(const std::string& name, std::string value, const int flagPos, const int valuePos)
-    : OptionBaseAst(name), value(std::move(value)), flagPos(flagPos), valuePos(valuePos) {}
+Argon::OptionAst::OptionAst(const Token& flagToken, const Token& valueToken)
+    : OptionBaseAst(flagToken) {
+    value = { .value = valueToken.image, .pos = valueToken.position };
+}
 
 void Argon::OptionAst::analyze(Parser& parser, Context& context) {
-    IOption *iOption = context.getOption(flag);
+    IOption *iOption = context.getOption(flag.value);
     if (!iOption) {
-        parser.addError("Unknown option: '" + flag + "'", flagPos);
+        parser.addError(std::format("Unknown option: '{}'", flag.value), flag.pos);
         return;
     }
     
     OptionBase *optionBase = dynamic_cast<OptionBase*>(iOption);
     if (!optionBase) {
-        parser.addError("Flag '" + flag + "' is not an option", flagPos);
+        parser.addError(std::format("Flag '{}' is not an option", flag.value), flag.pos);
         return;
     }
 
-    optionBase->set_value(flag, value);
+    optionBase->set_value(flag.value, value.value);
     if (iOption->has_error()) {
-        parser.addError(iOption->get_error(), valuePos);
+        parser.addError(iOption->get_error(), value.pos);
     }
 }
 
 // OptionGroupAst
 
-Argon::OptionGroupAst::OptionGroupAst(const std::string& name, const int flagPos)
-    : OptionBaseAst(name), flagPos(flagPos) {}
+Argon::OptionGroupAst::OptionGroupAst(const Token& flagToken)
+    : OptionBaseAst(flagToken) {}
 
 void Argon::OptionGroupAst::addOption(std::unique_ptr<OptionBaseAst> option) {
     if (option == nullptr) {
@@ -42,17 +48,17 @@ void Argon::OptionGroupAst::addOption(std::unique_ptr<OptionBaseAst> option) {
 }
 
 void Argon::OptionGroupAst::analyze(Parser& parser, Context& context) {
-    IOption *iOption = context.getOption(flag);
+    IOption *iOption = context.getOption(flag.value);
     if (!iOption) {
-        parser.removeErrorGroup(flagPos);
-        parser.addError("Unknown option group: '" + flag + "'", flagPos);
+        parser.removeErrorGroup(flag.pos);
+        parser.addError(std::format("Unknown option group: '{}'", flag.value), flag.pos);
         return;
     }
     
     OptionGroup *optionGroup = dynamic_cast<OptionGroup*>(iOption);
     if (!optionGroup) {
-        parser.removeErrorGroup(flagPos);
-        parser.addError("Flag '" + flag + "' is not an option group", flagPos);
+        parser.removeErrorGroup(flag.pos);
+        parser.addError(std::format("Flag '{}' is not an option group", flag.value), flag.pos);
         return;
     }
     

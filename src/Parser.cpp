@@ -4,65 +4,9 @@
 
 #include "Argon/Option.hpp"
 
-Argon::Parser::Parser(const Parser& parser) {
-    for (auto& option : parser.m_options) {
-        this->m_options.push_back(option->clone());
-    }
-}
-
-Argon::Parser::Parser(Parser&& parser) noexcept {
-    m_options = std::move(parser.m_options);
-}
-
-Argon::Parser& Argon::Parser::operator=(const Parser& parser) {
-    if (this != &parser) {
-        // Cleanup existing object
-        for (auto& option : parser.m_options) {
-            delete option;
-        }
-        m_options.clear();
-
-        // Copy from old object 
-        m_options.reserve(parser.m_options.size());
-        for (auto& option : parser.m_options) {
-            m_options.push_back(option->clone());
-        }
-    }
-    return *this;
-}
-
-Argon::Parser& Argon::Parser::operator=(Parser&& parser) noexcept {
-    if (this != &parser) {
-        // Cleanup existing object
-        for (auto& option : m_options) {
-            delete option;
-        }
-        // Move from old object
-        m_options = std::move(parser.m_options);
-    }
-    return *this;
-}
-
-Argon::Parser::~Parser() {
-    for (auto& option : m_options) {
-        delete option;
-    }
-}
-
 void Argon::Parser::addOption(const IOption& option) {
-    m_options.push_back(option.clone());
+    m_context.addOption(option);
  }
-
-Argon::IOption *Argon::Parser::getOption(const std::string& flag) {
-    return Argon::getOption(m_options, flag);
-}
-
-Argon::IOption* Argon::getOption(const std::vector<IOption*>& options, const std::string& flag) {
-    auto it = std::ranges::find_if(options, [&flag](const auto& option) {
-       return std::ranges::contains(option->get_flags(), flag); 
-    });
-    return it == options.end() ? nullptr : *it;
-}
 
 void Argon::Parser::addError(const std::string& error, const int pos) {
     m_analysisErrors.addErrorMessage(error, pos);
@@ -79,7 +23,7 @@ void Argon::Parser::removeErrorGroup(const int startPos) {
 void Argon::Parser::parseString(const std::string& str) {
     m_scanner = Scanner(str);
     StatementAst ast = parseStatement();
-    ast.analyze(*this, m_options);
+    ast.analyze(*this, m_context);
     m_syntaxErrors.printErrorsTreeMode();
     m_analysisErrors.printErrorsTreeMode();
     // m_analysisErrors.printErrorsFlatMode();
@@ -87,7 +31,6 @@ void Argon::Parser::parseString(const std::string& str) {
 
 Argon::StatementAst Argon::Parser::parseStatement() {
     StatementAst statement;
-    std::vector<std::string> localFlags = getLocalFlags(m_options);
     bool stop = false;
     while (!stop) {
         m_scanner.recordPosition();
@@ -129,12 +72,12 @@ Argon::StatementAst Argon::Parser::parseStatement() {
         // OptionGroup
         if (token2.kind == TokenKind::LBRACK) {
             m_scanner.rewind();
-            statement.addOption(parseOptionGroup(m_options, localFlags));
+            statement.addOption(parseOptionGroup(m_context));
         }
         // Option
         else if (token2.kind == TokenKind::IDENTIFIER) {
             m_scanner.rewind();
-            statement.addOption(parseOption(localFlags));
+            statement.addOption(parseOption(m_context));
         }
         
         stop = m_scanner.seeTokenKind(TokenKind::END);
@@ -142,7 +85,7 @@ Argon::StatementAst Argon::Parser::parseStatement() {
     return statement;
 }
 
-std::unique_ptr<Argon::OptionAst> Argon::Parser::parseOption(const std::vector<std::string>& sameLevelFlags) {
+std::unique_ptr<Argon::OptionAst> Argon::Parser::parseOption(const Context& context) {
     bool error = false;
     // Get flag
     Token flag = m_scanner.getNextToken();
@@ -152,7 +95,7 @@ std::unique_ptr<Argon::OptionAst> Argon::Parser::parseOption(const std::vector<s
     }
 
     // If the flag is not valid
-    if (!std::ranges::contains(sameLevelFlags, flag.image)) {
+    if (!context.containsLocalFlag(flag.image)) {
         m_analysisErrors.addErrorMessage(std::format("Unknown flag: '{}' at position {}", flag.image, flag.position), flag.position);
         error = true;
     }
@@ -166,7 +109,7 @@ std::unique_ptr<Argon::OptionAst> Argon::Parser::parseOption(const std::vector<s
     }
 
     // If value matches a flag
-    if (std::ranges::contains(sameLevelFlags, value.image)) {
+    if (context.containsLocalFlag(value.image)) {
         m_syntaxErrors.addErrorMessage(std::format("No value provided for flag '{}' at position {}", flag.image, flag.position), value.position);
         m_scanner.rewind();
         error = true;
@@ -175,8 +118,7 @@ std::unique_ptr<Argon::OptionAst> Argon::Parser::parseOption(const std::vector<s
     return error ? nullptr : std::make_unique<OptionAst>(flag.image, value.image, flag.position, value.position);
 }
 
-std::unique_ptr<Argon::OptionGroupAst> Argon::Parser::parseOptionGroup(
-    const std::vector<IOption*>& sameLevelOptions, const std::vector<std::string>& sameLevelFlags) {
+std::unique_ptr<Argon::OptionGroupAst> Argon::Parser::parseOptionGroup(Context& context) {
     // Get flag
     Token flag = m_scanner.getNextToken();
     if (flag.kind != TokenKind::IDENTIFIER) {
@@ -186,13 +128,13 @@ std::unique_ptr<Argon::OptionGroupAst> Argon::Parser::parseOptionGroup(
 
     bool validFlag = true;
     // If the flag is not valid
-    if (!std::ranges::contains(sameLevelFlags, flag.image)) {
+    if (!context.containsLocalFlag(flag.image)) {
         m_analysisErrors.addErrorMessage(std::format("Unknown flag: '{}' at position {}", flag.image, flag.position), flag.position);
         validFlag = false;
     }
 
-    OptionGroup *groupOption = dynamic_cast<OptionGroup*>(Argon::getOption(sameLevelOptions, flag.image));
-    if (groupOption == nullptr && validFlag) {
+    OptionGroup *optionGroup = context.getOptionDynamic<OptionGroup>(flag.image);
+    if (optionGroup == nullptr && validFlag) {
         m_analysisErrors.addErrorMessage(std::format("Flag '{}' at position {} is not an option group", flag.image, flag.position), flag.position);
         validFlag = false;
     }
@@ -214,11 +156,11 @@ std::unique_ptr<Argon::OptionGroupAst> Argon::Parser::parseOptionGroup(
         return nullptr;
     }
     
-    std::unique_ptr<OptionGroupAst> optionGroup = std::make_unique<OptionGroupAst>(flag.image, flag.position);
+    std::unique_ptr<OptionGroupAst> optionGroupAst = std::make_unique<OptionGroupAst>(flag.image, flag.position);
     
     // TODO: Right now, this can immediately stop if there is '[]' with no options inside
     while (true) {
-        std::vector<std::string> nextLevelFlags = getLocalFlags(groupOption->get_options());
+        Context& nextContext = optionGroup->get_context();
         
         // Get flag
         m_scanner.recordPosition();
@@ -230,14 +172,14 @@ std::unique_ptr<Argon::OptionGroupAst> Argon::Parser::parseOptionGroup(
         }
         
         if (token1.kind == TokenKind::RBRACK) {
-            optionGroup->endPos = token1.position;
-            m_analysisErrors.addErrorGroup(optionGroup->flag, optionGroup->flagPos, optionGroup->endPos);
-            return optionGroup;
+            optionGroupAst->endPos = token1.position;
+            m_analysisErrors.addErrorGroup(optionGroupAst->flag, optionGroupAst->flagPos, optionGroupAst->endPos);
+            return optionGroupAst;
         } else if (token1.kind == TokenKind::END) {
-            optionGroup->endPos = token1.position;
-            m_analysisErrors.addErrorGroup(optionGroup->flag, optionGroup->flagPos, optionGroup->endPos);
+            optionGroupAst->endPos = token1.position;
+            m_analysisErrors.addErrorGroup(optionGroupAst->flag, optionGroupAst->flagPos, optionGroupAst->endPos);
             m_syntaxErrors.addErrorMessage("No matching ']' found for group " + flag.image, token1.position);
-            return optionGroup;
+            return optionGroupAst;
         } 
 
         // Get value for option/lbrack for option group
@@ -250,16 +192,16 @@ std::unique_ptr<Argon::OptionGroupAst> Argon::Parser::parseOptionGroup(
         
         if (token2.kind == TokenKind::IDENTIFIER) {
             m_scanner.rewind();
-            optionGroup->addOption(parseOption(nextLevelFlags));
+            optionGroupAst->addOption(parseOption(nextContext));
         } else if (token2.kind == TokenKind::LBRACK) {
             m_scanner.rewind();
-            optionGroup->addOption(parseOptionGroup(groupOption->get_options(), nextLevelFlags));
+            optionGroupAst->addOption(parseOptionGroup(nextContext));
         } else if (token2.kind == TokenKind::END) {
             m_syntaxErrors.addErrorMessage(
                     std::format("Expected option or option group, got {} at position {}", token2.image, token2.position),
                     token2.position);
             m_syntaxErrors.addErrorMessage("No matching ']' found for group " + flag.image, token1.position);
-            return optionGroup;
+            return optionGroupAst;
         }
     }
 }

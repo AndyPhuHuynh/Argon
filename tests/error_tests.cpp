@@ -109,7 +109,7 @@ static void SyntaxError1() {
 }
 
 void runErrorTests() {
-    // MessageTest1();
-    // GroupTest1();
+    MessageTest1();
+    GroupTest1();
     SyntaxError1();
 }

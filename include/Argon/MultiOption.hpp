@@ -14,6 +14,7 @@ namespace Argon {
         T (*m_out)[];
         size_t m_size;
         size_t m_nextIndex = 0;
+        bool m_maxCapacityError = false;
     public:
         MultiOption(T (*out)[]);
 
@@ -31,6 +32,7 @@ namespace Argon {
         Converter<T> converter;
         std::array<T, N>* m_out;
         size_t m_nextIndex = 0;
+        bool m_maxCapacityError = false;
     public:
         MultiOption(std::array<T, N>* out);
 
@@ -121,8 +123,14 @@ namespace Argon {
 
     template <typename T>
     void MultiOption<T[]>::set_value(const std::string& flag, const std::string& value) {
+        if (m_maxCapacityError) {
+            this->m_error.clear();
+            return;
+        }
+        
         if (m_nextIndex >= m_size) {
             this->m_error = std::format("Flag '{}' only supports a maximum of {} values", flag, m_size);
+            m_maxCapacityError = true;
             return;
         }
         
@@ -155,8 +163,14 @@ namespace Argon {
 
     template <typename T, size_t N>
     void MultiOption<std::array<T, N>>::set_value(const std::string& flag, const std::string& value) {
+        if (m_maxCapacityError) {
+            this->m_error.clear();
+            return;
+        }
+        
         if (m_nextIndex >= N) {
             this->m_error = std::format("Flag '{}' only supports a maximum of {} values", flag, N);
+            m_maxCapacityError = true;
             return;
         }
         

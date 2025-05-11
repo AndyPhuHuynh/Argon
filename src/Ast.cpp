@@ -1,5 +1,6 @@
 ﻿#include "Argon/Ast.hpp"
 
+#include "Argon/Context.hpp"
 #include "Argon/Option.hpp"
 
 Argon::OptionBaseAst::OptionBaseAst(std::string name) : flag(std::move(name)) {}
@@ -9,8 +10,8 @@ Argon::OptionBaseAst::OptionBaseAst(std::string name) : flag(std::move(name)) {}
 Argon::OptionAst::OptionAst(const std::string& name, std::string value, const int flagPos, const int valuePos)
     : OptionBaseAst(name), value(std::move(value)), flagPos(flagPos), valuePos(valuePos) {}
 
-void Argon::OptionAst::analyze(Parser& parser, const std::vector<IOption*>& options) {
-    IOption *iOption = getOption(options, flag);
+void Argon::OptionAst::analyze(Parser& parser, Context& context) {
+    IOption *iOption = context.getOption(flag);
     if (!iOption) {
         parser.addError("Unknown option: '" + flag + "'", flagPos);
         return;
@@ -40,8 +41,8 @@ void Argon::OptionGroupAst::addOption(std::unique_ptr<OptionBaseAst> option) {
     m_options.push_back(std::move(option)); 
 }
 
-void Argon::OptionGroupAst::analyze(Parser& parser, const std::vector<IOption*>& options) {
-    IOption *iOption = getOption(options, flag);
+void Argon::OptionGroupAst::analyze(Parser& parser, Context& context) {
+    IOption *iOption = context.getOption(flag);
     if (!iOption) {
         parser.removeErrorGroup(flagPos);
         parser.addError("Unknown option group: '" + flag + "'", flagPos);
@@ -56,7 +57,7 @@ void Argon::OptionGroupAst::analyze(Parser& parser, const std::vector<IOption*>&
     }
     
     for (const auto& option : m_options) {
-        option->analyze(parser, optionGroup->get_options());
+        option->analyze(parser, optionGroup->get_context());
     }
 }
 
@@ -69,8 +70,8 @@ void Argon::StatementAst::addOption(std::unique_ptr<OptionBaseAst> option) {
     m_options.push_back(std::move(option));    
 }
 
-void Argon::StatementAst::analyze(Parser& parser, const std::vector<IOption*>& options) {
+void Argon::StatementAst::analyze(Parser& parser, Context& context) {
     for (const auto& option : m_options) {
-        option->analyze(parser, options);
+        option->analyze(parser, context);
     }
 }

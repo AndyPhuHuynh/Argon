@@ -77,18 +77,15 @@ Argon::OptionGroup& Argon::OptionGroup::operator+(const IOption& other) {
 }
 
 void Argon::OptionGroup::add_option(const IOption& option) {
-    m_options.push_back(option.clone());
+    m_context.addOption(option);
 }
 
 Argon::IOption *Argon::OptionGroup::get_option(const std::string& flag) {
-    auto it = std::ranges::find_if(m_options, [&flag](const auto& option) {
-        return std::ranges::contains(option->get_flags(), flag);
-    });
-    return it == m_options.end() ? nullptr : *it;
+    return m_context.getOption(flag);
 }
 
-const std::vector<Argon::IOption*>& Argon::OptionGroup::get_options() const {
-    return m_options;
+Argon::Context& Argon::OptionGroup::get_context() {
+    return m_context;
 }
 
 bool Argon::parseBool(const std::string& arg, bool& out) {
@@ -102,13 +99,4 @@ bool Argon::parseBool(const std::string& arg, bool& out) {
         return true;
     }
     return false;
-}
-
-std::vector<std::string> Argon::getLocalFlags(const std::vector<IOption*>& options) {
-    std::vector<std::string> flags;
-    for (const auto& iOption : options) {
-        auto optionFlags = iOption->get_flags();
-        flags.insert(flags.end(), optionFlags.begin(), optionFlags.end());
-    }
-    return flags;
 }

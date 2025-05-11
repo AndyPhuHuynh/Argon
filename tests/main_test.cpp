@@ -1,3 +1,5 @@
+#include <array>
+
 #include "testing.hpp"
 
 #include <iostream>
@@ -137,13 +139,22 @@ void MultiOptionTest() {
     std::string name;
     Option opt = Option(&name)["--name"];
     
-    std::vector<int> options;
-
-    auto conv = [] (const std::string& input, int& output) {
-        output = 2;
-    };
+    std::array<int, 3> options;
     
     MultiOption multi = MultiOption(&options)["--options"];
+
+    int i = 0;
+    while (i < 10) {
+        // std::cout << "Iteration: " << i << "\n";
+
+        multi.set_value("--what", std::to_string(i));
+        if (multi.has_error()) {
+            std::cout << multi.get_error() << "\n";
+        } else {
+            std::cout << "No error\n";
+        }
+        i++;
+    }
 }
 
 int main() {
@@ -152,6 +163,9 @@ int main() {
     // MissingFlagNested();
     // UnknownGroup();
     StudentTest();
+    // MultiOptionTest();
+    // runScannerTests();
+    // runOptionsTests();
     // runErrorTests();
     return 0;
     std::string name;

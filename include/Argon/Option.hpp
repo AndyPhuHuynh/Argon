@@ -39,7 +39,7 @@ namespace Argon {
         bool has_error() const;
         void clear_error();
         
-        virtual IOption* clone() const = 0;
+        virtual std::unique_ptr<IOption> clone() const = 0;
     };
     
     template <typename Derived>
@@ -48,7 +48,7 @@ namespace Argon {
 
         OptionComponent() = default;
     public:
-        IOption* clone() const override;
+        std::unique_ptr<IOption> clone() const override;
         Derived& operator[](const std::string& tag);
     };
     
@@ -93,28 +93,26 @@ namespace Argon {
     };
 
     class OptionGroup : public OptionComponent<OptionGroup> {
-        std::vector<IOption*> m_options;
+        Context m_context;
     public:
         OptionGroup& operator+(const IOption& other);
 
         void add_option(const IOption& option);
         IOption *get_option(const std::string& flag);
-        const std::vector<IOption*>& get_options() const;
+        Context& get_context();
     };
     
     template<typename T>
     bool parseNonBoolIntegralType(const std::string& arg, T& out);
     bool parseBool(const std::string& arg, bool& out);
-
-    std::vector<std::string> getLocalFlags(const std::vector<IOption*>& options);
 }
 
 // Template Implementations
 
 namespace Argon {
     template <typename Derived>
-    IOption* OptionComponent<Derived>::clone() const {
-        return new Derived(static_cast<const Derived&>(*this));
+    std::unique_ptr<IOption> OptionComponent<Derived>::clone() const {
+        return std::make_unique<Derived>(static_cast<const Derived&>(*this));
     }
 
     template <typename Derived>
@@ -182,7 +180,7 @@ namespace Argon {
 
     template <typename T>
     bool Converter<T>::has_error() {
-        return m_error.empty();
+        return !m_error.empty();
     }
 
     template <typename T>

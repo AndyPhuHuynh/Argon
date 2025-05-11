@@ -9,6 +9,7 @@ add_custom_target(Documentation SOURCES ${DOC_FILES})
 
 set(INCLUDE_FILES 
     ${CMAKE_SOURCE_DIR}/include/Argon/Ast.hpp
+    ${CMAKE_SOURCE_DIR}/include/Argon/Context.hpp
     ${CMAKE_SOURCE_DIR}/include/Argon/Error.hpp
     ${CMAKE_SOURCE_DIR}/include/Argon/MultiOption.hpp
     ${CMAKE_SOURCE_DIR}/include/Argon/Option.hpp
@@ -20,6 +21,7 @@ set(INCLUDE_FILES
 
 set(SOURCE_FILES
     ${CMAKE_SOURCE_DIR}/src/Ast.cpp
+    ${CMAKE_SOURCE_DIR}/src/Context.cpp
     ${CMAKE_SOURCE_DIR}/src/Error.cpp
     ${CMAKE_SOURCE_DIR}/src/Option.cpp
     ${CMAKE_SOURCE_DIR}/src/Parser.cpp

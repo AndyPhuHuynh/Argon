@@ -35,6 +35,16 @@ void Argon::OptionAst::analyze(Parser& parser, Context& context) {
     }
 }
 
+// MultiOptionAst
+
+Argon::MultiOptionAst::MultiOptionAst(const Token &flagToken) : OptionBaseAst(flagToken) {
+
+}
+
+void Argon::MultiOptionAst::addValue(const Token &value) {
+    m_values.emplace_back(value.image, value.position);
+}
+
 // OptionGroupAst
 
 Argon::OptionGroupAst::OptionGroupAst(const Token& flagToken)

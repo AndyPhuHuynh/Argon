@@ -6,17 +6,19 @@
 namespace Argon {
     template <typename T>
     class MultiOption;
-    
+
+    class IsMultiOption {};
+
     // MultiOption with C-Style array
     template<typename T>
-    class MultiOption<T[]> : public OptionBase, public OptionComponent<MultiOption<T[]>> {
+    class MultiOption<T[]> : public OptionBase, public OptionComponent<MultiOption<T[]>>, public IsMultiOption {
         Converter<T> converter;
         T (*m_out)[];
         size_t m_size;
         size_t m_nextIndex = 0;
         bool m_maxCapacityError = false;
     public:
-        MultiOption(T (*out)[]);
+        explicit MultiOption(T (*out)[]);
 
         MultiOption(T (*out)[], const ConversionFn<T>& conversion_func);
         
@@ -28,13 +30,13 @@ namespace Argon {
     // MultiOption with std::array
     
     template<typename T, size_t N>
-    class MultiOption<std::array<T, N>> : public OptionBase, public OptionComponent<MultiOption<std::array<T, N>>> {
+    class MultiOption<std::array<T, N>> : public OptionBase, public OptionComponent<MultiOption<std::array<T, N>>>, public IsMultiOption{
         Converter<T> converter;
         std::array<T, N>* m_out;
         size_t m_nextIndex = 0;
         bool m_maxCapacityError = false;
     public:
-        MultiOption(std::array<T, N>* out);
+        explicit MultiOption(std::array<T, N>* out);
 
         MultiOption(std::array<T, N>* out, const ConversionFn<T>& conversion_func);
         
@@ -45,12 +47,12 @@ namespace Argon {
 
     // MultiOption with std::vector
     template<typename T>
-    class MultiOption<std::vector<T>> : public OptionBase, public OptionComponent<MultiOption<std::vector<T>>> {
+    class MultiOption<std::vector<T>> : public OptionBase, public OptionComponent<MultiOption<std::vector<T>>>, public IsMultiOption {
         Converter<T> converter;
         std::vector<T>* m_out;
 
     public:
-        MultiOption(std::vector<T>* out);
+        explicit MultiOption(std::vector<T>* out);
 
         MultiOption(std::vector<T>* out, const ConversionFn<T>& conversion_func);
         

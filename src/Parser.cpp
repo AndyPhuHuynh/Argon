@@ -2,6 +2,7 @@
 
 #include <algorithm>
 
+#include "Argon/MultiOption.hpp"
 #include "Argon/Option.hpp"
 
 void Argon::Parser::addOption(const IOption& option) {
@@ -86,7 +87,6 @@ Argon::StatementAst Argon::Parser::parseStatement() {
 }
 
 std::unique_ptr<Argon::OptionAst> Argon::Parser::parseOption(Context& context) {
-    bool error = false;
     // Get flag
     Token flag = m_scanner.getNextToken();
     if (flag.kind != TokenKind::IDENTIFIER) {
@@ -94,32 +94,60 @@ std::unique_ptr<Argon::OptionAst> Argon::Parser::parseOption(Context& context) {
         flag = m_scanner.scanUntilGet({TokenKind::IDENTIFIER});
     }
 
-    // If the flag is not valid
+    // If the flag is not valid, scan until we find a valid flag
     if (!context.containsLocalFlag(flag.image)) {
         m_analysisErrors.addErrorMessage(std::format("Unknown flag: '{}' at position {}", flag.image, flag.position), flag.position);
-        error = true;
-    }
-    
-    if (OptionBase *option = context.getOptionDynamic<OptionBase>(flag.image)) {
-        
-    }
-    
-    // Get value
-    m_scanner.recordPosition();
-    Token value = m_scanner.getNextToken();
-    if (value.kind != TokenKind::IDENTIFIER) {
-        m_syntaxErrors.addErrorMessage(std::format("Expected flag value, got '{}' at position {}", value.image, value.position), value.position);
-        value = m_scanner.scanUntilGet({TokenKind::IDENTIFIER});
+
+        while (true) {
+            const Token nextToken = m_scanner.peekToken();
+
+            const bool isFlag = nextToken.kind == TokenKind::IDENTIFIER && context.containsLocalFlag(nextToken.image);
+            const bool notIdentifier = nextToken.kind != TokenKind::IDENTIFIER;
+            if (isFlag || notIdentifier) {
+                return nullptr;
+            }
+
+            m_scanner.getNextToken();
+        }
     }
 
-    // If value matches a flag
-    if (context.containsLocalFlag(value.image)) {
-        m_syntaxErrors.addErrorMessage(std::format("No value provided for flag '{}' at position {}", flag.image, flag.position), value.position);
-        m_scanner.rewind();
-        error = true;
+    // If the flag is an option group
+    if (context.getOptionDynamic<OptionGroup>(flag.image)) {
+        m_analysisErrors.addErrorMessage(std::format("Flag '{}' at position {} is not a single or multi option", flag.image, flag.position), flag.position);
+        return nullptr;
     }
-    
-    return error ? nullptr : std::make_unique<OptionAst>(flag, value);
+
+    // We now have a valid flag
+    OptionBase *option = context.getOptionDynamic<OptionBase>(flag.image);
+    if (dynamic_cast<IsSingleOption*>(option)) {
+        // Get value
+        m_scanner.recordPosition();
+        Token value = m_scanner.getNextToken();
+        if (value.kind != TokenKind::IDENTIFIER) {
+            m_syntaxErrors.addErrorMessage(std::format("Expected flag value, got '{}' at position {}", value.image, value.position), value.position);
+            value = m_scanner.scanUntilGet({TokenKind::IDENTIFIER});
+        }
+
+        // If value matches a flag
+        if (context.containsLocalFlag(value.image)) {
+            m_syntaxErrors.addErrorMessage(std::format("No value provided for flag '{}' at position {}", flag.image, flag.position), value.position);
+            m_scanner.rewind();
+        }
+
+        return std::make_unique<OptionAst>(flag, value);
+    } else if (dynamic_cast<IsMultiOption*>(option)) {
+        while (true) {
+            const Token nextToken = m_scanner.peekToken();
+
+            if (nextToken.kind == TokenKind::END) break;
+
+            if (!context.containsLocalFlag(nextToken.image)) {
+
+            } else {
+
+            }
+        }
+    }
 }
 
 std::unique_ptr<Argon::OptionGroupAst> Argon::Parser::parseOptionGroup(Context& context) {

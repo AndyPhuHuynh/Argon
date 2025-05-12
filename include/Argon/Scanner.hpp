@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace Argon {
@@ -19,7 +20,7 @@ namespace Argon {
         int position = 0;
 
         Token() = default;
-        Token(TokenKind kind);
+        explicit Token(TokenKind kind);
         Token(TokenKind kind, std::string image);
         Token(TokenKind kind, int position);
         Token(TokenKind kind, std::string image, int position);
@@ -29,23 +30,31 @@ namespace Argon {
     std::string getDefaultImage(TokenKind kind);
     
     class Scanner {
-        std::string m_buffer;
-        uint32_t m_bufferPos = 0;
-
-        uint32_t m_rewindPos = 0;
     public:
         Scanner() = default;
-        explicit Scanner(std::string buffer) : m_buffer(std::move(buffer)) {}
+        explicit Scanner(std::string_view buffer);
 
-        bool seeTokenKind(TokenKind kind);
+        bool seeTokenKind(TokenKind kind) const;
+        bool seeTokenKind(const std::initializer_list<TokenKind>& kinds) const;
         char peekChar() const;
         char nextChar();
         Token getNextToken();
+        Token peekToken() const;
         
         void scanUntilSee(const std::initializer_list<TokenKind>& kinds);
         Token scanUntilGet(const std::initializer_list<TokenKind>& kinds);
         
         void recordPosition();
         void rewind();
+    private:
+        std::vector<Token> m_tokens;
+        uint32_t m_tokenPos = 0;
+        uint32_t m_rewindPos = 0;
+
+        std::string_view m_buffer;
+        uint32_t m_bufferPos = 0;
+
+        void scanNextToken();
+        void scanBuffer();
     };
 }

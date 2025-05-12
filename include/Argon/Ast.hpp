@@ -46,14 +46,20 @@ namespace Argon {
     };
 
     class MultiOptionAst : public OptionBaseAst {
-        std::vector<Value> values;
+        std::vector<Value> m_values;
+
+    public:
+        explicit MultiOptionAst(const Token& flagToken);
+        ~MultiOptionAst() override = default;
+
+        void addValue(const Token& value);
     };
     
     class OptionGroupAst : public OptionBaseAst {
     public:
         int endPos = -1;
-        
-        OptionGroupAst(const Token& flagToken);
+
+        explicit OptionGroupAst(const Token& flagToken);
         
         OptionGroupAst(const OptionGroupAst&) = delete;
         OptionGroupAst& operator=(const OptionGroupAst&) = delete;

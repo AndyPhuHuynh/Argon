@@ -75,9 +75,11 @@ namespace Argon {
         bool has_error() const;
         std::string get_error();
     };
-    
+
+    class IsSingleOption {};
+
     template <typename T>
-    class Option : public OptionBase, public OptionComponent<Option<T>> {
+    class Option : public OptionBase, public OptionComponent<Option<T>>, public IsSingleOption {
         Converter<T> converter;
         T *m_out = nullptr;
     public:

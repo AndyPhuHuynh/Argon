@@ -56,10 +56,10 @@ static void StudentTest() {
                             + Option(&minor)["--minor"]
                             + Option(&instrumentName)["--name"]);
     
-    std::string str = "--wtf true --name John --group [--age 20aasdf --major CS --nested [--minor music --name violin --null hi --null2 what] --back test] -top-level huh";
+    // std::string str = "--wtf true --name John --group [--age 20aasdf --major CS --nested [--minor music --name violin --null hi --null2 what] --back test] -top-level huh";
     // std::string str = "--name John --outside asdfasd --group [--age 20aasdf --major CS --nested [--minor music --name violin --null hi] --back asdfas] --outter2 asdfas";
-    std::string working = "--name John --group [--age 20asdf --major CS --nested [--minor music --name violin]]";
-    parser.parseString(str);
+    const std::string working = "--name John --group [--age 20asdf --major CS --nested [--minor music --name violin]]";
+    parser.parseString(working);
     
     std::cout << "name: " << name << "\n";
     std::cout << "age: " << age << "\n";
@@ -86,8 +86,8 @@ static void UnknownGroup() {
                             + Option(&minor)["--minor"]
                             + Option(&instrumentName)["--name"]);
 
-    
-    std::string input = "--name [-- what john] --unknowngroup [--what the --fuck ?]";
+
+    const std::string input = "--name [-- what john] --unknowngroup [--what the --fuck ?]";
     parser.parseString(input);
 }
 
@@ -101,7 +101,7 @@ static void MissingFlag() {
                     | Option(&age)["--age"]
                     | Option(&major)["--major"];
 
-    std::string input = "--name --age 10 --major music";
+    const std::string input = "--name --age 10 --major music";
     parser.parseString(input);
 
     std::cout << std::format("Name: {}\n Age: {}\nMajor: {}\n", name, age, major);
@@ -125,8 +125,8 @@ static void MissingFlagNested() {
                             + Option(&minor)["--minor"]
                             + Option(&instrumentName)["--name"]);
 
-    
-    std::string input = "--name John --group [--age --major music]";
+
+    const std::string input = "--name John --group [--age --major music]";
     parser.parseString(input);
     std::cout << "Name: " << name << "\n";
     std::cout << "Age: " << age << "\n";
@@ -162,8 +162,8 @@ int main() {
     // MissingFlag();
     // MissingFlagNested();
     // UnknownGroup();
-    StudentTest();
-    // MultiOptionTest();
+    // StudentTest();
+    MultiOptionTest();
     // runScannerTests();
     // runOptionsTests();
     // runErrorTests();

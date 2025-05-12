@@ -19,12 +19,12 @@ static void Test1() {
     }
 
     const std::vector<Token> expected = {
-        {TokenKind::IDENTIFIER, "hello"},
-        {TokenKind::IDENTIFIER, "world!"},
-        {TokenKind::LBRACK},
-        {TokenKind::IDENTIFIER, "inside"},
-        {TokenKind::IDENTIFIER, "brackets"},
-        {TokenKind::RBRACK},
+        Token(TokenKind::IDENTIFIER, "hello"),
+        Token(TokenKind::IDENTIFIER, "world!"),
+        Token(TokenKind::LBRACK),
+        Token(TokenKind::IDENTIFIER, "inside"),
+        Token(TokenKind::IDENTIFIER, "brackets"),
+        Token(TokenKind::RBRACK),
     };
 
     bool equals = true;
@@ -53,13 +53,13 @@ static void Test2() {
     std::vector<Token> expected = {
         {TokenKind::IDENTIFIER, "hello"},
         {TokenKind::IDENTIFIER, "world!"},
-        {TokenKind::LBRACK},
-        {TokenKind::LBRACK},   
-        {TokenKind::LBRACK},   
-        {TokenKind::LBRACK},   
+        Token(TokenKind::LBRACK),
+        Token(TokenKind::LBRACK),
+        Token(TokenKind::LBRACK),
+        Token(TokenKind::LBRACK),
         {TokenKind::IDENTIFIER, "inside"},
         {TokenKind::IDENTIFIER, "brackets"},
-        {TokenKind::RBRACK},
+        Token(TokenKind::RBRACK),
     };
 
     bool equals = true;

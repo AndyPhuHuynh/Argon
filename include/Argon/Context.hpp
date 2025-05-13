@@ -22,7 +22,7 @@ namespace Argon {
         template <typename T>
         T *getOptionDynamic(const std::string& flag);
         
-        bool containsLocalFlag(const std::string& flag) const;
+        [[nodiscard]] bool containsLocalFlag(const std::string& flag) const;
     };
 }
 

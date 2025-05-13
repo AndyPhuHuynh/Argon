@@ -172,8 +172,10 @@ std::unique_ptr<Argon::OptionGroupAst> Argon::Parser::parseOptionGroup(Context& 
     }
 
     OptionGroup *optionGroup = context.getOptionDynamic<OptionGroup>(flag.image);
-    if (optionGroup == nullptr && validFlag) {
-        m_analysisErrors.addErrorMessage(std::format("Flag '{}' at position {} is not an option group", flag.image, flag.position), flag.position);
+    if (optionGroup == nullptr) {
+        if (validFlag) {
+            m_analysisErrors.addErrorMessage(std::format("Flag '{}' at position {} is not an option group", flag.image, flag.position), flag.position);
+        }
         validFlag = false;
     }
     
@@ -181,7 +183,7 @@ std::unique_ptr<Argon::OptionGroupAst> Argon::Parser::parseOptionGroup(Context& 
     Token lbrack = m_scanner.getNextToken();
     if (lbrack.kind != TokenKind::LBRACK) {
         m_syntaxErrors.addErrorMessage(std::format("Expected '[', got '{}' at position {}", lbrack.image, lbrack.position), lbrack.position);
-        lbrack = m_scanner.scanUntilGet({TokenKind::LBRACK});
+        m_scanner.scanUntilGet({TokenKind::LBRACK});
     }
 
     // Early return if invalid flag

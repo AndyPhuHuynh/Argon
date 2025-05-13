@@ -15,9 +15,9 @@ namespace Argon {
     };
 
     struct Token {
-        TokenKind kind;
+        TokenKind kind = TokenKind::NONE;
         std::string image;
-        int position = 0;
+        int position = -1;
 
         Token() = default;
         explicit Token(TokenKind kind);
@@ -35,12 +35,12 @@ namespace Argon {
         Scanner() = default;
         explicit Scanner(std::string_view buffer);
 
-        bool seeTokenKind(TokenKind kind) const;
-        bool seeTokenKind(const std::initializer_list<TokenKind>& kinds) const;
-        char peekChar() const;
+        [[nodiscard]] bool seeTokenKind(TokenKind kind) const;
+        [[nodiscard]] bool seeTokenKind(const std::initializer_list<TokenKind>& kinds) const;
+        [[nodiscard]] char peekChar() const;
         char nextChar();
         Token getNextToken();
-        Token peekToken() const;
+        [[nodiscard]] Token peekToken() const;
         
         void scanUntilSee(const std::initializer_list<TokenKind>& kinds);
         Token scanUntilGet(const std::initializer_list<TokenKind>& kinds);

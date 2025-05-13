@@ -32,13 +32,13 @@ namespace Argon {
         Parser operator|(const IOption& other) const;
         explicit operator Parser() const;
 
-        const std::vector<std::string>& get_flags() const;
+        [[nodiscard]] const std::vector<std::string>& get_flags() const;
         void print_flags() const;
-        const std::string& get_error() const;
-        bool has_error() const;
+        [[nodiscard]] const std::string& get_error() const;
+        [[nodiscard]] bool has_error() const;
         void clear_error();
         
-        virtual std::unique_ptr<IOption> clone() const = 0;
+        [[nodiscard]] virtual std::unique_ptr<IOption> clone() const = 0;
     };
     
     template <typename Derived>
@@ -47,7 +47,7 @@ namespace Argon {
 
         OptionComponent() = default;
     public:
-        std::unique_ptr<IOption> clone() const override;
+        [[nodiscard]] std::unique_ptr<IOption> clone() const override;
         Derived& operator[](const std::string& tag);
     };
     
@@ -72,7 +72,7 @@ namespace Argon {
         void generate_error_msg(const std::string& flag, const std::string& invalidArg);
     public:
         void convert(const std::string& flag, const std::string& value, T& outValue);
-        bool has_error() const;
+        [[nodiscard]] bool has_error() const;
         std::string get_error();
     };
 

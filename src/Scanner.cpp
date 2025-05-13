@@ -64,7 +64,7 @@ char Argon::Scanner::nextChar() {
 
 Argon::Token Argon::Scanner::peekToken() const {
     if (m_tokenPos >= m_tokens.size()) {
-        return Token(TokenKind::END, m_buffer.size());
+        return {TokenKind::END, static_cast<int>(m_buffer.size())};
     } else {
         return m_tokens[m_tokenPos];
     }
@@ -72,7 +72,7 @@ Argon::Token Argon::Scanner::peekToken() const {
 
 Argon::Token Argon::Scanner::getNextToken() {
     if (m_tokenPos >= m_tokens.size()) {
-        return Token(TokenKind::END, m_buffer.size());
+        return {TokenKind::END, static_cast<int>(m_buffer.size())};
     } else {
         return m_tokens[m_tokenPos++];
     }

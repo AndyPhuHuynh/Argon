@@ -11,9 +11,9 @@
  */
 std::vector<std::string> Argon::StringUtil::split_string(const std::string& str, const char delimiter) {
     std::vector<std::string> tokens;
-    int prevIndex = 0;
-    const int length = static_cast<int>(str.length());
-    for (int i = 0; i < length; i++) {
+    size_t prevIndex = 0;
+    const size_t length = str.length();
+    for (size_t i = 0; i < length; i++) {
         if (str[i] == delimiter) {
             // Add token only if it's non-empty
             if (prevIndex != i) {
@@ -37,10 +37,15 @@ std::vector<std::string> Argon::StringUtil::split_string(const std::string& str,
 
 std::string Argon::StringUtil::format_with_commas(const int64_t value) {
     std::string num = std::to_string(value);
-    
-    int insertPosition = static_cast<int>(num.length()) - 3;
-    while (insertPosition > 0 && num[insertPosition - 1] != '-') {
+
+    if (num.length() <= 3) return num;
+
+    size_t insertPosition = num.length() - 3;
+    while (insertPosition > 0 && num[(insertPosition) - 1] != '-') {
         num.insert(insertPosition, ",");
+        if (insertPosition <= 3) {
+            break;
+        }
         insertPosition -= 3;
     }
     return num;
@@ -48,10 +53,15 @@ std::string Argon::StringUtil::format_with_commas(const int64_t value) {
 
 std::string Argon::StringUtil::format_with_underscores(const int64_t value) {
     std::string num = std::to_string(value);
-    
-    int insertPosition = static_cast<int>(num.length()) - 3;
-    while (insertPosition > 0 && num[insertPosition - 1] != '-') {
+
+    if (num.length() <= 3) return num;
+
+    size_t insertPosition = num.length() - 3;
+    while (insertPosition > 0 && num[(insertPosition) - 1] != '-') {
         num.insert(insertPosition, "_");
+        if (insertPosition <= 3) {
+            break;
+        }
         insertPosition -= 3;
     }
     return num;

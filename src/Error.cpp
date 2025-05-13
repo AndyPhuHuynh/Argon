@@ -72,17 +72,17 @@ void Argon::ErrorGroup::addErrorMessage(const std::string& msg, int pos) {
         return;
     }
     
-    int index = 0;
-    for (; index < static_cast<int>(m_errors.size()); index++) {
+    size_t index = 0;
+    for (; index < m_errors.size(); index++) {
         ErrorVariant& item = m_errors[index];
 
         if (std::holds_alternative<ErrorMessage>(item)) {
-            ErrorMessage& errorMsg = std::get<ErrorMessage>(item);
+            const ErrorMessage& errorMsg = std::get<ErrorMessage>(item);
             if (errorMsg.pos > pos) {
                 break;
             }
         } else if (std::holds_alternative<ErrorGroup>(item)) {
-            ErrorGroup& errorGroup = std::get<ErrorGroup>(item);
+            const ErrorGroup& errorGroup = std::get<ErrorGroup>(item);
             if (errorGroup.m_startPos > pos) {
                 break;
             }
@@ -111,11 +111,11 @@ void Argon::ErrorGroup::addErrorMessage(const std::string& msg, int pos) {
     }
 
     // Else insert at that index
-    if (index >= static_cast<int>(m_errors.size())) {
+    if (index >= m_errors.size()) {
         m_errors.emplace_back(std::in_place_type<ErrorMessage>, msg, pos);
         setHasErrors();
     } else {
-        m_errors.emplace(m_errors.begin() + index, std::in_place_type<ErrorMessage>, msg, pos);
+        m_errors.emplace(m_errors.begin() + static_cast<std::ptrdiff_t>(index), std::in_place_type<ErrorMessage>, msg, pos);
         setHasErrors();
     }
 }
@@ -131,8 +131,8 @@ void Argon::ErrorGroup::addErrorGroup(ErrorGroup& groupToAdd) {
     }
 
     // Find the sorted index of the start position
-    int insertIndex = 0;
-    for (; insertIndex < static_cast<int>(m_errors.size()); insertIndex++) {
+    size_t insertIndex = 0;
+    for (; insertIndex < m_errors.size(); insertIndex++) {
         ErrorVariant& item = m_errors[insertIndex];
 
         if (std::holds_alternative<ErrorMessage>(item)) {
@@ -156,8 +156,8 @@ void Argon::ErrorGroup::addErrorGroup(ErrorGroup& groupToAdd) {
         if (std::holds_alternative<ErrorGroup>(item)) {
             ErrorGroup& errorGroup = std::get<ErrorGroup>(item);
 
-            bool fullyInRange = inRange(groupToAdd.m_startPos, errorGroup.m_startPos, errorGroup.m_endPos) &&
-                                inRange(groupToAdd.m_endPos, errorGroup.m_startPos, errorGroup.m_endPos);
+            const bool fullyInRange = inRange(groupToAdd.m_startPos, errorGroup.m_startPos, errorGroup.m_endPos) &&
+                                      inRange(groupToAdd.m_endPos, errorGroup.m_startPos, errorGroup.m_endPos);
             if (fullyInRange) {
                 errorGroup.addErrorGroup(groupToAdd);
             } else {
@@ -169,12 +169,12 @@ void Argon::ErrorGroup::addErrorGroup(ErrorGroup& groupToAdd) {
 
     // If the previous item was not a group OR if it was a group and the error we want to add is not in its bounds
     // Check for every item after index and insert it into the new group, if its fully within bounds
-    while (insertIndex < static_cast<int>(m_errors.size())) {
+    while (insertIndex < m_errors.size()) {
         if (std::holds_alternative<ErrorMessage>(m_errors[insertIndex])) {
             ErrorMessage& errorMsg = std::get<ErrorMessage>(m_errors[insertIndex]);
             if (inRange(errorMsg.pos, groupToAdd.m_startPos, groupToAdd.m_endPos)) {
                 groupToAdd.addErrorMessage(errorMsg.msg, errorMsg.pos);
-                m_errors.erase(m_errors.begin() + insertIndex);
+                m_errors.erase(m_errors.begin() + static_cast<std::ptrdiff_t>(insertIndex));
             } else {
                 break;
             }
@@ -183,7 +183,7 @@ void Argon::ErrorGroup::addErrorGroup(ErrorGroup& groupToAdd) {
             if (inRange(errorGroup.m_startPos, groupToAdd.m_startPos, groupToAdd.m_endPos) &&
                 inRange(errorGroup.m_endPos, groupToAdd.m_startPos, groupToAdd.m_endPos)) {
                 groupToAdd.addErrorGroup(errorGroup);
-                m_errors.erase(m_errors.begin() + insertIndex);
+                m_errors.erase(m_errors.begin() + static_cast<std::ptrdiff_t>(insertIndex));
             } else if ((inRange(errorGroup.m_startPos, groupToAdd.m_startPos, groupToAdd.m_endPos) && !inRange(errorGroup.m_endPos, groupToAdd.m_startPos, groupToAdd.m_endPos)) ||
                 (inRange(errorGroup.m_endPos, groupToAdd.m_startPos, groupToAdd.m_endPos) && !inRange(errorGroup.m_startPos, groupToAdd.m_startPos, groupToAdd.m_endPos))) {
                 std::cerr << "Error adding error group, bounds overlap!\n";
@@ -194,10 +194,10 @@ void Argon::ErrorGroup::addErrorGroup(ErrorGroup& groupToAdd) {
     }
     
     // Insert group at index
-    if (insertIndex >= static_cast<int>(m_errors.size())) {
+    if (insertIndex >= m_errors.size()) {
         m_errors.emplace_back(std::move(groupToAdd));
     } else {
-        m_errors.insert(m_errors.begin() + insertIndex, std::move(groupToAdd));
+        m_errors.insert(m_errors.begin() + static_cast<std::ptrdiff_t>(insertIndex), std::move(groupToAdd));
     }
 }
 

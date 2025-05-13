@@ -3,7 +3,6 @@
 #include "testing.hpp"
 
 #include <iostream>
-#include <bits/ranges_algo.h>
 
 #include "Argon/MultiOption.hpp"
 #include "Argon/Option.hpp"
@@ -137,7 +136,7 @@ static void MissingFlagNested() {
 static void MultiOptionTest() {
     using namespace Argon;
     
-    std::array<int, 3> intArr;
+    std::array<int, 3> intArr{};
     std::vector<double> doubleArr;
 
     Parser parser = MultiOption(&intArr)["-i"]["--ints"]
@@ -153,7 +152,7 @@ static void MultiOptionTest() {
 static void MultiOptionGroupTest() {
     using namespace Argon;
 
-    std::array<int, 3> intArr;
+    std::array<int, 3> intArr{};
     std::vector<double> doubleArr;
 
     Parser parser = MultiOption(&intArr)["-i"]["--ints"]
@@ -172,9 +171,9 @@ int main() {
     // MissingFlag();
     // MissingFlagNested();
     // UnknownGroup();
-    // StudentTest();
-    MultiOptionTest();
-    MultiOptionGroupTest();
+    StudentTest();
+    // MultiOptionTest();
+    // MultiOptionGroupTest();
     // runScannerTests();
     // runOptionsTests();
     // runErrorTests();

@@ -17,7 +17,7 @@ namespace Argon {
     
     struct ErrorMessage {
         std::string msg;
-        int pos;
+        int pos = -1;
 
         ErrorMessage() = default;
         ErrorMessage(std::string msg, int pos);
@@ -42,8 +42,8 @@ namespace Argon {
         void addErrorGroup(const std::string& name, int startPos, int endPos);
         void removeErrorGroup(int startPos);
 
-        const std::string& getGroupName() const;
-        const std::vector<ErrorVariant>& getErrors() const;
+        [[nodiscard]] const std::string& getGroupName() const;
+        [[nodiscard]] const std::vector<ErrorVariant>& getErrors() const;
         
         void printErrorsFlatMode() const;
         void printErrorsTreeMode() const;
@@ -51,6 +51,6 @@ namespace Argon {
         ErrorGroup(std::string groupName, int startPos, int endPos, ErrorGroup* parent);
         
         void addErrorGroup(ErrorGroup& groupToAdd);
-        size_t getIndexOfLastHasError() const; 
+        [[nodiscard]] size_t getIndexOfLastHasError() const;
     };
 }

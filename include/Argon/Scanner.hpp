@@ -28,6 +28,7 @@ namespace Argon {
     };
 
     std::string getDefaultImage(TokenKind kind);
+    bool isOneOf(const Token& token, const std::initializer_list<TokenKind>& kinds);
     
     class Scanner {
     public:

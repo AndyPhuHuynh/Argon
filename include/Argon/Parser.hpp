@@ -28,7 +28,7 @@ namespace Argon {
         
         void parseString(const std::string& str);
         StatementAst parseStatement();
-        std::unique_ptr<OptionAst> parseOption(Context& context);
+        std::unique_ptr<OptionBaseAst> parseOption(Context& context);
         std::unique_ptr<OptionGroupAst> parseOptionGroup(Context& context);
         
         Parser& operator|(const IOption& option);

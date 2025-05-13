@@ -50,7 +50,7 @@ static void Test2() {
         token = scanner.getNextToken();
     }
 
-    std::vector<Token> expected = {
+    const std::vector<Token> expected = {
         {TokenKind::IDENTIFIER, "hello"},
         {TokenKind::IDENTIFIER, "world!"},
         Token(TokenKind::LBRACK),

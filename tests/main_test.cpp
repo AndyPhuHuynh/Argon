@@ -3,6 +3,7 @@
 #include "testing.hpp"
 
 #include <iostream>
+#include <bits/ranges_algo.h>
 
 #include "Argon/MultiOption.hpp"
 #include "Argon/Option.hpp"
@@ -133,28 +134,37 @@ static void MissingFlagNested() {
     std::cout << "Major: " << major << "\n";
 }
 
-void MultiOptionTest() {
+static void MultiOptionTest() {
+    using namespace Argon;
+    
+    std::array<int, 3> intArr;
+    std::vector<double> doubleArr;
+
+    Parser parser = MultiOption(&intArr)["-i"]["--ints"]
+                  | MultiOption(&doubleArr)["-d"]["--doubles"];
+
+    const std::string input = "--ints 1 2 3 --doubles 4.0 5.5 6.7";
+    parser.parseString(input);
+
+    std::cout << "Ints: " << intArr[0] << " " << intArr[1] << " " << intArr[2] << "\n";
+    std::cout << "Doubles: " << doubleArr[0] << " " << doubleArr[1] << " " << doubleArr[2] << "\n";
+}
+
+static void MultiOptionGroupTest() {
     using namespace Argon;
 
-    std::string name;
-    Option opt = Option(&name)["--name"];
-    
-    std::array<int, 3> options;
-    
-    MultiOption multi = MultiOption(&options)["--options"];
+    std::array<int, 3> intArr;
+    std::vector<double> doubleArr;
 
-    int i = 0;
-    while (i < 10) {
-        // std::cout << "Iteration: " << i << "\n";
+    Parser parser = MultiOption(&intArr)["-i"]["--ints"]
+                    | OptionGroup()["--group"]
+                        + MultiOption(&doubleArr)["-d"]["--doubles"];
 
-        multi.set_value("--what", std::to_string(i));
-        if (multi.has_error()) {
-            std::cout << multi.get_error() << "\n";
-        } else {
-            std::cout << "No error\n";
-        }
-        i++;
-    }
+    const std::string input = "--ints 1 2 3 --group [--doubles 4.0 5.5 6.7]";
+    parser.parseString(input);
+
+    std::cout << "Ints: " << intArr[0] << " " << intArr[1] << " " << intArr[2] << "\n";
+    std::cout << "Doubles: " << doubleArr[0] << " " << doubleArr[1] << " " << doubleArr[2] << "\n";
 }
 
 int main() {
@@ -164,6 +174,7 @@ int main() {
     // UnknownGroup();
     // StudentTest();
     MultiOptionTest();
+    MultiOptionGroupTest();
     // runScannerTests();
     // runOptionsTests();
     // runErrorTests();

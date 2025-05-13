@@ -86,7 +86,7 @@ Argon::StatementAst Argon::Parser::parseStatement() {
     return statement;
 }
 
-std::unique_ptr<Argon::OptionAst> Argon::Parser::parseOption(Context& context) {
+std::unique_ptr<Argon::OptionBaseAst> Argon::Parser::parseOption(Context& context) {
     // Get flag
     Token flag = m_scanner.getNextToken();
     if (flag.kind != TokenKind::IDENTIFIER) {
@@ -136,18 +136,24 @@ std::unique_ptr<Argon::OptionAst> Argon::Parser::parseOption(Context& context) {
 
         return std::make_unique<OptionAst>(flag, value);
     } else if (dynamic_cast<IsMultiOption*>(option)) {
+        auto multiOptionAst = std::make_unique<MultiOptionAst>(flag);
+
         while (true) {
-            const Token nextToken = m_scanner.peekToken();
+            Token nextToken = m_scanner.peekToken();
 
-            if (nextToken.kind == TokenKind::END) break;
-
-            if (!context.containsLocalFlag(nextToken.image)) {
-
+            const bool endOfMultiOption = nextToken.kind != TokenKind::IDENTIFIER || context.containsLocalFlag(nextToken.image);
+            if (endOfMultiOption) {
+                return multiOptionAst;
             } else {
-
+                multiOptionAst->addValue(nextToken);
+                m_scanner.getNextToken();
             }
         }
     }
+    m_syntaxErrors.addErrorMessage(
+        std::format("Expected option or multi-option, got {} at position {}", flag.image, flag.position),
+        flag.position);
+    return nullptr;
 }
 
 std::unique_ptr<Argon::OptionGroupAst> Argon::Parser::parseOptionGroup(Context& context) {
@@ -233,6 +239,7 @@ std::unique_ptr<Argon::OptionGroupAst> Argon::Parser::parseOptionGroup(Context& 
                     std::format("Expected option or option group, got {} at position {}", token2.image, token2.position),
                     token2.position);
             m_syntaxErrors.addErrorMessage("No matching ']' found for group " + flag.image, token1.position);
+            optionGroupAst->endPos = token2.position;
             return optionGroupAst;
         }
     }

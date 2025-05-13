@@ -31,6 +31,10 @@ std::string Argon::getDefaultImage(const TokenKind kind) {
     return kindToImage.contains(kind) ? kindToImage.at(kind) : "";
 }
 
+bool Argon::isOneOf(const Token& token, const std::initializer_list<TokenKind> &kinds) {
+    return std::ranges::contains(kinds, token.kind);
+}
+
 Argon::Scanner::Scanner(const std::string_view buffer) {
     m_buffer = buffer;
     scanBuffer();
@@ -60,7 +64,7 @@ char Argon::Scanner::nextChar() {
 
 Argon::Token Argon::Scanner::peekToken() const {
     if (m_tokenPos >= m_tokens.size()) {
-        return Token(TokenKind::END);
+        return Token(TokenKind::END, m_buffer.size());
     } else {
         return m_tokens[m_tokenPos];
     }
@@ -68,7 +72,7 @@ Argon::Token Argon::Scanner::peekToken() const {
 
 Argon::Token Argon::Scanner::getNextToken() {
     if (m_tokenPos >= m_tokens.size()) {
-        return Token(TokenKind::END);
+        return Token(TokenKind::END, m_buffer.size());
     } else {
         return m_tokens[m_tokenPos++];
     }
@@ -103,7 +107,7 @@ void Argon::Scanner::scanNextToken() {
             continue;
         }
         else if (ch == EOF) {
-            m_tokens.emplace_back(TokenKind::END, -1);
+            m_tokens.emplace_back(TokenKind::END, position);
             return;
         } else if (ch == '[') {
             m_tokens.emplace_back(TokenKind::LBRACK, position);

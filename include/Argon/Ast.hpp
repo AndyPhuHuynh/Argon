@@ -53,6 +53,7 @@ namespace Argon {
         ~MultiOptionAst() override = default;
 
         void addValue(const Token& value);
+        void analyze(Parser& parser, Context& context) override;
     };
     
     class OptionGroupAst : public OptionBaseAst {

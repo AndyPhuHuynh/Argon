@@ -3,6 +3,7 @@
 #include "Argon/Ast.hpp"
 
 #include "Argon/Context.hpp"
+#include "Argon/MultiOption.hpp"
 #include "Argon/Option.hpp"
 
 Argon::OptionBaseAst::OptionBaseAst(const Token& flagToken) {
@@ -24,7 +25,7 @@ void Argon::OptionAst::analyze(Parser& parser, Context& context) {
     }
     
     OptionBase *optionBase = dynamic_cast<OptionBase*>(iOption);
-    if (!optionBase) {
+    if (!optionBase || !dynamic_cast<IsSingleOption*>(iOption)) {
         parser.addError(std::format("Flag '{}' is not an option", flag.value), flag.pos);
         return;
     }
@@ -37,12 +38,33 @@ void Argon::OptionAst::analyze(Parser& parser, Context& context) {
 
 // MultiOptionAst
 
-Argon::MultiOptionAst::MultiOptionAst(const Token &flagToken) : OptionBaseAst(flagToken) {
+Argon::MultiOptionAst::MultiOptionAst(const Token& flagToken) : OptionBaseAst(flagToken) {
 
 }
 
-void Argon::MultiOptionAst::addValue(const Token &value) {
+void Argon::MultiOptionAst::addValue(const Token& value) {
     m_values.emplace_back(value.image, value.position);
+}
+
+void Argon::MultiOptionAst::analyze(Parser& parser, Context &context) {
+    IOption *iOption = context.getOption(flag.value);
+    if (!iOption) {
+        parser.addError(std::format("Unknown multi-option: '{}'", flag.value), flag.pos);
+        return;
+    }
+
+    OptionBase *optionBase = dynamic_cast<OptionBase*>(iOption);
+    if (!optionBase || !dynamic_cast<IsMultiOption*>(iOption)) {
+        parser.addError(std::format("Flag '{}' is not a multi-option", flag.value), flag.pos);
+        return;
+    }
+
+    for (const auto&[value, pos] : m_values) {
+        optionBase->set_value(flag.value, value);
+        if (iOption->has_error()) {
+            parser.addError(iOption->get_error(), pos);
+        }
+    }
 }
 
 // OptionGroupAst

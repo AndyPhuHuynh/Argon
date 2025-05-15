@@ -1,36 +1,38 @@
+#pragma once
 #include "Argon/Parser.hpp"
 
-#include <algorithm>
+#include "MultiOption.hpp"
 
-#include "Argon/MultiOption.hpp"
-#include "Argon/Option.hpp"
+inline Argon::Parser::Parser(const IOption &option) {
+    addOption(option);
+}
 
-void Argon::Parser::addOption(const IOption& option) {
+inline void Argon::Parser::addOption(const IOption& option) {
     m_context.addOption(option);
  }
 
-void Argon::Parser::addError(const std::string& error, const int pos) {
+inline void Argon::Parser::addError(const std::string& error, const int pos) {
     m_analysisErrors.addErrorMessage(error, pos);
 }
 
-void Argon::Parser::addErrorGroup(const std::string& groupName, const int startPos, const int endPos) {
+inline void Argon::Parser::addErrorGroup(const std::string& groupName, const int startPos, const int endPos) {
     m_analysisErrors.addErrorGroup(groupName, startPos, endPos);
 }
 
-void Argon::Parser::removeErrorGroup(const int startPos) {
+inline void Argon::Parser::removeErrorGroup(const int startPos) {
     m_analysisErrors.removeErrorGroup(startPos);
 }
 
-void Argon::Parser::parseString(const std::string& str) {
+inline void Argon::Parser::parseString(const std::string& str) {
     m_scanner = Scanner(str);
     StatementAst ast = parseStatement();
-    ast.analyze(*this, m_context);
+    ast.analyze(m_analysisErrors, m_context);
     m_syntaxErrors.printErrorsTreeMode();
     m_analysisErrors.printErrorsTreeMode();
     // m_analysisErrors.printErrorsFlatMode();
 }
 
-Argon::StatementAst Argon::Parser::parseStatement() {
+inline Argon::StatementAst Argon::Parser::parseStatement() {
     StatementAst statement;
     bool stop = false;
     while (!stop) {
@@ -48,8 +50,8 @@ Argon::StatementAst Argon::Parser::parseStatement() {
             m_scanner.scanUntilSee({TokenKind::IDENTIFIER});
             m_scanner.recordPosition();
             token1 = m_scanner.getNextToken();
-        } 
-        
+        }
+
         if (token1.kind == TokenKind::END) {
             break;
         }
@@ -64,12 +66,12 @@ Argon::StatementAst Argon::Parser::parseStatement() {
                     token2.position);
             }
             token2 = m_scanner.scanUntilGet({TokenKind::IDENTIFIER, TokenKind::LBRACK});
-        } 
+        }
 
         if (token2.kind == TokenKind::END) {
             break;
         }
-        
+
         // OptionGroup
         if (token2.kind == TokenKind::LBRACK) {
             m_scanner.rewind();
@@ -80,13 +82,13 @@ Argon::StatementAst Argon::Parser::parseStatement() {
             m_scanner.rewind();
             statement.addOption(parseOption(m_context));
         }
-        
+
         stop = m_scanner.seeTokenKind(TokenKind::END);
     }
     return statement;
 }
 
-std::unique_ptr<Argon::OptionBaseAst> Argon::Parser::parseOption(Context& context) {
+inline std::unique_ptr<Argon::OptionBaseAst> Argon::Parser::parseOption(Context& context) {
     // Get flag
     Token flag = m_scanner.getNextToken();
     if (flag.kind != TokenKind::IDENTIFIER) {
@@ -156,7 +158,7 @@ std::unique_ptr<Argon::OptionBaseAst> Argon::Parser::parseOption(Context& contex
     return nullptr;
 }
 
-std::unique_ptr<Argon::OptionGroupAst> Argon::Parser::parseOptionGroup(Context& context) {
+inline std::unique_ptr<Argon::OptionGroupAst> Argon::Parser::parseOptionGroup(Context& context) {
     // Get flag
     Token flag = m_scanner.getNextToken();
     if (flag.kind != TokenKind::IDENTIFIER) {
@@ -178,7 +180,7 @@ std::unique_ptr<Argon::OptionGroupAst> Argon::Parser::parseOptionGroup(Context& 
         }
         validFlag = false;
     }
-    
+
     // Get lbrack
     Token lbrack = m_scanner.getNextToken();
     if (lbrack.kind != TokenKind::LBRACK) {
@@ -197,11 +199,11 @@ std::unique_ptr<Argon::OptionGroupAst> Argon::Parser::parseOptionGroup(Context& 
     }
 
     auto optionGroupAst = std::make_unique<OptionGroupAst>(flag);
-    
+
     // TODO: Right now, this can immediately stop if there is '[]' with no options inside
     while (true) {
         Context& nextContext = optionGroup->get_context();
-        
+
         // Get flag
         m_scanner.recordPosition();
         Token token1 = m_scanner.getNextToken();
@@ -210,7 +212,7 @@ std::unique_ptr<Argon::OptionGroupAst> Argon::Parser::parseOptionGroup(Context& 
             m_syntaxErrors.addErrorMessage(std::format("Expected flag name, got '{}' at position {}", token1.image, token1.position), token1.position);
             m_scanner.scanUntilGet({TokenKind::IDENTIFIER, TokenKind::LBRACK});
         }
-        
+
         if (token1.kind == TokenKind::RBRACK) {
             optionGroupAst->endPos = token1.position;
             m_analysisErrors.addErrorGroup(optionGroupAst->flag.value, optionGroupAst->flag.pos, optionGroupAst->endPos);
@@ -220,7 +222,7 @@ std::unique_ptr<Argon::OptionGroupAst> Argon::Parser::parseOptionGroup(Context& 
             m_analysisErrors.addErrorGroup(optionGroupAst->flag.value, optionGroupAst->flag.pos, optionGroupAst->endPos);
             m_syntaxErrors.addErrorMessage("No matching ']' found for group " + flag.image, token1.position);
             return optionGroupAst;
-        } 
+        }
 
         // Get value for option/lbrack for option group
         Token token2 = m_scanner.getNextToken();
@@ -229,7 +231,7 @@ std::unique_ptr<Argon::OptionGroupAst> Argon::Parser::parseOptionGroup(Context& 
             m_syntaxErrors.addErrorMessage(std::format("Expected option value or '[', got {} at position {}", token2.image, token2.position), token2.position);
             m_scanner.scanUntilGet({TokenKind::IDENTIFIER, TokenKind::LBRACK});
         }
-        
+
         if (token2.kind == TokenKind::IDENTIFIER) {
             m_scanner.rewind();
             optionGroupAst->addOption(parseOption(nextContext));
@@ -247,7 +249,14 @@ std::unique_ptr<Argon::OptionGroupAst> Argon::Parser::parseOptionGroup(Context& 
     }
 }
 
-Argon::Parser& Argon::Parser::operator|(const IOption& option) {
+inline Argon::Parser& Argon::Parser::operator|(const IOption& option) {
     addOption(option);
     return *this;
+}
+
+inline Argon::Parser Argon::operator|(const IOption &left, const IOption &right) {
+    Parser parser;
+    parser.addOption(left);
+    parser.addOption(right);
+    return parser;
 }

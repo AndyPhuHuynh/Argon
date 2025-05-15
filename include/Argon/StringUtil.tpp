@@ -1,4 +1,5 @@
-﻿#include "Argon/StringUtil.hpp"
+#pragma once
+#include "Argon/StringUtil.hpp"
 
 #include <algorithm>
 #include <cstdint>
@@ -9,7 +10,7 @@
  * @param delimiter The character used as the delimiter
  * @return A vector of the tokens in the tokenized string
  */
-std::vector<std::string> Argon::StringUtil::split_string(const std::string& str, const char delimiter) {
+inline std::vector<std::string> Argon::StringUtil::split_string(const std::string& str, const char delimiter) {
     std::vector<std::string> tokens;
     size_t prevIndex = 0;
     const size_t length = str.length();
@@ -31,11 +32,11 @@ std::vector<std::string> Argon::StringUtil::split_string(const std::string& str,
     if (prevIndex < length) {
         tokens.push_back(str.substr(prevIndex));
     }
-    
+
     return tokens;
 }
 
-std::string Argon::StringUtil::format_with_commas(const int64_t value) {
+inline std::string Argon::StringUtil::format_with_commas(const int64_t value) {
     std::string num = std::to_string(value);
 
     if (num.length() <= 3) return num;
@@ -51,7 +52,7 @@ std::string Argon::StringUtil::format_with_commas(const int64_t value) {
     return num;
 }
 
-std::string Argon::StringUtil::format_with_underscores(const int64_t value) {
+inline std::string Argon::StringUtil::format_with_underscores(const int64_t value) {
     std::string num = std::to_string(value);
 
     if (num.length() <= 3) return num;
@@ -67,12 +68,12 @@ std::string Argon::StringUtil::format_with_underscores(const int64_t value) {
     return num;
 }
 
-void Argon::StringUtil::to_lower(std::string& str) {
+inline void Argon::StringUtil::to_lower(std::string& str) {
     std::ranges::transform(str, str.begin(),
         [](const unsigned char c) { return static_cast<char>(std::tolower(c)); });
 }
 
-void Argon::StringUtil::to_upper(std::string& str) {
+inline void Argon::StringUtil::to_upper(std::string& str) {
     std::ranges::transform(str, str.begin(),
         [](const unsigned char c) { return static_cast<char>(std::toupper(c)); });
 }

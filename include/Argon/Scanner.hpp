@@ -59,3 +59,5 @@ namespace Argon {
         void scanBuffer();
     };
 }
+
+#include "Scanner.tpp"

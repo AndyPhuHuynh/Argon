@@ -15,3 +15,5 @@ namespace Argon::StringUtil {
 
     void to_upper(std::string& str);
 }
+
+#include "StringUtil.tpp"

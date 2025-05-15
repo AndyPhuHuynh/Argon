@@ -34,3 +34,5 @@ namespace Argon {
         return dynamic_cast<T*>(getOption(flag));
     }
 }
+
+#include "Context.tpp"

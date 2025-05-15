@@ -9,10 +9,6 @@
 #include "Scanner.hpp"
 
 namespace Argon {
-    class IOption;
-    template<typename T>
-    class Option;
-    
     class Parser {
         Context m_context;
         Scanner m_scanner = Scanner();
@@ -20,6 +16,9 @@ namespace Argon {
         ErrorGroup m_syntaxErrors = ErrorGroup("Syntax Errors", -1, -1);
         ErrorGroup m_analysisErrors = ErrorGroup("Analysis Errors", -1, -1);
     public:
+        Parser() = default;
+        explicit Parser(const IOption& option);
+
         void addOption(const IOption& option);
 
         void addError(const std::string& error, int pos);
@@ -33,4 +32,8 @@ namespace Argon {
         
         Parser& operator|(const IOption& option);
     };
+
+    Parser operator|(const IOption& left, const IOption& right);
 }
+
+#include "Parser.tpp"

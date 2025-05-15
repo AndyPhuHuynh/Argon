@@ -1,4 +1,5 @@
-﻿#include "Argon/Error.hpp"
+#pragma once
+#include "Argon/Error.hpp"
 
 #include <format>
 #include <iostream>
@@ -8,8 +9,8 @@
 #include <windows.h>
 #endif
 
-bool terminalSupportsUTF8() {
-#if defined(_WIN32) 
+inline bool terminalSupportsUTF8() {
+#if defined(_WIN32)
     // Check if the output is a console
     const HANDLE hOut = GetStdHandle(STD_OUTPUT_HANDLE);
     if (hOut == INVALID_HANDLE_VALUE || hOut == nullptr) {
@@ -19,7 +20,7 @@ bool terminalSupportsUTF8() {
     // Not a console (e.g., redirected to file)
     DWORD mode;
     if (!GetConsoleMode(hOut, &mode)) {
-        return false; 
+        return false;
     }
 
     // Check the code page
@@ -41,23 +42,23 @@ static bool inRange(const int value, const int min, const int max) {
     return value >= min && value <= max;
 }
 
-Argon::ErrorMessage::ErrorMessage(std::string msg, const int pos) : msg(std::move(msg)), pos(pos) {}
+inline Argon::ErrorMessage::ErrorMessage(std::string msg, const int pos) : msg(std::move(msg)), pos(pos) {}
 
-std::strong_ordering Argon::ErrorMessage::operator<=>(const ErrorMessage& other) const {
+inline std::strong_ordering Argon::ErrorMessage::operator<=>(const ErrorMessage& other) const {
     return pos <=> other.pos;
 }
 
-Argon::ErrorGroup::ErrorGroup(std::string groupName, const int startPos, const int endPos)
+inline Argon::ErrorGroup::ErrorGroup(std::string groupName, const int startPos, const int endPos)
 : m_groupName(std::move(groupName)), m_startPos(startPos), m_endPos(endPos) {
-    
+
 }
 
-Argon::ErrorGroup::ErrorGroup(std::string groupName, const int startPos, const int endPos, ErrorGroup* parent)
+inline Argon::ErrorGroup::ErrorGroup(std::string groupName, const int startPos, const int endPos, ErrorGroup* parent)
 : m_groupName(std::move(groupName)), m_startPos(startPos), m_endPos(endPos), m_parent(parent) {
-    
+
 }
 
-void Argon::ErrorGroup::setHasErrors() {
+inline void Argon::ErrorGroup::setHasErrors() {
     ErrorGroup *group = this;
     while (group != nullptr) {
         group->m_hasErrors = true;
@@ -65,13 +66,13 @@ void Argon::ErrorGroup::setHasErrors() {
     }
 }
 
-void Argon::ErrorGroup::addErrorMessage(const std::string& msg, int pos) {
+inline void Argon::ErrorGroup::addErrorMessage(const std::string& msg, int pos) {
     if (m_errors.empty()) {
         m_errors.emplace_back(std::in_place_type<ErrorMessage>, msg, pos);
         setHasErrors();
         return;
     }
-    
+
     size_t index = 0;
     for (; index < m_errors.size(); index++) {
         ErrorVariant& item = m_errors[index];
@@ -88,7 +89,7 @@ void Argon::ErrorGroup::addErrorMessage(const std::string& msg, int pos) {
             }
         }
     }
-    
+
     // Index is now the index of the item positioned ahead of where we want
     // If index is zero just insert it at 0
     if (index == 0) {
@@ -96,10 +97,10 @@ void Argon::ErrorGroup::addErrorMessage(const std::string& msg, int pos) {
         setHasErrors();
         return;
     }
-    
+
     // Else check the previous index
     ErrorVariant& item = m_errors[index - 1];
-    
+
     // If error group, check if it's within the bounds, if it is, insert into that group
     if (std::holds_alternative<ErrorGroup>(item)) {
         ErrorGroup& errorGroup = std::get<ErrorGroup>(item);
@@ -119,12 +120,13 @@ void Argon::ErrorGroup::addErrorMessage(const std::string& msg, int pos) {
         setHasErrors();
     }
 }
-void Argon::ErrorGroup::addErrorGroup(const std::string& name, const int startPos, const int endPos) {
+
+inline void Argon::ErrorGroup::addErrorGroup(const std::string& name, const int startPos, const int endPos) {
     ErrorGroup groupToAdd = ErrorGroup(name, startPos, endPos, this);
     addErrorGroup(groupToAdd);
 }
 
-void Argon::ErrorGroup::addErrorGroup(ErrorGroup& groupToAdd) {
+inline void Argon::ErrorGroup::addErrorGroup(ErrorGroup& groupToAdd) {
     if (m_errors.empty()) {
         m_errors.emplace_back(std::move(groupToAdd));
         return;
@@ -147,11 +149,11 @@ void Argon::ErrorGroup::addErrorGroup(ErrorGroup& groupToAdd) {
             }
         }
     }
-    
+
     if (insertIndex != 0) {
         // Else check the previous index
         ErrorVariant& item = m_errors[insertIndex - 1];
-    
+
         // If error group, check if it's within the bounds, if it is, insert into that group
         if (std::holds_alternative<ErrorGroup>(item)) {
             ErrorGroup& errorGroup = std::get<ErrorGroup>(item);
@@ -192,7 +194,7 @@ void Argon::ErrorGroup::addErrorGroup(ErrorGroup& groupToAdd) {
             }
         }
     }
-    
+
     // Insert group at index
     if (insertIndex >= m_errors.size()) {
         m_errors.emplace_back(std::move(groupToAdd));
@@ -201,7 +203,7 @@ void Argon::ErrorGroup::addErrorGroup(ErrorGroup& groupToAdd) {
     }
 }
 
-void Argon::ErrorGroup::removeErrorGroup(int startPos) {
+inline void Argon::ErrorGroup::removeErrorGroup(int startPos) {
     auto it = std::ranges::find_if(m_errors, [startPos](const ErrorVariant& item) {
         if (std::holds_alternative<ErrorGroup>(item)) {
             const ErrorGroup& errorGroup = std::get<ErrorGroup>(item);
@@ -217,15 +219,15 @@ void Argon::ErrorGroup::removeErrorGroup(int startPos) {
     }
 }
 
-const std::string& Argon::ErrorGroup::getGroupName() const {
+inline const std::string& Argon::ErrorGroup::getGroupName() const {
     return m_groupName;
 }
 
-const std::vector<std::variant<Argon::ErrorMessage, Argon::ErrorGroup>>& Argon::ErrorGroup::getErrors() const {
+inline const std::vector<std::variant<Argon::ErrorMessage, Argon::ErrorGroup>>& Argon::ErrorGroup::getErrors() const {
     return m_errors;
 }
 
-void Argon::ErrorGroup::printErrorsFlatMode() const {
+inline void Argon::ErrorGroup::printErrorsFlatMode() const {
     constexpr auto printRecursive = [](std::stringstream& stream, const ErrorGroup& group,
                                        const std::string& parentGroups, const bool isRootGroup, bool isFirstPrint,
                                        auto&& printRecursiveRef) -> void {
@@ -281,7 +283,7 @@ void Argon::ErrorGroup::printErrorsFlatMode() const {
     std::cout << ss.str();
 }
 
-void Argon::ErrorGroup::printErrorsTreeMode() const {
+inline void Argon::ErrorGroup::printErrorsTreeMode() const {
     constexpr auto printRecursive = [](std::stringstream& stream, const ErrorGroup& group, const std::string& prefix,
                                        const bool isFirstPrint, const bool useUnicode, auto&& printRecursiveRef) -> void {
         if (isFirstPrint) {
@@ -296,7 +298,7 @@ void Argon::ErrorGroup::printErrorsTreeMode() const {
                     if (i == lastErrorIndex) {
                         useUnicode ? stream << std::format("{}└── {}\n", prefix, e.msg) :
                                      stream << std::format("{}'-- {}\n", prefix, e.msg);
-                    } else {    
+                    } else {
                         useUnicode ? stream << std::format("{}├── {}\n", prefix, e.msg) :
                                      stream << std::format("{}|-- {}\n", prefix, e.msg);
                     }
@@ -304,7 +306,7 @@ void Argon::ErrorGroup::printErrorsTreeMode() const {
                     if (!e.m_hasErrors) {
                         return;
                     }
-                    
+
                     if (i == lastErrorIndex) {
                         useUnicode ? stream << std::format("{}└── [{}]\n", prefix, e.getGroupName()) :
                                      stream << std::format("{}'-- [{}]\n", prefix, e.getGroupName());
@@ -326,13 +328,13 @@ void Argon::ErrorGroup::printErrorsTreeMode() const {
     if (!m_hasErrors) {
         return;
     }
-    
+
     std::stringstream ss;
     printRecursive(ss, *this, "", true, terminalSupportsUTF8(), printRecursive);
     std::cout << ss.str();
 }
 
-size_t Argon::ErrorGroup::getIndexOfLastHasError() const {
+inline size_t Argon::ErrorGroup::getIndexOfLastHasError() const {
     size_t index = m_errors.size();
     while (index-- > 0) {
         ErrorVariant errorVariant = m_errors[index];

@@ -147,6 +147,7 @@ auto parser = Argon::Option(&school)["--school"]
             | Argon::MultiOption(&students, studentConversionFn, studentErrorFn)["--students"];
             
 const std::string input = "--students 1 2 --school University";
+parser.parseString(input);
 ```
 Above, the value of school will be "University" and the students vector will contain two students: Josh and Sally
 
@@ -169,4 +170,5 @@ auto parser = Argon::Option(&globalName)["-n"]["--name"]
                 + Argon::Option(&student2.age)["-a"]["--age"]
                 
 const std::string input = "--name global --student1 [--name Josh --age 1] --student2 [--name Sally --age 2]"
+parser.parseString(input);
 ```

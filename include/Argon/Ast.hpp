@@ -4,7 +4,7 @@
 #include <string>
 #include <vector>
 
-#include "Scanner.hpp"
+#include "Error.hpp"
 
 namespace Argon {
     class IOption;
@@ -13,6 +13,7 @@ namespace Argon {
     class OptionGroupAst;
     class StatementAst;
     class Context;
+    class Token;
     
     struct Value {
         std::string value;
@@ -21,57 +22,57 @@ namespace Argon {
     
     class Ast {
     public:
-        virtual void analyze(Parser& parser, Context& context) = 0;
+        inline virtual void analyze(ErrorGroup& errorGroup, Context& context) = 0;
     protected:
-        virtual ~Ast() = default;
+        inline virtual ~Ast() = default;
     };
 
     class OptionBaseAst : public Ast {
     public:
         Value flag;
         
-        ~OptionBaseAst() override = default;
+        inline ~OptionBaseAst() override = default;
     protected:
-        explicit OptionBaseAst(const Token& flagToken);
+        inline explicit OptionBaseAst(const Token& flagToken);
     };
     
     class OptionAst : public OptionBaseAst {
     public:
         Value value;
         
-        OptionAst(const Token& flagToken, const Token& valueToken);
-        ~OptionAst() override = default;
+        inline OptionAst(const Token& flagToken, const Token& valueToken);
+        inline ~OptionAst() override = default;
 
-        void analyze(Parser& parser, Context& context) override;
+        inline void analyze(ErrorGroup& errorGroup, Context& context) override;
     };
 
     class MultiOptionAst : public OptionBaseAst {
         std::vector<Value> m_values;
 
     public:
-        explicit MultiOptionAst(const Token& flagToken);
-        ~MultiOptionAst() override = default;
+        inline explicit MultiOptionAst(const Token& flagToken);
+        inline ~MultiOptionAst() override = default;
 
-        void addValue(const Token& value);
-        void analyze(Parser& parser, Context& context) override;
+        inline void addValue(const Token& value);
+        inline void analyze(ErrorGroup& errorGroup, Context& context) override;
     };
     
     class OptionGroupAst : public OptionBaseAst {
     public:
         int endPos = -1;
 
-        explicit OptionGroupAst(const Token& flagToken);
+        inline explicit OptionGroupAst(const Token& flagToken);
         
-        OptionGroupAst(const OptionGroupAst&) = delete;
-        OptionGroupAst& operator=(const OptionGroupAst&) = delete;
+        inline OptionGroupAst(const OptionGroupAst&) = delete;
+        inline OptionGroupAst& operator=(const OptionGroupAst&) = delete;
         
-        OptionGroupAst(OptionGroupAst&&) noexcept = default;
-        OptionGroupAst& operator=(OptionGroupAst&&) noexcept = default;
+        inline OptionGroupAst(OptionGroupAst&&) noexcept = default;
+        inline OptionGroupAst& operator=(OptionGroupAst&&) noexcept = default;
         
-        ~OptionGroupAst() override = default;
+        inline ~OptionGroupAst() override = default;
         
-        void addOption(std::unique_ptr<OptionBaseAst> option);
-        void analyze(Parser& parser, Context& context) override;
+        inline void addOption(std::unique_ptr<OptionBaseAst> option);
+        inline void analyze(ErrorGroup& errorGroup, Context& context) override;
     private:
         std::vector<std::unique_ptr<OptionBaseAst>> m_options;
     };
@@ -79,19 +80,21 @@ namespace Argon {
     class StatementAst : public Ast {
     public:
 
-        StatementAst() = default;
+        inline StatementAst() = default;
         
-        StatementAst(const StatementAst&) = delete;
-        StatementAst& operator=(const StatementAst&) = delete;
+        inline StatementAst(const StatementAst&) = delete;
+        inline StatementAst& operator=(const StatementAst&) = delete;
         
-        StatementAst(StatementAst&&) noexcept = default;
-        StatementAst& operator=(StatementAst&&) noexcept = default;
+        inline StatementAst(StatementAst&&) noexcept = default;
+        inline StatementAst& operator=(StatementAst&&) noexcept = default;
         
-        ~StatementAst() override = default;
+        inline ~StatementAst() override = default;
         
-        void addOption(std::unique_ptr<OptionBaseAst> option);
-        void analyze(Parser& parser, Context& context) override;
+        inline void addOption(std::unique_ptr<OptionBaseAst> option);
+        inline void analyze(ErrorGroup& errorGroup, Context& context) override;
     private:
         std::vector<std::unique_ptr<OptionBaseAst>> m_options;
     };
 }
+
+#include "Ast.tpp"

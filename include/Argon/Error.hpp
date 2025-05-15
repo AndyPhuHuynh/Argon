@@ -54,3 +54,5 @@ namespace Argon {
         [[nodiscard]] size_t getIndexOfLastHasError() const;
     };
 }
+
+#include "Error.tpp"

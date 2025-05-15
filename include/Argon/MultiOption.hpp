@@ -10,6 +10,7 @@ namespace Argon {
     class IsMultiOption {};
 
     // MultiOption with C-Style array
+
     template<typename T>
     class MultiOption<T[]> : public OptionBase, public OptionComponent<MultiOption<T[]>>, public IsMultiOption {
         Converter<T> converter;
@@ -70,33 +71,34 @@ namespace Argon {
     template <typename T, std::size_t N>
     MultiOption(T (*)[]) -> MultiOption<T[]>;
     
-    template <typename T, std::size_t N>
-    MultiOption(T (*)[], ConversionFn<T>) -> MultiOption<T[]>;
-    
-    template <typename T, std::size_t N>
-    MultiOption(T (*)[], ConversionFn<T>, GenerateErrorMsgFn) -> MultiOption<T[]>;
+    template <typename T,  std::size_t N, typename F>
+    MultiOption(T (*)[], F&&) -> MultiOption<std::vector<T>>;
+
+    template <typename T,  std::size_t N, typename F1, typename F2>
+    MultiOption(T (*)[], F1&&, F2&&) -> MultiOption<std::vector<T>>;
     
     // Deduction guides for std::array
     
     template <typename T, std::size_t N>
     MultiOption(std::array<T, N>*) -> MultiOption<std::array<T, N>>;
     
-    template <typename T, std::size_t N>
-    MultiOption(std::array<T, N>*, ConversionFn<T>) -> MultiOption<std::array<T, N>>;
-    
-    template <typename T, std::size_t N>
-    MultiOption(std::array<T, N>*, ConversionFn<T>, GenerateErrorMsgFn) -> MultiOption<std::array<T, N>>;
+    template <typename T,  std::size_t N, typename F>
+    MultiOption(std::array<T, N>*, F&&) -> MultiOption<std::vector<T>>;
+
+    template <typename T,  std::size_t N, typename F1, typename F2>
+    MultiOption(std::array<T, N>*, F1&&, F2&&) -> MultiOption<std::vector<T>>;
     
     // Deduction guides for std::vector
 
     template <typename T>
     MultiOption(std::vector<T>*) -> MultiOption<std::vector<T>>;
 
-    template <typename T>
-    MultiOption(std::vector<T>*, ConversionFn<T>) -> MultiOption<std::vector<T>>;
-    
-    template <typename T>
-    MultiOption(std::vector<T>*, ConversionFn<T>, GenerateErrorMsgFn) -> MultiOption<std::vector<T>>;
+    template <typename T, typename F>
+    MultiOption(std::vector<T>*, F&&) -> MultiOption<std::vector<T>>;
+
+    template <typename T, typename F1, typename F2>
+    MultiOption(std::vector<T>*, F1&&, F2&&) -> MultiOption<std::vector<T>>;
+
 }
 
 // Template Implementations

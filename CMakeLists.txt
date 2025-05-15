@@ -42,6 +42,7 @@ set_target_properties(Argon PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
 enable_testing()
 add_subdirectory(tests)
+add_subdirectory(examples)
 
 install(TARGETS Argon DESTINATION lib)
 install(FILES ${INCLUDE_FILES} DESTINATION include/Argon)

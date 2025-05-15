@@ -30,7 +30,7 @@ static void StructTest() {
         int age;
     };
 
-    auto studentFromString = [](const std::string & str, Student& out) -> bool {
+    auto studentFromString = [](const std::string& str, Student& out) -> bool {
         if (str == "1") {
             out = {
                 .name = "Josh",

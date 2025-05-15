@@ -26,7 +26,7 @@ int main() {
     auto parser = Argon::Option<Student>(&student1, studentConversionFn)["--first"]
                 | Argon::Option<Student>(&student2, studentConversionFn)["--second"];
 
-    const std::string input = "--first 1 --second 2";
+    const std::string input = "--first 1 --second 3";
     parser.parseString(input);
     std::cout << "Student1: " << student1.name << ", " << student1.age << "\n";
     std::cout << "Student2: " << student2.name << ", " << student2.age << "\n";

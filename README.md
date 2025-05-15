@@ -110,8 +110,8 @@ A default error message is logged when the conversion fails:
 It is possible to specify a function to generate a custom error message as well:
 ```c++
 auto studentErrorFn = [](const std::string& flag, const std::string& invalidArg) -> std::string {
-    return std::format("Invalid value for flag '{}': expected either '1' or '2'", flag);
-};  
+    return std::format("Invalid value for flag '{}': expected either '1' or '2', got '{}'", flag, invalidArg);
+};
 
 Student student1, student2;
 auto parser = Argon::Option<Student>(&student1, studentConversionFn, studentErrorFn)["--first"]

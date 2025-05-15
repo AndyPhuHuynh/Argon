@@ -28,8 +28,6 @@ namespace Argon {
 
 // --------------------------------------------- Implementations -------------------------------------------------------
 
-#include "Argon/Context.hpp"
-
 #include <algorithm>
 
 #include "Option.hpp" // NOLINT (misc-unused-include)

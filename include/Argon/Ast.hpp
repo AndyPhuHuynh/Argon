@@ -96,8 +96,6 @@ namespace Argon {
 
 #include <utility>
 
-#include "Argon/Ast.hpp"
-
 #include "Context.hpp"
 #include "Option.hpp"
 #include "MultiOption.hpp"

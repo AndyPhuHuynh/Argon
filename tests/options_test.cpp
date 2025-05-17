@@ -53,15 +53,8 @@ static void StructTest() {
         return false;
     };
 
-    auto printStudent = [](const Student& student) {
-        std::cout << "Name: " << student.name << "\n";
-        std::cout << "Age: " << student.age << "\n";
-    };
-
     auto studentError = [](const std::string& flag, const std::string& invalidArg) -> std::string {
-        std::stringstream ss;
-        ss << "Flag: " << flag << ": valid options are 1, 2, and 3";
-        return ss.str();
+        return std::format("Invalid value for flag '{}': expected either '1' or '2', got '{}'", flag, invalidArg);
     };
     
     Student testStudent{};

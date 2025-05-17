@@ -25,10 +25,10 @@ namespace Argon {
         Token(TokenKind kind, int position);
         Token(TokenKind kind, std::string image, int position);
         bool operator==(std::vector<Token>::const_reference token) const;
+        [[nodiscard]] bool isOneOf(const std::initializer_list<TokenKind>& kinds) const;
     };
 
     std::string getDefaultImage(TokenKind kind);
-    bool isOneOf(const Token& token, const std::initializer_list<TokenKind>& kinds);
     
     class Scanner {
     public:
@@ -83,6 +83,10 @@ inline bool Argon::Token::operator==(std::vector<Token>::const_reference token) 
     return kind == token.kind && image == token.image;
 }
 
+inline bool Argon::Token::isOneOf(const std::initializer_list<TokenKind> &kinds) const {
+    return std::ranges::contains(kinds, kind);
+}
+
 inline std::string Argon::getDefaultImage(const TokenKind kind) {
     static const std::unordered_map<TokenKind, std::string> kindToImage = {
         { TokenKind::LBRACK, "[" },
@@ -91,10 +95,6 @@ inline std::string Argon::getDefaultImage(const TokenKind kind) {
     };
 
     return kindToImage.contains(kind) ? kindToImage.at(kind) : "";
-}
-
-inline bool Argon::isOneOf(const Token& token, const std::initializer_list<TokenKind> &kinds) {
-    return std::ranges::contains(kinds, token.kind);
 }
 
 inline Argon::Scanner::Scanner(const std::string_view buffer) {

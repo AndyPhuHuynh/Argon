@@ -10,10 +10,6 @@ namespace Argon {
     class ErrorGroup;
 
     using ErrorVariant = std::variant<ErrorMessage, ErrorGroup>;
-    struct StringGroup {
-        std::vector<std::string> groups;
-        std::vector<std::string> errors;
-    };
     
     struct ErrorMessage {
         std::string msg;
@@ -36,8 +32,7 @@ namespace Argon {
         ErrorGroup() = default;
         ErrorGroup(std::string groupName, int startPos, int endPos);
 
-        void setHasErrors();
-        
+        void clear();
         void addErrorMessage(const std::string& msg, int pos);
         void addErrorGroup(const std::string& name, int startPos, int endPos);
         void removeErrorGroup(int startPos);
@@ -49,7 +44,8 @@ namespace Argon {
         void printErrorsTreeMode() const;
     private:
         ErrorGroup(std::string groupName, int startPos, int endPos, ErrorGroup* parent);
-        
+
+        void setHasErrors();
         void addErrorGroup(ErrorGroup& groupToAdd);
         [[nodiscard]] size_t getIndexOfLastHasError() const;
     };
@@ -68,7 +64,7 @@ namespace Argon {
 inline bool terminalSupportsUTF8() {
 #if defined(_WIN32)
     // Check if the output is a console
-    const HANDLE hOut = GetStdHandle(STD_OUTPUT_HANDLE);
+    HANDLE hOut = GetStdHandle(STD_OUTPUT_HANDLE); //NOLINT (windows typedef)
     if (hOut == INVALID_HANDLE_VALUE || hOut == nullptr) {
         return false;
     }
@@ -109,6 +105,11 @@ inline Argon::ErrorGroup::ErrorGroup(std::string groupName, const int startPos, 
 
 }
 
+inline void Argon::ErrorGroup::clear() {
+    m_errors.clear();
+    m_hasErrors = false;
+}
+
 inline Argon::ErrorGroup::ErrorGroup(std::string groupName, const int startPos, const int endPos, ErrorGroup* parent)
 : m_groupName(std::move(groupName)), m_startPos(startPos), m_endPos(endPos), m_parent(parent) {
 
@@ -122,7 +123,7 @@ inline void Argon::ErrorGroup::setHasErrors() {
     }
 }
 
-inline void Argon::ErrorGroup::addErrorMessage(const std::string& msg, int pos) {
+inline void Argon::ErrorGroup::addErrorMessage(const std::string& msg, int pos) { //NOLINT (recursion)
     if (m_errors.empty()) {
         m_errors.emplace_back(std::in_place_type<ErrorMessage>, msg, pos);
         setHasErrors();
@@ -182,7 +183,7 @@ inline void Argon::ErrorGroup::addErrorGroup(const std::string& name, const int 
     addErrorGroup(groupToAdd);
 }
 
-inline void Argon::ErrorGroup::addErrorGroup(ErrorGroup& groupToAdd) {
+inline void Argon::ErrorGroup::addErrorGroup(ErrorGroup& groupToAdd) { //NOLINT (recursion)
     if (m_errors.empty()) {
         m_errors.emplace_back(std::move(groupToAdd));
         return;

@@ -276,15 +276,15 @@ inline Argon::OptionGroup& Argon::OptionGroup::operator+(const IOption& other) {
     return *this;
 }
 
-inline void Argon::OptionGroup::add_option(const IOption& option) {
+inline void Argon::OptionGroup::add_option(const IOption& option) { //NOLINT (function is not const)
     m_context->addOption(option);
 }
 
-inline Argon::IOption *Argon::OptionGroup::get_option(const std::string& flag) {
+inline Argon::IOption *Argon::OptionGroup::get_option(const std::string& flag) { //NOLINT (function is not const)
     return m_context->getOption(flag);
 }
 
-inline Argon::Context& Argon::OptionGroup::get_context() {
+inline Argon::Context& Argon::OptionGroup::get_context() { //NOLINT (function is not const)
     return *m_context;
 }
 

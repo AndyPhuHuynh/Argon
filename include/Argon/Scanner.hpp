@@ -1,6 +1,7 @@
 ﻿#pragma once
 
 #include <cstdint>
+#include <functional>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -41,9 +42,6 @@ namespace Argon {
         char nextChar();
         Token getNextToken();
         [[nodiscard]] Token peekToken() const;
-        
-        void scanUntilSee(const std::initializer_list<TokenKind>& kinds);
-        Token scanUntilGet(const std::initializer_list<TokenKind>& kinds);
         
         void recordPosition();
         void rewind();
@@ -139,18 +137,6 @@ inline Argon::Token Argon::Scanner::getNextToken() {
         return m_tokens[m_tokenPos++];
     }
 }
-
-inline void Argon::Scanner::scanUntilSee(const std::initializer_list<TokenKind>& kinds) {
-    while (!seeTokenKind(kinds) && !seeTokenKind(TokenKind::END)) {
-        getNextToken();
-    }
-}
-
-inline Argon::Token Argon::Scanner::scanUntilGet(const std::initializer_list<TokenKind>& kinds) {
-    scanUntilSee(kinds);
-    return getNextToken();
-}
-
 
 inline void Argon::Scanner::recordPosition() {
     m_rewindPos = m_tokenPos;

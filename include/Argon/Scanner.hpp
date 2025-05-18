@@ -12,6 +12,7 @@ namespace Argon {
         LBRACK,
         RBRACK,
         IDENTIFIER,
+        EQUALS,
         END,
     };
 
@@ -56,14 +57,13 @@ namespace Argon {
         void scanNextToken();
         void scanBuffer();
 
-        Token getEndToken() const;
+        [[nodiscard]] Token getEndToken() const;
     };
 }
 
 // --------------------------------------------- Implementations -------------------------------------------------------
 
 #include <algorithm>
-#include <sstream>
 #include <unordered_map>
 
 inline Argon::Token::Token(const TokenKind kind) : kind(kind) {
@@ -91,6 +91,7 @@ inline std::string Argon::getDefaultImage(const TokenKind kind) {
     static const std::unordered_map<TokenKind, std::string> kindToImage = {
         { TokenKind::LBRACK, "[" },
         { TokenKind::RBRACK, "]" },
+        { TokenKind::EQUALS, "=" },
         { TokenKind::END, "" }
     };
 
@@ -170,6 +171,10 @@ inline void Argon::Scanner::scanNextToken() {
             m_tokens.emplace_back(TokenKind::RBRACK, position);
             return;
         }
+        if (ch == '=') {
+            m_tokens.emplace_back(TokenKind::EQUALS, position);
+            return;
+        }
 
         std::string image;
         image += ch;
@@ -178,7 +183,7 @@ inline void Argon::Scanner::scanNextToken() {
             if (!optCh.has_value()) break;
 
             ch = optCh.value();
-            if (ch == ' ' || ch == '[' || ch == ']') break;
+            if (ch == ' ' || ch == '[' || ch == ']' || ch == '=') break;
 
             image += nextChar().value();
         }

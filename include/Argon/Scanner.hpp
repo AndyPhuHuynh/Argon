@@ -1,7 +1,7 @@
 ﻿#pragma once
 
 #include <cstdint>
-#include <functional>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -38,8 +38,8 @@ namespace Argon {
 
         [[nodiscard]] bool seeTokenKind(TokenKind kind) const;
         [[nodiscard]] bool seeTokenKind(const std::initializer_list<TokenKind>& kinds) const;
-        [[nodiscard]] char peekChar() const;
-        char nextChar();
+        [[nodiscard]] std::optional<char> peekChar() const;
+        std::optional<char> nextChar();
         Token getNextToken();
         [[nodiscard]] Token peekToken() const;
         
@@ -55,6 +55,8 @@ namespace Argon {
 
         void scanNextToken();
         void scanBuffer();
+
+        Token getEndToken() const;
     };
 }
 
@@ -108,23 +110,23 @@ inline bool Argon::Scanner::seeTokenKind(const std::initializer_list<TokenKind>&
     return std::ranges::contains(kinds, peekToken().kind);
 }
 
-inline char Argon::Scanner::peekChar() const {
+inline std::optional<char> Argon::Scanner::peekChar() const {
     if (m_bufferPos >= m_buffer.size()) {
-        return EOF;
+        return std::nullopt;
     }
     return m_buffer[m_bufferPos];
 }
 
-inline char Argon::Scanner::nextChar() {
+inline std::optional<char> Argon::Scanner::nextChar() {
     if (m_bufferPos >= m_buffer.size()) {
-        return EOF;
+        return std::nullopt;
     }
     return m_buffer[m_bufferPos++];
 }
 
 inline Argon::Token Argon::Scanner::peekToken() const {
     if (m_tokenPos >= m_tokens.size()) {
-        return {TokenKind::END, static_cast<int>(m_buffer.size())};
+        return getEndToken();
     } else {
         return m_tokens[m_tokenPos];
     }
@@ -132,7 +134,7 @@ inline Argon::Token Argon::Scanner::peekToken() const {
 
 inline Argon::Token Argon::Scanner::getNextToken() {
     if (m_tokenPos >= m_tokens.size()) {
-        return {TokenKind::END, static_cast<int>(m_buffer.size())};
+        return getEndToken();
     } else {
         return m_tokens[m_tokenPos++];
     }
@@ -148,41 +150,53 @@ inline void Argon::Scanner::rewind() {
 
 inline void Argon::Scanner::scanNextToken() {
     int position = static_cast<int>(m_bufferPos);
-    char ch = nextChar();
+    auto optCh = nextChar();
     while (true) {
-        if (ch == ' ') {
-            ch = nextChar();
-            continue;
-        }
-        else if (ch == EOF) {
+        if (!optCh.has_value()) {
             m_tokens.emplace_back(TokenKind::END, position);
             return;
-        } else if (ch == '[') {
+        }
+        char ch = optCh.value();
+
+        if (ch == ' ') {
+            optCh = nextChar();
+            continue;
+        }
+        if (ch == '[') {
             m_tokens.emplace_back(TokenKind::LBRACK, position);
             return;
-        } else if (ch == ']') {
+        }
+        if (ch == ']') {
             m_tokens.emplace_back(TokenKind::RBRACK, position);
             return;
         }
-        // Token is identifier
-        else {
-            std::stringstream ss;
-            ss << ch;
-            ch = peekChar();
-            while (ch != ' ' && ch != EOF && ch != '[' && ch != ']') {
-                ch = nextChar();
-                ss << ch;
-                ch = peekChar();
-            }
-            m_tokens.emplace_back(TokenKind::IDENTIFIER, ss.str(), position);
-            return;
+
+        std::string image;
+        image += ch;
+        while (true) {
+            optCh = peekChar();
+            if (!optCh.has_value()) break;
+
+            ch = optCh.value();
+            if (ch == ' ' || ch == '[' || ch == ']') break;
+
+            image += nextChar().value();
         }
+        m_tokens.emplace_back(TokenKind::IDENTIFIER, image, position);
+        return;
     }
 }
 
 inline void Argon::Scanner::scanBuffer() {
-    while (m_bufferPos < m_buffer.size() ||  m_tokens.back().kind != TokenKind::END) {
+    while (m_bufferPos < m_buffer.size()) {
         scanNextToken();
     }
+    if (m_tokens.empty() || m_tokens.back().kind != TokenKind::END) {
+        m_tokens.emplace_back(TokenKind::END, static_cast<int>(m_buffer.size()));
+    }
+}
+
+inline Argon::Token Argon::Scanner::getEndToken() const {
+    return m_tokens.back();
 }
 

@@ -4,6 +4,7 @@ Lexical Grammar
 
 LBRACK      ::= "["
 RBRACK      ::= "]"
+EQUALS      ::= "="
 
 IDENTIFIER  ::= ( "a"..."z" | "A"..."Z" | "0"..."9")
                 { "a"..."z" | "A"..."Z" | "0"..."9"}
@@ -13,8 +14,12 @@ IDENTIFIER  ::= ( "a"..."z" | "A"..."Z" | "0"..."9")
 Syntactic Grammar
 ----------------------
 
-statement   ::= ( option | optionGroup ) { option | optionGroup }
+statement       ::= optionBundle { optionBundle }
 
-option      ::= IDENTIFIER IDENTIFIER
+option          ::= IDENTIFIER IDENTIFIER
 
-optionGroup ::= IDENTIFIER LBRACK statement RBRACK
+multiOption     ::= IDENTIFIER { IDENTIFIER }
+
+optionGroup     ::= IDENTIFIER LBRACK optionBundle { optionBundle } RBRACK
+
+optionBundle    ::= option | multiOption | optionGroup

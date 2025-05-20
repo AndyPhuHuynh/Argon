@@ -40,6 +40,7 @@ install (DIRECTORY ${CMAKE_SOURCE_DIR}/docs DESTINATION docs)
 
 IF(MSVC)
     target_compile_options(Argon INTERFACE /W4 /utf-8)
+    target_compile_definitions(Argon INTERFACE NOMINMAX)
 ELSE()
     target_compile_options(Argon INTERFACE -Wall -Wextra -Wpedantic -Wconversion -Wsign-conversion -Wswitch-enum)
 ENDIF()

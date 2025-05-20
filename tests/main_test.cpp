@@ -201,6 +201,25 @@ static void GroupErrors() {
     parser.parseString(noRBRACK);
 }
 
+static void BasicOption() {
+    using namespace Argon;
+
+    std::string name;
+    int age;
+    std::string major;
+
+    auto parser = Option(&name)["--name"]
+                | Option(&age)["--age"]
+                | Option(&major)["--major"];
+
+    const std::string input = "--name John --age 20 --major CS";
+    parser.parseString(input);
+
+    std::cout << "Name: " << name << "\n";
+    std::cout << "Age: " << age << "\n";
+    std::cout << "Major: " << major << "\n";
+}
+
 int main() {
     const auto start = std::chrono::steady_clock::now();
     using namespace Argon;
@@ -208,12 +227,13 @@ int main() {
     // MissingFlagNested();
     // UnknownGroup();
     // StudentTest();
-    // MultiOptionTest();
-    // MultiOptionGroupTest();
+    MultiOptionTest();
+    MultiOptionGroupTest();
     // runScannerTests();
     // runOptionsTests();
     // runErrorTests();
-    GroupErrors();
+    // GroupErrors();
+    // BasicOption();
     const auto end = std::chrono::steady_clock::now();
     const auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     std::cout << "Time: " << duration << "\n";

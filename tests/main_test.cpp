@@ -172,30 +172,31 @@ static void GroupErrors() {
 
     std::string name;
     int age;
+    std::string major;
 
     auto parser = Option(&name)["--name"]
                 | OptionGroup()["--group"]
                     + Option(&age)["--age"];
 
     // Not an option group flag:
-    const std::string notGroup = "--name [--age 10]";
-    std::cout << "Not option group flag: \n";
-    parser.parseString(notGroup);
-
-    // Unknown flag:
-    const std::string unknownFlag = "--name John --huh [--age 20]";
-    std::cout << "----------------------------\n";
-    std::cout << "Unknown flag: \n";
-    parser.parseString(unknownFlag);
-
-    // Missing LBRACK
-    const std::string noLBRACK = "--name John --group --age 20]";
-    std::cout << "----------------------------\n";
-    std::cout << "No lbrack: \n";
-    parser.parseString(noLBRACK);
+    // const std::string notGroup = "--name [--age 10]";
+    // std::cout << "Not option group flag: \n";
+    // parser.parseString(notGroup);
+    //
+    // // Unknown flag:
+    // const std::string unknownFlag = "--name John --huh [--age 20]";
+    // std::cout << "----------------------------\n";
+    // std::cout << "Unknown flag: \n";
+    // parser.parseString(unknownFlag);
+    //
+    // // Missing LBRACK
+    // const std::string noLBRACK = "--name John --group --age 20]";
+    // std::cout << "----------------------------\n";
+    // std::cout << "No lbrack: \n";
+    // parser.parseString(noLBRACK);
 
     // Missing RBRACK
-    const std::string noRBRACK = "--name John --group [--age 20";
+    const std::string noRBRACK = "--name John --group [--age 20 --major CS";
     std::cout << "----------------------------\n";
     std::cout << "No rbrack: \n";
     parser.parseString(noRBRACK);
@@ -226,13 +227,13 @@ int main() {
     // MissingFlag();
     // MissingFlagNested();
     // UnknownGroup();
-    StudentTest();
+    // StudentTest();
     // MultiOptionTest();
     // MultiOptionGroupTest();
     // runScannerTests();
     // runOptionsTests();
     // runErrorTests();
-    // GroupErrors();
+    GroupErrors();
     // BasicOption();
     const auto end = std::chrono::steady_clock::now();
     const auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);

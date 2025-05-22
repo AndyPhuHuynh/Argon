@@ -16,7 +16,9 @@ namespace Argon {
 
         ErrorGroup m_syntaxErrors = ErrorGroup("Syntax Errors", -1, -1);
         ErrorGroup m_analysisErrors = ErrorGroup("Analysis Errors", -1, -1);
+
         std::vector<Token> m_brackets;
+        bool m_mismatchedRBRACK = false;
     public:
         Parser() = default;
         explicit Parser(const IOption& option);
@@ -125,7 +127,9 @@ inline std::unique_ptr<Argon::OptionAst> Argon::Parser::parseSingleOption(const 
     if (value.kind != TokenKind::IDENTIFIER) {
         m_syntaxErrors.addErrorMessage(std::format("Expected flag value, got '{}' at position {}", value.image, value.position), value.position);
         getNextValidFlag(context, false);
-        m_scanner.rewind(1);
+        if (m_scanner.peekToken().kind != TokenKind::END) {
+            m_scanner.rewind(1);
+        }
         return nullptr;
     }
 
@@ -133,7 +137,9 @@ inline std::unique_ptr<Argon::OptionAst> Argon::Parser::parseSingleOption(const 
     if (context.containsLocalFlag(value.image)) {
         m_syntaxErrors.addErrorMessage(std::format("No value provided for flag '{}' at position {}", flag.image, flag.position), value.position);
         getNextValidFlag(context, false);
-        m_scanner.rewind(1);
+        if (m_scanner.peekToken().kind != TokenKind::END) {
+            m_scanner.rewind(1);
+        }
         return nullptr;
     }
 
@@ -181,7 +187,12 @@ inline void Argon::Parser::parseGroupContents(OptionGroupAst& optionGroupAst, Co
 }
 
 inline std::unique_ptr<Argon::OptionGroupAst> Argon::Parser::parseOptionGroup(Context& context, const Token& flag) { // NOLINT(misc-no-recursion)
-    expectToken(TokenKind::LBRACK, "Expected '[', got '{}' at position {}");
+    const Token lbrack = m_scanner.peekToken();
+    if (lbrack.kind != TokenKind::LBRACK) {
+        m_syntaxErrors.addErrorMessage(std::format("Expected '[', got '{}' at position {}", lbrack.image, lbrack.position), lbrack.position);
+        return nullptr;
+    }
+    m_scanner.getNextToken();
 
     const auto optionGroup = context.getOptionDynamic<OptionGroup>(flag.image);
     auto& nextContext = optionGroup->get_context();
@@ -191,7 +202,7 @@ inline std::unique_ptr<Argon::OptionGroupAst> Argon::Parser::parseOptionGroup(Co
     return optionGroupAst;
 }
 
-inline auto Argon::Parser::getNextValidFlag(const Context& context, bool printErrors) -> std::optional<Token> {
+inline auto Argon::Parser::getNextValidFlag(const Context& context, const bool printErrors) -> std::optional<Token> {
     Token flag = m_scanner.peekToken();
 
     const bool isIdentifier =  flag.kind == TokenKind::IDENTIFIER;
@@ -219,17 +230,19 @@ inline auto Argon::Parser::getNextValidFlag(const Context& context, bool printEr
     }
 
     while (true) {
-        Token token = m_scanner.peekToken();
+        Token token = getNextToken();
         if (token.kind == TokenKind::LBRACK) {
+            m_scanner.rewind(1);
             skipScope();
+        } else if (m_mismatchedRBRACK) {
+            continue;
         } else if (token.kind == TokenKind::RBRACK || token.kind == TokenKind::END) {
             // Escape this scope, leave RBRACK scanning to the function above
+            m_scanner.rewind(1);
             return std::nullopt;
         } else if (token.kind == TokenKind::IDENTIFIER && context.containsLocalFlag(token.image)) {
-            getNextToken();
             return token;
         }
-        getNextToken();
     }
 }
 
@@ -268,26 +281,32 @@ inline Argon::Token Argon::Parser::expectToken(std::initializer_list<TokenKind> 
 }
 
 inline Argon::Token Argon::Parser::getNextToken() {
+    m_mismatchedRBRACK = false;
     const Token nextToken = m_scanner.getNextToken();
-    // if (nextToken.kind == TokenKind::LBRACK) {
-    //     m_brackets.push_back(nextToken);
-    // } else if (nextToken.kind == TokenKind::RBRACK) {
-    //     if (m_brackets.empty()) {
-    //         m_syntaxErrors.addErrorMessage(
-    //             std::format("No matching '[' found for ']' at positions {}", nextToken.position),
-    //             nextToken.position
-    //         );
-    //     } else {
-    //         m_brackets.pop_back();
-    //     }
-    // }
+    if (nextToken.kind == TokenKind::LBRACK) {
+        m_brackets.push_back(nextToken);
+    } else if (nextToken.kind == TokenKind::RBRACK) {
+        if (m_brackets.empty()) {
+            m_mismatchedRBRACK = true;
+            m_syntaxErrors.addErrorMessage(
+                std::format("No matching '[' found for ']' at position {}", nextToken.position),
+                nextToken.position
+            );
+        } else {
+            m_brackets.pop_back();
+        }
+    }
     return nextToken;
 }
 
 inline void Argon::Parser::scanUntilSee(const std::initializer_list<TokenKind>& kinds) {
+    const Token t = m_scanner.peekToken();
     while (!m_scanner.seeTokenKind(kinds) && !m_scanner.seeTokenKind(TokenKind::END)) {
         if (m_scanner.seeTokenKind(TokenKind::LBRACK)) {
             skipScope();
+        } else {
+            getNextToken();
+            const Token t2 = m_scanner.peekToken();
         }
     }
 }
@@ -301,7 +320,7 @@ inline void Argon::Parser::skipScope() {
     if (m_scanner.peekToken().kind != TokenKind::LBRACK) return;
     std::vector<Token> brackets;
     while (true) {
-        const Token token = m_scanner.getNextToken();
+        const Token token = getNextToken();
         if (token.kind == TokenKind::LBRACK) {
             brackets.push_back(token);
         } else if (token.kind == TokenKind::RBRACK) {
@@ -318,6 +337,7 @@ inline void Argon::Parser::skipScope() {
                 m_syntaxErrors.addErrorMessage(
                     std::format("Unmatched '[' found at position {}", bracket.position), bracket.position);
             }
+            return;
         }
 
         if (brackets.empty()) {

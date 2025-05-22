@@ -225,8 +225,8 @@ int main() {
     using namespace Argon;
     // MissingFlag();
     // MissingFlagNested();
-    UnknownGroup();
-    // StudentTest();
+    // UnknownGroup();
+    StudentTest();
     // MultiOptionTest();
     // MultiOptionGroupTest();
     // runScannerTests();

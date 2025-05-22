@@ -45,7 +45,8 @@ namespace Argon {
         [[nodiscard]] Token peekToken() const;
         
         void recordPosition();
-        void rewind();
+        void rewindToPosition();
+        void rewind(uint32_t amount);
     private:
         std::vector<Token> m_tokens;
         uint32_t m_tokenPos = 0;
@@ -145,8 +146,16 @@ inline void Argon::Scanner::recordPosition() {
     m_rewindPos = m_tokenPos;
 }
 
-inline void Argon::Scanner::rewind() {
+inline void Argon::Scanner::rewindToPosition() {
     m_tokenPos = m_rewindPos;
+}
+
+inline void Argon::Scanner::rewind(const uint32_t amount) {
+    if (amount > m_tokenPos) {
+        m_tokenPos = 0;
+    } else {
+        m_tokenPos -= amount;
+    }
 }
 
 inline void Argon::Scanner::scanNextToken() {

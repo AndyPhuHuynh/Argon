@@ -225,10 +225,10 @@ int main() {
     using namespace Argon;
     // MissingFlag();
     // MissingFlagNested();
-    // UnknownGroup();
+    UnknownGroup();
     // StudentTest();
-    MultiOptionTest();
-    MultiOptionGroupTest();
+    // MultiOptionTest();
+    // MultiOptionGroupTest();
     // runScannerTests();
     // runOptionsTests();
     // runErrorTests();

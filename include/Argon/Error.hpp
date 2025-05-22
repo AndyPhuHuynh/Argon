@@ -352,7 +352,7 @@ inline void Argon::ErrorGroup::printErrorsTreeMode() const {
             stream << std::format("[{}]\n", group.getGroupName());
         }
         const auto& errors = group.getErrors();
-        size_t lastErrorIndex = group.getIndexOfLastHasError();
+        const size_t lastErrorIndex = group.getIndexOfLastHasError();
         for (size_t i = 0; i < errors.size(); ++i) {
             auto& error = errors[i];
             std::visit([&]<typename T>(const T& e) {

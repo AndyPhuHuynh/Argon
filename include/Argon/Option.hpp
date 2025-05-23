@@ -11,12 +11,12 @@ namespace Argon {
     template <typename T> class Option;
     class OptionGroup;
     class Context;
-    
+
     class IOption {
     protected:
         std::vector<std::string> m_flags;
         std::string m_error;
-        
+
         IOption() = default;
     public:
         IOption(const IOption&);
@@ -30,10 +30,10 @@ namespace Argon {
         [[nodiscard]] const std::string& get_error() const;
         [[nodiscard]] bool has_error() const;
         void clear_error();
-        
+
         [[nodiscard]] virtual std::unique_ptr<IOption> clone() const = 0;
     };
-    
+
     template <typename Derived>
     class OptionComponent : public IOption {
         friend Derived;
@@ -43,19 +43,19 @@ namespace Argon {
         [[nodiscard]] std::unique_ptr<IOption> clone() const override;
         Derived& operator[](const std::string& tag);
     };
-    
+
     class OptionBase {
     public:
         OptionBase() = default;
         virtual ~OptionBase() = default;
-        
+
         virtual void set_value(const std::string& flag, const std::string& value) = 0;
     };
 
     template <typename T>
     using ConversionFn = std::function<bool(const std::string&, T&)>;
     using GenerateErrorMsgFn = std::function<std::string(const std::string&, const std::string&)>;
-    
+
     template <typename T>
     struct Converter {
         ConversionFn<T> conversion_fn = nullptr;
@@ -77,9 +77,9 @@ namespace Argon {
         T *m_out = nullptr;
     public:
         explicit Option(T* out);
-        
+
         Option(T* out, const ConversionFn<T>& conversion_func);
-        
+
         Option(T* out, const ConversionFn<T>& conversion_func, const GenerateErrorMsgFn& generate_error_msg_func);
 
     private:
@@ -87,22 +87,20 @@ namespace Argon {
     };
 
     class OptionGroup : public OptionComponent<OptionGroup> {
-        std::shared_ptr<Context> m_context;
+        std::unique_ptr<Context> m_context;
     public:
         OptionGroup();
+        OptionGroup(const OptionGroup&);
+        OptionGroup& operator=(const OptionGroup&);
         OptionGroup& operator+(const IOption& other);
 
         void add_option(const IOption& option);
         IOption *get_option(const std::string& flag);
         Context& get_context();
     };
-
-    template<typename T>
-    bool parseNonBoolIntegralType(const std::string& arg, T& out);
-    bool parseBool(const std::string& arg, bool& out);
 }
 
-// --------------------------------------------- Implementations -------------------------------------------------------
+//------------------------------------------------------Includes--------------------------------------------------------
 
 #include <algorithm>
 #include <iostream>
@@ -112,6 +110,54 @@ namespace Argon {
 #include "StringUtil.hpp"
 #include "Traits.hpp"
 
+//---------------------------------------------------Free Functions-----------------------------------------------------
+
+namespace Argon {
+template <typename T>
+bool parseNonBoolIntegralType(const std::string& arg, T& out) {
+    static_assert(is_non_bool_integral<T>);
+    T min = std::numeric_limits<T>::min();
+    T max = std::numeric_limits<T>::max();
+
+    try {
+        if (std::is_unsigned_v<T>) {
+            size_t pos;
+            unsigned long long result = std::stoull(arg, &pos);
+            if (result > max || pos != arg.size()) {
+                return false;
+            }
+            out = static_cast<T>(result);
+        } else {
+            size_t pos;
+            long long result = std::stoll(arg, &pos);
+            if (result < min || result > max || pos != arg.size()) {
+                return false;
+            }
+            out = static_cast<T>(result);
+        }
+        return true;
+    } catch (const std::invalid_argument&) {
+        return false;
+    } catch (const std::out_of_range&) {
+        return false;
+    }
+}
+
+inline bool parseBool(const std::string& arg, bool& out) {
+    std::string boolStr = arg;
+    StringUtil::to_lower(boolStr);
+    if (boolStr == "true") {
+        out = true;
+        return true;
+    } else if (boolStr == "false") {
+        out = false;
+        return true;
+    }
+    return false;
+}
+}
+
+//---------------------------------------------------Implementations----------------------------------------------------
 
 template <typename Derived>
 std::unique_ptr<Argon::IOption> Argon::OptionComponent<Derived>::clone() const {
@@ -269,7 +315,20 @@ inline void Argon::IOption::clear_error() {
 }
 
 inline Argon::OptionGroup::OptionGroup() {
-    m_context = std::make_shared<Context>();
+    m_context = std::make_unique<Context>();
+}
+
+inline Argon::OptionGroup::OptionGroup(const OptionGroup &other) : OptionComponent(other) {
+    m_context = std::make_unique<Context>(*other.m_context);
+}
+
+inline Argon::OptionGroup & Argon::OptionGroup::operator=(const OptionGroup &other) {
+    if (this == &other) {
+        return *this;
+    }
+
+    m_context = std::make_unique<Context>(*other.m_context);
+    return *this;
 }
 
 inline Argon::OptionGroup& Argon::OptionGroup::operator+(const IOption& other) {
@@ -288,47 +347,3 @@ inline Argon::IOption *Argon::OptionGroup::get_option(const std::string& flag) {
 inline Argon::Context& Argon::OptionGroup::get_context() { //NOLINT (function is not const)
     return *m_context;
 }
-
-template <typename T>
-bool Argon::parseNonBoolIntegralType(const std::string& arg, T& out) {
-    static_assert(Argon::is_non_bool_integral<T>);
-    T min = std::numeric_limits<T>::min();
-    T max = std::numeric_limits<T>::max();
-
-    try {
-        if (std::is_unsigned_v<T>) {
-            size_t pos;
-            unsigned long long result = std::stoull(arg, &pos);
-            if (result > max || pos != arg.size()) {
-                return false;
-            }
-            out = static_cast<T>(result);
-        } else {
-            size_t pos;
-            long long result = std::stoll(arg, &pos);
-            if (result < min || result > max || pos != arg.size()) {
-                return false;
-            }
-            out = static_cast<T>(result);
-        }
-        return true;
-    } catch (const std::invalid_argument&) {
-        return false;
-    } catch (const std::out_of_range&) {
-        return false;
-    }
-}
-
-inline bool Argon::parseBool(const std::string& arg, bool& out) {
-    std::string boolStr = arg;
-    StringUtil::to_lower(boolStr);
-    if (boolStr == "true") {
-        out = true;
-        return true;
-    } else if (boolStr == "false") {
-        out = false;
-        return true;
-    }
-    return false;
-}
-

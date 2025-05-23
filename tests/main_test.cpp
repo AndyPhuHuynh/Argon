@@ -179,21 +179,21 @@ static void GroupErrors() {
                     + Option(&age)["--age"];
 
     // Not an option group flag:
-    // const std::string notGroup = "--name [--age 10]";
-    // std::cout << "Not option group flag: \n";
-    // parser.parseString(notGroup);
-    //
-    // // Unknown flag:
-    // const std::string unknownFlag = "--name John --huh [--age 20]";
-    // std::cout << "----------------------------\n";
-    // std::cout << "Unknown flag: \n";
-    // parser.parseString(unknownFlag);
-    //
-    // // Missing LBRACK
-    // const std::string noLBRACK = "--name John --group --age 20]";
-    // std::cout << "----------------------------\n";
-    // std::cout << "No lbrack: \n";
-    // parser.parseString(noLBRACK);
+    const std::string notGroup = "--name [--age 10]";
+    std::cout << "Not option group flag: \n";
+    parser.parseString(notGroup);
+
+    // Unknown flag:
+    const std::string unknownFlag = "--name John --huh [--age 20]";
+    std::cout << "----------------------------\n";
+    std::cout << "Unknown flag: \n";
+    parser.parseString(unknownFlag);
+
+    // Missing LBRACK
+    const std::string noLBRACK = "--name John --group --age 20]";
+    std::cout << "----------------------------\n";
+    std::cout << "No lbrack: \n";
+    parser.parseString(noLBRACK);
 
     // Missing RBRACK
     const std::string noRBRACK = "--name John --group [--age 20 --major CS";
@@ -224,12 +224,12 @@ static void BasicOption() {
 int main() {
     const auto start = std::chrono::steady_clock::now();
     using namespace Argon;
-    // MissingFlag();
-    // MissingFlagNested();
-    // UnknownGroup();
-    // StudentTest();
-    // MultiOptionTest();
-    // MultiOptionGroupTest();
+    MissingFlag();
+    MissingFlagNested();
+    UnknownGroup();
+    StudentTest();
+    MultiOptionTest();
+    MultiOptionGroupTest();
     // runScannerTests();
     // runOptionsTests();
     // runErrorTests();

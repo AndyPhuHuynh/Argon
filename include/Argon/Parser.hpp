@@ -196,6 +196,7 @@ inline std::unique_ptr<Argon::OptionGroupAst> Argon::Parser::parseOptionGroup(Co
 
     const auto optionGroup = context.getOptionDynamic<OptionGroup>(flag.image);
     auto& nextContext = optionGroup->get_context();
+    nextContext.setName(flag.image);
 
     auto optionGroupAst = std::make_unique<OptionGroupAst>(flag);
     parseGroupContents(*optionGroupAst, nextContext);
@@ -219,10 +220,17 @@ inline auto Argon::Parser::getNextValidFlag(const Context& context, const bool p
             flag.position
         );
     } else if (printErrors) {
-        m_syntaxErrors.addErrorMessage(
-            std::format("Unknown flag '{}' at position {}", flag.image, flag.position),
-            flag.position
-        );
+        if (&context == &m_context) {
+            m_syntaxErrors.addErrorMessage(
+                std::format("Unknown flag '{}' at position {}", flag.image, flag.position),
+                flag.position
+            );
+        } else {
+            m_syntaxErrors.addErrorMessage(
+                std::format("Unknown flag '{}' inside group '{}' at position {}", flag.image, context.getPath(), flag.position),
+                flag.position
+            );
+        }
     }
 
     if (flag.kind == TokenKind::LBRACK) {

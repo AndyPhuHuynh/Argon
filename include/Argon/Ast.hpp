@@ -118,7 +118,7 @@ inline void Argon::OptionAst::analyze(ErrorGroup& errorGroup, Context& context) 
         return;
     }
 
-    OptionBase *optionBase = dynamic_cast<OptionBase*>(iOption);
+    auto *optionBase = dynamic_cast<OptionBase*>(iOption);
     if (!optionBase || !dynamic_cast<IsSingleOption*>(iOption)) {
         errorGroup.addErrorMessage(std::format("Flag '{}' is not an option", flag.value), flag.pos);
         return;
@@ -147,7 +147,7 @@ inline void Argon::MultiOptionAst::analyze(ErrorGroup& errorGroup, Context &cont
         return;
     }
 
-    OptionBase *optionBase = dynamic_cast<OptionBase*>(iOption);
+    auto *optionBase = dynamic_cast<OptionBase*>(iOption);
     if (!optionBase || !dynamic_cast<IsMultiOption*>(iOption)) {
         errorGroup.addErrorMessage(std::format("Flag '{}' is not a multi-option", flag.value), flag.pos);
         return;
@@ -181,7 +181,7 @@ inline void Argon::OptionGroupAst::analyze(ErrorGroup& errorGroup, Context& cont
         return;
     }
 
-    OptionGroup *optionGroup = dynamic_cast<OptionGroup*>(iOption);
+    auto optionGroup = dynamic_cast<OptionGroup*>(iOption);
     if (!optionGroup) {
         errorGroup.removeErrorGroup(flag.pos);
         errorGroup.addErrorMessage(std::format("Flag '{}' is not an option group", flag.value), flag.pos);

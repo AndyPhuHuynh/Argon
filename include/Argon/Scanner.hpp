@@ -170,6 +170,7 @@ inline void Argon::Scanner::scanNextToken() {
 
         if (ch == ' ') {
             optCh = nextChar();
+            position++;
             continue;
         }
         if (ch == '[') {

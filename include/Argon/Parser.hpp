@@ -135,7 +135,17 @@ inline std::unique_ptr<Argon::OptionAst> Argon::Parser::parseSingleOption(const 
 
     // If value matches a flag (no value supplied)
     if (context.containsLocalFlag(value.image)) {
-        m_syntaxErrors.addErrorMessage(std::format("No value provided for flag '{}' at position {}", flag.image, flag.position), value.position);
+        if (&context == &m_context) {
+            m_syntaxErrors.addErrorMessage(
+                std::format("No value provided for flag '{}' at position {}", flag.image, flag.position),
+                value.position
+            );
+        } else {
+            m_syntaxErrors.addErrorMessage(
+                std::format("No value provided for flag '{}' inside group '{}' at position {}", flag.image, context.getPath(), flag.position),
+                value.position
+            );
+        }
         getNextValidFlag(context, false);
         if (m_scanner.peekToken().kind != TokenKind::END) {
             m_scanner.rewind(1);
@@ -192,7 +202,7 @@ inline std::unique_ptr<Argon::OptionGroupAst> Argon::Parser::parseOptionGroup(Co
         m_syntaxErrors.addErrorMessage(std::format("Expected '[', got '{}' at position {}", lbrack.image, lbrack.position), lbrack.position);
         return nullptr;
     }
-    m_scanner.getNextToken();
+    getNextToken();
 
     const auto optionGroup = context.getOptionDynamic<OptionGroup>(flag.image);
     auto& nextContext = optionGroup->get_context();
@@ -222,7 +232,7 @@ inline auto Argon::Parser::getNextValidFlag(const Context& context, const bool p
     } else if (printErrors) {
         if (&context == &m_context) {
             m_syntaxErrors.addErrorMessage(
-                std::format("Unknown flag '{}' at position {}", flag.image, flag.position),
+                std::format("Unknown flag '{}'  at position {}", flag.image, flag.position),
                 flag.position
             );
         } else {

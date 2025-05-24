@@ -224,17 +224,17 @@ static void BasicOption() {
 int main() {
     const auto start = std::chrono::steady_clock::now();
     using namespace Argon;
-    MissingFlag();
-    MissingFlagNested();
-    UnknownGroup();
-    StudentTest();
-    MultiOptionTest();
-    MultiOptionGroupTest();
+    // MissingFlag();
+    // MissingFlagNested();
+    // UnknownGroup();
+    // StudentTest();
+    // MultiOptionTest();
+    // MultiOptionGroupTest();
     // runScannerTests();
     // runOptionsTests();
     // runErrorTests();
     GroupErrors();
-    // BasicOption();
+    BasicOption();
     const auto end = std::chrono::steady_clock::now();
     const auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     std::cout << "Time: " << duration << "\n";

@@ -85,6 +85,10 @@ inline void Argon::Context::setName(const std::string& name) {
 }
 
 inline std::string Argon::Context::getPath() const {
+    if (m_parent == nullptr) {
+        return "";
+    }
+
     std::vector<const std::string*> names;
 
     const auto *current = this;

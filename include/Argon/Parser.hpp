@@ -12,7 +12,7 @@
 namespace Argon {
     class Parser {
         Context m_context;
-        Scanner m_scanner = Scanner();
+        Scanner m_scanner;
 
         ErrorGroup m_syntaxErrors = ErrorGroup("Syntax Errors", -1, -1);
         ErrorGroup m_analysisErrors = ErrorGroup("Analysis Errors", -1, -1);
@@ -34,7 +34,7 @@ namespace Argon {
         void parseString(const std::string& str);
         Parser& operator|(const IOption& option);
     private:
-        void reset();
+        auto reset() -> void;
 
         auto parseStatement() -> StatementAst;
 
@@ -109,7 +109,7 @@ inline void Argon::Parser::parseString(const std::string& str) {
     }
 }
 
-inline Argon::StatementAst Argon::Parser::parseStatement() {
+inline auto Argon::Parser::parseStatement() -> StatementAst {
     StatementAst statement;
     while (!m_scanner.seeTokenKind(TokenKind::END)) {
         // Handle rbrack that gets leftover after SkipScope
@@ -141,7 +141,7 @@ inline auto Argon::Parser::parseOptionBundle(Context& context) -> std::unique_pt
     return nullptr;
 }
 
-inline std::unique_ptr<Argon::OptionAst> Argon::Parser::parseSingleOption(const Context &context, const Token& flag) {
+inline auto Argon::Parser::parseSingleOption(const Context &context, const Token &flag) -> std::unique_ptr<OptionAst> {
     // Get value
     Token value = m_scanner.peekToken();
     if (value.kind != TokenKind::IDENTIFIER) {
@@ -177,7 +177,7 @@ inline std::unique_ptr<Argon::OptionAst> Argon::Parser::parseSingleOption(const 
     return std::make_unique<OptionAst>(flag, value);
 }
 
-inline std::unique_ptr<Argon::MultiOptionAst> Argon::Parser::parseMultiOption(const Context &context, const Token &flag) {
+inline auto Argon::Parser::parseMultiOption(const Context &context, const Token &flag) -> std::unique_ptr<MultiOptionAst> {
     auto multiOptionAst = std::make_unique<MultiOptionAst>(flag);
 
     while (true) {
@@ -193,7 +193,7 @@ inline std::unique_ptr<Argon::MultiOptionAst> Argon::Parser::parseMultiOption(co
     }
 }
 
-inline void Argon::Parser::parseGroupContents(OptionGroupAst& optionGroupAst, Context& nextContext) { // NOLINT(misc-no-recursion)
+inline auto Argon::Parser::parseGroupContents(OptionGroupAst &optionGroupAst, Context &nextContext) -> void { // NOLINT(misc-no-recursion)
     while (true) {
         const Token nextToken = m_scanner.peekToken();
 
@@ -216,7 +216,7 @@ inline void Argon::Parser::parseGroupContents(OptionGroupAst& optionGroupAst, Co
     }
 }
 
-inline std::unique_ptr<Argon::OptionGroupAst> Argon::Parser::parseOptionGroup(Context& context, const Token& flag) { // NOLINT(misc-no-recursion)
+inline auto Argon::Parser::parseOptionGroup(Context &context, const Token &flag) -> std::unique_ptr<OptionGroupAst> { // NOLINT(misc-no-recursion)
     const Token lbrack = m_scanner.peekToken();
     if (lbrack.kind != TokenKind::LBRACK) {
         m_syntaxErrors.addErrorMessage(std::format("Expected '[', got '{}' at position {}", lbrack.image, lbrack.position), lbrack.position);
@@ -285,18 +285,18 @@ inline auto Argon::Parser::getNextValidFlag(const Context& context, const bool p
     }
 }
 
-inline Argon::Parser& Argon::Parser::operator|(const IOption& option) {
+inline auto Argon::Parser::operator|(const IOption &option) -> Parser& {
     addOption(option);
     return *this;
 }
 
-inline void Argon::Parser::reset() {
+inline auto Argon::Parser::reset() -> void {
     m_syntaxErrors.clear();
     m_analysisErrors.clear();
     m_brackets.clear();
 }
 
-inline Argon::Token Argon::Parser::getNextToken() {
+inline auto Argon::Parser::getNextToken() -> Token {
     m_mismatchedRBRACK = false;
     const Token nextToken = m_scanner.getNextToken();
     if (nextToken.kind == TokenKind::LBRACK) {
@@ -315,7 +315,7 @@ inline Argon::Token Argon::Parser::getNextToken() {
     return nextToken;
 }
 
-inline void Argon::Parser::skipScope() {
+inline auto Argon::Parser::skipScope() -> void {
     if (m_scanner.peekToken().kind != TokenKind::LBRACK) return;
     std::vector<Token> brackets;
     while (true) {

@@ -68,44 +68,6 @@ namespace Argon {
 #include <iostream>
 #include <sstream>
 
-#if defined(_WIN32)
-
-#ifndef NOMINMAX
-#define NOMINMAX
-#endif
-
-#include <windows.h>
-#endif
-
-inline bool terminalSupportsUTF8() {
-#if defined(_WIN32)
-    // Check if the output is a console
-    HANDLE hOut = GetStdHandle(STD_OUTPUT_HANDLE); //NOLINT (windows typedef)
-    if (hOut == INVALID_HANDLE_VALUE || hOut == nullptr) {
-        return false;
-    }
-
-    // Not a console (e.g., redirected to file)
-    DWORD mode;
-    if (!GetConsoleMode(hOut, &mode)) {
-        return false;
-    }
-
-    // Check the code page
-    if (const UINT codePage = GetConsoleOutputCP(); codePage != 65001) {
-        return false;  // Not UTF-8
-    }
-
-    return true;
-#else
-    const char* lang = std::getenv("LANG");
-    const char* lc_ctype = std::getenv("LC_CTYPE");
-
-    std::string encoding = (lc_ctype ? lc_ctype : (lang ? lang : ""));
-    return encoding.find("UTF-8") != std::string::npos || encoding.find("utf8") != std::string::npos;
-#endif
-}
-
 static bool inRange(const int value, const int min, const int max) {
     return value >= min && value <= max;
 }

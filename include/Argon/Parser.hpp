@@ -49,7 +49,7 @@ namespace Argon {
         auto getNextValidFlag(const Context &context, bool printErrors = true) -> std::optional<Token>;
 
         auto getNextToken() -> Token;
-        void skipScope();
+        auto skipScope() -> void;
     };
 
     Parser operator|(const IOption& left, const IOption& right);

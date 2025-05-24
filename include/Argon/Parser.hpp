@@ -35,27 +35,20 @@ namespace Argon {
         Parser& operator|(const IOption& option);
     private:
         void reset();
-        StatementAst parseStatement();
+
+        auto parseStatement() -> StatementAst;
 
         auto parseOptionBundle(Context& context) -> std::unique_ptr<OptionBaseAst>;
 
-        void handleBadOptionFlag(const Context& context);
-        std::unique_ptr<OptionAst> parseSingleOption(const Context& context, const Token& flag);
-        std::unique_ptr<MultiOptionAst> parseMultiOption(const Context& context, const Token& flag);
-        std::unique_ptr<OptionBaseAst> parseOption(Context& context);
+        auto parseSingleOption(const Context &context, const Token &flag) -> std::unique_ptr<OptionAst>;
+        auto parseMultiOption(const Context &context, const Token &flag) -> std::unique_ptr<MultiOptionAst>;
 
-        void handleBadGroupFlag(const Token& flag);
-        void parseGroupContents(OptionGroupAst& optionGroupAst, Context& nextContext);
-        std::unique_ptr<OptionGroupAst> parseOptionGroup(Context& context, const Token& flag);
+        auto parseGroupContents(OptionGroupAst &optionGroupAst, Context &nextContext) -> void;
+        auto parseOptionGroup(Context &context, const Token &flag) -> std::unique_ptr<OptionGroupAst>;
 
         auto getNextValidFlag(const Context &context, bool printErrors = true) -> std::optional<Token>;
-        Token expectFlag();
-        Token expectToken(TokenKind kind, const std::format_string<std::string&, int&>& errorMsg);
-        Token expectToken(std::initializer_list<TokenKind> kinds, const std::format_string<std::string&, int&>& errorMsg);
 
-        Token getNextToken();
-        void scanUntilSee(const std::initializer_list<TokenKind>& kinds);
-        Token scanUntilGet(const std::initializer_list<TokenKind>& kinds);
+        auto getNextToken() -> Token;
         void skipScope();
     };
 
@@ -119,6 +112,11 @@ inline void Argon::Parser::parseString(const std::string& str) {
 inline Argon::StatementAst Argon::Parser::parseStatement() {
     StatementAst statement;
     while (!m_scanner.seeTokenKind(TokenKind::END)) {
+        // Handle rbrack that gets leftover after SkipScope
+        if (m_scanner.seeTokenKind(TokenKind::RBRACK)) {
+            getNextToken();
+            continue;
+        }
         statement.addOption(parseOptionBundle(m_context));
     }
     return statement;
@@ -298,29 +296,6 @@ inline void Argon::Parser::reset() {
     m_brackets.clear();
 }
 
-inline Argon::Token Argon::Parser::expectFlag() {
-    return expectToken(TokenKind::IDENTIFIER, "Expected flag name, got '{}' at position {}");
-}
-
-inline Argon::Token Argon::Parser::expectToken(TokenKind kind, const std::format_string<std::string&, int&>& errorMsg) {
-    Token token = getNextToken();
-    if (token.kind != kind) {
-        m_syntaxErrors.addErrorMessage(std::format(errorMsg, token.image, token.position), token.position);
-        token = scanUntilGet({kind});
-    }
-    return token;
-}
-
-inline Argon::Token Argon::Parser::expectToken(std::initializer_list<TokenKind> kinds,
-    const std::format_string<std::string &, int &> &errorMsg) {
-    Token token = getNextToken();
-    if (!token.isOneOf(kinds)) {
-        m_syntaxErrors.addErrorMessage(std::format(errorMsg, token.image, token.position), token.position);
-        token = scanUntilGet({kinds});
-    }
-    return token;
-}
-
 inline Argon::Token Argon::Parser::getNextToken() {
     m_mismatchedRBRACK = false;
     const Token nextToken = m_scanner.getNextToken();
@@ -338,23 +313,6 @@ inline Argon::Token Argon::Parser::getNextToken() {
         }
     }
     return nextToken;
-}
-
-inline void Argon::Parser::scanUntilSee(const std::initializer_list<TokenKind>& kinds) {
-    const Token t = m_scanner.peekToken();
-    while (!m_scanner.seeTokenKind(kinds) && !m_scanner.seeTokenKind(TokenKind::END)) {
-        if (m_scanner.seeTokenKind(TokenKind::LBRACK)) {
-            skipScope();
-        } else {
-            getNextToken();
-            const Token t2 = m_scanner.peekToken();
-        }
-    }
-}
-
-inline Argon::Token Argon::Parser::scanUntilGet(const std::initializer_list<TokenKind>& kinds) {
-    scanUntilSee(kinds);
-    return getNextToken();
 }
 
 inline void Argon::Parser::skipScope() {

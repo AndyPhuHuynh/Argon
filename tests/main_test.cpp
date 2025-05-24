@@ -233,7 +233,7 @@ int main() {
     // runScannerTests();
     // runOptionsTests();
     // runErrorTests();
-    // GroupErrors();
+    GroupErrors();
     // BasicOption();
     const auto end = std::chrono::steady_clock::now();
     const auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);

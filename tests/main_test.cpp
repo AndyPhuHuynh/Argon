@@ -57,10 +57,10 @@ static void StudentTest() {
                             + Option(&minor)["--minor"]
                             + Option(&instrumentName)["--name"]);
     
-    // std::string str = "--wtf true --name John --group [--age 20aasdf --major CS --nested [--minor music --name violin --null hi --null2 what] --back test] -top-level huh";
-    // std::string str = "--name John --outside asdfasd --group [--age 20aasdf --major CS --nested [--minor music --name violin --null hi] --back asdfas] --outter2 asdfas";
-    const std::string working = "--name John --group [--age 20asdf --major CS --nested [--minor music --name violin]]";
-    parser.parseString(working);
+    const std::string str = "--wtf true --name John --group [--age 20aasdf --major CS --nested [--minor music --name violin --null hi --null2 what] --back test] -top-level huh";
+    // const std::string str = "--name John --outside asdfasd --group [--age 20aasdf --major CS --nested [--minor music --name violin --null hi] --back asdfas] --outter2 asdfas";
+    // const std::string str = "--name John --group [--age 20asdf --major CS --nested [--minor music --name violin]]";
+    parser.parseString(str);
     
     std::cout << "name: " << name << "\n";
     std::cout << "age: " << age << "\n";
@@ -233,8 +233,8 @@ int main() {
     // runScannerTests();
     // runOptionsTests();
     // runErrorTests();
-    GroupErrors();
-    BasicOption();
+    // GroupErrors();
+    // BasicOption();
     const auto end = std::chrono::steady_clock::now();
     const auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     std::cout << "Time: " << duration << "\n";

@@ -10,6 +10,16 @@ namespace Argon {
     class ErrorGroup;
 
     using ErrorVariant = std::variant<ErrorMessage, ErrorGroup>;
+
+    enum class PrintMode {
+        Flat,
+        Tree,
+    };
+
+    enum class TextMode {
+        Ascii,
+        Utf8,
+    };
     
     struct ErrorMessage {
         std::string msg;
@@ -39,9 +49,10 @@ namespace Argon {
 
         [[nodiscard]] const std::string& getGroupName() const;
         [[nodiscard]] const std::vector<ErrorVariant>& getErrors() const;
+        [[nodiscard]] bool hasErrors() const;
         
         void printErrorsFlatMode() const;
-        void printErrorsTreeMode() const;
+        void printErrorsTreeMode(TextMode textMode) const;
     private:
         ErrorGroup(std::string groupName, int startPos, int endPos, ErrorGroup* parent);
 
@@ -165,7 +176,7 @@ inline void Argon::ErrorGroup::addErrorMessage(const std::string& msg, int pos) 
 
     // If error group, check if it's within the bounds, if it is, insert into that group
     if (std::holds_alternative<ErrorGroup>(item)) {
-        ErrorGroup& errorGroup = std::get<ErrorGroup>(item);
+        auto& errorGroup = std::get<ErrorGroup>(item);
 
         if (inRange(pos, errorGroup.m_startPos, errorGroup.m_endPos)) {
             errorGroup.addErrorMessage(msg, pos);
@@ -218,7 +229,7 @@ inline void Argon::ErrorGroup::addErrorGroup(ErrorGroup& groupToAdd) { //NOLINT 
 
         // If error group, check if it's within the bounds, if it is, insert into that group
         if (std::holds_alternative<ErrorGroup>(item)) {
-            ErrorGroup& errorGroup = std::get<ErrorGroup>(item);
+            auto& errorGroup = std::get<ErrorGroup>(item);
 
             const bool fullyInRange = inRange(groupToAdd.m_startPos, errorGroup.m_startPos, errorGroup.m_endPos) &&
                                       inRange(groupToAdd.m_endPos, errorGroup.m_startPos, errorGroup.m_endPos);
@@ -235,7 +246,7 @@ inline void Argon::ErrorGroup::addErrorGroup(ErrorGroup& groupToAdd) { //NOLINT 
     // Check for every item after index and insert it into the new group, if its fully within bounds
     while (insertIndex < m_errors.size()) {
         if (std::holds_alternative<ErrorMessage>(m_errors[insertIndex])) {
-            ErrorMessage& errorMsg = std::get<ErrorMessage>(m_errors[insertIndex]);
+            auto& errorMsg = std::get<ErrorMessage>(m_errors[insertIndex]);
             if (inRange(errorMsg.pos, groupToAdd.m_startPos, groupToAdd.m_endPos)) {
                 groupToAdd.addErrorMessage(errorMsg.msg, errorMsg.pos);
                 m_errors.erase(m_errors.begin() + static_cast<std::ptrdiff_t>(insertIndex));
@@ -243,7 +254,7 @@ inline void Argon::ErrorGroup::addErrorGroup(ErrorGroup& groupToAdd) { //NOLINT 
                 break;
             }
         } else if (std::holds_alternative<ErrorGroup>(m_errors[insertIndex])) {
-            ErrorGroup& errorGroup = std::get<ErrorGroup>(m_errors[insertIndex]);
+            auto& errorGroup = std::get<ErrorGroup>(m_errors[insertIndex]);
             if (inRange(errorGroup.m_startPos, groupToAdd.m_startPos, groupToAdd.m_endPos) &&
                 inRange(errorGroup.m_endPos, groupToAdd.m_startPos, groupToAdd.m_endPos)) {
                 groupToAdd.addErrorGroup(errorGroup);
@@ -268,7 +279,7 @@ inline void Argon::ErrorGroup::addErrorGroup(ErrorGroup& groupToAdd) { //NOLINT 
 inline void Argon::ErrorGroup::removeErrorGroup(int startPos) {
     auto it = std::ranges::find_if(m_errors, [startPos](const ErrorVariant& item) {
         if (std::holds_alternative<ErrorGroup>(item)) {
-            const ErrorGroup& errorGroup = std::get<ErrorGroup>(item);
+            const auto& errorGroup = std::get<ErrorGroup>(item);
             if (errorGroup.m_startPos == startPos) {
                 return true;
             }
@@ -287,6 +298,10 @@ inline const std::string& Argon::ErrorGroup::getGroupName() const {
 
 inline const std::vector<std::variant<Argon::ErrorMessage, Argon::ErrorGroup>>& Argon::ErrorGroup::getErrors() const {
     return m_errors;
+}
+
+inline bool Argon::ErrorGroup::hasErrors() const {
+    return m_hasErrors;
 }
 
 inline void Argon::ErrorGroup::printErrorsFlatMode() const {
@@ -345,7 +360,7 @@ inline void Argon::ErrorGroup::printErrorsFlatMode() const {
     std::cout << ss.str();
 }
 
-inline void Argon::ErrorGroup::printErrorsTreeMode() const {
+inline void Argon::ErrorGroup::printErrorsTreeMode(const TextMode textMode) const {
     constexpr auto printRecursive = [](std::stringstream& stream, const ErrorGroup& group, const std::string& prefix,
                                        const bool isFirstPrint, const bool useUnicode, auto&& printRecursiveRef) -> void {
         if (isFirstPrint) {
@@ -392,7 +407,7 @@ inline void Argon::ErrorGroup::printErrorsTreeMode() const {
     }
 
     std::stringstream ss;
-    printRecursive(ss, *this, "", true, terminalSupportsUTF8(), printRecursive);
+    printRecursive(ss, *this, "", true, textMode == TextMode::Utf8, printRecursive);
     std::cout << ss.str();
 }
 

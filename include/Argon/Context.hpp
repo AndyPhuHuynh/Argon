@@ -3,7 +3,6 @@
 #include <memory>
 #include <numeric>
 #include <string>
-#include <string_view>
 #include <vector>
 
 namespace Argon {
@@ -44,6 +43,9 @@ inline Argon::Context::Context(std::string name) : m_name(std::move(name)) {}
 inline Argon::Context::Context(const Context& other) {
     for (const auto& option : other.m_options) {
         m_options.push_back(option->clone());
+        if (auto *optionGroup = dynamic_cast<OptionGroup*>(m_options.back().get())) {
+            optionGroup->get_context().m_parent = this;
+        }
     }
     m_flags = other.m_flags;
     m_name = other.m_name;
@@ -58,6 +60,9 @@ inline Argon::Context& Argon::Context::operator=(const Context& other) {
     m_options.clear();
     for (const auto& option : other.m_options) {
         m_options.push_back(option->clone());
+        if (auto *optionGroup = dynamic_cast<OptionGroup*>(m_options.back().get())) {
+            optionGroup->get_context().m_parent = this;
+        }
     }
     m_flags = other.m_flags;
     m_name = other.m_name;

@@ -28,6 +28,8 @@ namespace Argon {
         void addError(const std::string& error, int pos);
         void addErrorGroup(const std::string& groupName, int startPos, int endPos);
         void removeErrorGroup(int startPos);
+        [[nodiscard]] bool hasErrors() const;
+        void printErrors(PrintMode analysisPrintMode, TextMode analysisTextMode = TextMode::Ascii) const;
         
         void parseString(const std::string& str);
         Parser& operator|(const IOption& option);
@@ -84,14 +86,34 @@ inline void Argon::Parser::removeErrorGroup(const int startPos) {
     m_analysisErrors.removeErrorGroup(startPos);
 }
 
+inline bool Argon::Parser::hasErrors() const {
+    return m_syntaxErrors.hasErrors() || m_analysisErrors.hasErrors();
+}
+
+inline void Argon::Parser::printErrors(const PrintMode analysisPrintMode, const TextMode analysisTextMode) const {
+    if (m_syntaxErrors.hasErrors()) {
+        m_syntaxErrors.printErrorsFlatMode();
+        return;
+    }
+    if (!m_analysisErrors.hasErrors()) return;
+
+    switch (analysisPrintMode) {
+        case PrintMode::Flat:
+            m_analysisErrors.printErrorsFlatMode();
+            return;
+        case PrintMode::Tree:
+            m_analysisErrors.printErrorsTreeMode(analysisTextMode);
+    }
+}
+
 inline void Argon::Parser::parseString(const std::string& str) {
     reset();
     m_scanner = Scanner(str);
     StatementAst ast = parseStatement();
     ast.analyze(m_analysisErrors, m_context);
-    m_syntaxErrors.printErrorsTreeMode();
-    m_analysisErrors.printErrorsTreeMode();
-    // m_analysisErrors.printErrorsFlatMode();
+    if (hasErrors()) {
+        printErrors(PrintMode::Flat, TextMode::Utf8);
+    }
 }
 
 inline Argon::StatementAst Argon::Parser::parseStatement() {
@@ -248,19 +270,20 @@ inline auto Argon::Parser::getNextValidFlag(const Context& context, const bool p
     }
 
     while (true) {
-        Token token = getNextToken();
+        Token token = m_scanner.peekToken();
         if (token.kind == TokenKind::LBRACK) {
-            m_scanner.rewind(1);
             skipScope();
         } else if (m_mismatchedRBRACK) {
+            getNextToken();
             continue;
         } else if (token.kind == TokenKind::RBRACK || token.kind == TokenKind::END) {
             // Escape this scope, leave RBRACK scanning to the function above
-            m_scanner.rewind(1);
             return std::nullopt;
         } else if (token.kind == TokenKind::IDENTIFIER && context.containsLocalFlag(token.image)) {
+            getNextToken();
             return token;
         }
+        getNextToken();
     }
 }
 

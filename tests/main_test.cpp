@@ -221,6 +221,75 @@ static void BasicOption() {
     std::cout << "Major: " << major << "\n";
 }
 
+static void GetValue() {
+    using namespace Argon;
+
+    std::string name;
+    int age;
+    std::string major;
+
+    auto parser = Option(&name)["--name"]
+                | Option(&age)["--age"]
+                | Option(&major)["--major"];
+
+    const std::string input = "--name John --age 20 --major CS";
+    parser.parseString(input);
+
+    const auto nameOpt = parser.getValue<std::string>("--name");
+    const auto ageOpt = parser.getValue<int>("--age");
+    const auto majorOpt = parser.getValue<std::string>("--major");
+    // const auto wrongOpt = parser.getValue<std::string>("--wrong", "what");
+
+    if (nameOpt.has_value()) {
+        std::cout << "Name: " << nameOpt.value() << "\n";
+    }
+    if (ageOpt.has_value()) {
+        std::cout << "Age: " << ageOpt.value() << "\n";
+    }
+    if (majorOpt.has_value()) {
+        std::cout << "Major: " << majorOpt.value() << "\n";
+    }
+}
+
+static void GetValueNested() {
+    using namespace Argon;
+
+    std::string one;
+    std::string two;
+    std::string three;
+    std::string four;
+
+    auto parser = Option(&one)["--one"]
+                | (OptionGroup()["--g1"]
+                    + Option(&two)["--two"]
+                    + (OptionGroup()["--g2"]
+                        + Option(&three)["--three"]
+                        + (OptionGroup()["--g3"]
+                            + Option(&four)["--four"])));
+
+    const std::string input = "--one 1 --g1 [--two 2 --g2 [--three 3 --g3 [--four 4]]]";
+    parser.parseString(input);
+
+
+    const auto oneOpt = parser.getValue<std::string>("--one");
+    const auto twoOpt = parser.getValue<std::string>("--g1", "--two");
+    const auto threeOpt = parser.getValue<std::string>("--g1", "--g2", "--three");
+    const auto fourOpt = parser.getValue<std::string>("--g1", "--g2", "--g3", "--four");
+
+    if (oneOpt.has_value()) {
+        std::cout << "One: " << oneOpt.value() << "\n";
+    }
+    if (twoOpt.has_value()) {
+        std::cout << "Two: " << twoOpt.value() << "\n";
+    }
+    if (threeOpt.has_value()) {
+        std::cout << "Three: " << threeOpt.value() << "\n";
+    }
+    if (fourOpt.has_value()) {
+        std::cout << "Four: " << fourOpt.value() << "\n";
+    }
+}
+
 int main() {
     const auto start = std::chrono::steady_clock::now();
     using namespace Argon;
@@ -233,8 +302,10 @@ int main() {
     // runScannerTests();
     // runOptionsTests();
     // runErrorTests();
-    GroupErrors();
+    // GroupErrors();
     // BasicOption();
+    GetValue();
+    GetValueNested();
     const auto end = std::chrono::steady_clock::now();
     const auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     std::cout << "Time: " << duration << "\n";

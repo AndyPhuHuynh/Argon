@@ -33,6 +33,9 @@ namespace Argon {
         
         void parseString(const std::string& str);
         Parser& operator|(const IOption& option);
+
+        template<typename ValueType, typename ... Args> requires(Argon::AllConvertibleTo<std::string_view, Args...>)
+        auto getValue(const std::string &str, Args... args) -> std::optional<ValueType>;
     private:
         auto reset() -> void;
 
@@ -50,6 +53,12 @@ namespace Argon {
 
         auto getNextToken() -> Token;
         auto skipScope() -> void;
+
+        template<typename ValueType>
+        auto getValue(Context &context, const std::string &flag) -> std::optional<ValueType>;
+
+        template<typename ValueType, typename ... Args> requires(Argon::AllConvertibleTo<std::string_view, Args...>)
+        auto getValue(Context &context, const std::string &flag, Args... args) -> std::optional<ValueType>;
     };
 
     Parser operator|(const IOption& left, const IOption& right);
@@ -343,6 +352,48 @@ inline auto Argon::Parser::skipScope() -> void {
             return;
         }
     }
+}
+
+template<typename ValueType, typename ... Args> requires (Argon::AllConvertibleTo<std::string_view, Args...>)
+auto Argon::Parser::getValue(const std::string &str, Args... args) -> std::optional<ValueType> {
+    return getValue<ValueType>(m_context, str, args...);
+}
+
+template<typename ValueType>
+auto Argon::Parser::getValue(Context &context, const std::string &flag) -> std::optional<ValueType> {
+    auto option = context.getOptionDynamic<Option<ValueType>>(flag);
+    if (option == nullptr) {
+        if (&context == &m_context) {
+            std::cerr << std::format(
+                "Assertion Failed: Argon::Parser::getValue(): Unable to find matching option group for flag '{}'\n"
+                       "                  Ensure that the specified flag and group path are valid, and the given templated type is correct.\n", flag, context.getPath());
+        } else {
+            std::cerr << std::format(
+                "Assertion Failed: Argon::Parser::getValue(): Unable to find matching option group for flag '{}' inside group '{}'.\n"
+                       "                  Ensure that the specified flag and group path are valid, and the given templated type is correct.\n", flag, context.getPath());
+        }
+        std::abort();
+    }
+    return option->get_value();
+}
+
+template<typename ValueType, typename ... Args> requires (Argon::AllConvertibleTo<std::string_view, Args...>)
+auto Argon::Parser::getValue(Context &context, const std::string &flag, Args... args) -> std::optional<ValueType> {
+    const auto optionGroup = context.getOptionDynamic<OptionGroup>(flag);
+    if (optionGroup == nullptr) {
+        if (&context == &m_context) {
+            std::cerr << std::format(
+                "Assertion Failed: Argon::Parser::getValue(): Unable to find matching option group for flag '{}'\n"
+                       "                  Ensure that the specified flag and group path are valid, and the given templated type is correct.\n", flag, context.getPath());
+        } else {
+            std::cerr << std::format(
+                "Assertion Failed: Argon::Parser::getValue(): Unable to find matching option group for flag '{}' inside group '{}'.\n"
+                       "                  Ensure that the specified flag and group path are valid, and the given templated type is correct.\n", flag, context.getPath());
+        }
+        std::abort();
+    }
+
+    return getValue<ValueType>(optionGroup->get_context(), args...);
 }
 
 inline Argon::Parser Argon::operator|(const IOption &left, const IOption &right) {

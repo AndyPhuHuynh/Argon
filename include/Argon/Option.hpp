@@ -3,6 +3,7 @@
 #include <functional>
 #include <limits>
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -74,6 +75,7 @@ namespace Argon {
     template <typename T>
     class Option : public OptionBase, public OptionComponent<Option<T>>, public IsSingleOption {
         Converter<T> converter;
+        std::optional<T> m_value;
         T *m_out = nullptr;
     public:
         explicit Option(T* out);
@@ -82,6 +84,7 @@ namespace Argon {
 
         Option(T* out, const ConversionFn<T>& conversion_func, const GenerateErrorMsgFn& generate_error_msg_func);
 
+        std::optional<T> get_value();
     private:
         void set_value(const std::string& flag, const std::string& value) override;
     };
@@ -256,12 +259,21 @@ Argon::Option<T>::Option(T* out, const ConversionFn<T>& conversion_func, const G
     converter.generate_error_msg_fn = generate_error_msg_func;
 }
 
+template<typename T>
+std::optional<T> Argon::Option<T>::get_value() {
+    return m_value;
+}
+
 template <typename T>
 void Argon::Option<T>::set_value(const std::string& flag, const std::string& value) {
-    converter.convert(flag, value, *m_out);
+    T temp;
+    converter.convert(flag, value, temp);
     if (converter.has_error()) {
         this->m_error = converter.get_error();
+        return;
     }
+    m_value = temp;
+    *m_out = temp;
 }
 
 inline Argon::IOption::IOption(const IOption& other) {

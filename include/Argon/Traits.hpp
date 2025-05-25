@@ -1,4 +1,6 @@
 ﻿#pragma once
+
+#include <concepts>
 #include <type_traits>
 #include <istream>
 
@@ -99,4 +101,10 @@ namespace Argon {
     inline std::string type_name<std::string>() {
         return "string";
     }
+
+    template<typename T, typename... Args>
+    concept AllSame = (std::same_as<std::decay_t<Args>, T> && ...);
+
+    template<typename T, typename... Args>
+    concept AllConvertibleTo = (std::convertible_to<Args, T> && ...);
 }

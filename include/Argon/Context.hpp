@@ -19,16 +19,17 @@ namespace Argon {
         Context(const Context&);
         Context& operator=(const Context&);
         
-        void addOption(const IOption& option);
-        IOption *getOption(const std::string& flag);
+        auto addOption(const IOption &option) -> void;
 
-        void setName(const std::string& name);
-        [[nodiscard]] std::string getPath() const;
+        auto getOption(const std::string &flag) -> IOption *;
+
+        auto setName(const std::string &name) -> void;
+        [[nodiscard]] auto getPath() const -> std::string;
 
         template <typename T>
-        T *getOptionDynamic(const std::string& flag);
+        auto getOptionDynamic(const std::string &flag) -> T*;
 
-        [[nodiscard]] bool containsLocalFlag(const std::string& flag) const;
+        [[nodiscard]] auto containsLocalFlag(const std::string &flag) const -> bool;
     };
 }
 
@@ -78,18 +79,18 @@ inline void Argon::Context::addOption(const IOption& option) {
     }
 }
 
-inline Argon::IOption* Argon::Context::getOption(const std::string& flag) {
+inline auto Argon::Context::getOption(const std::string &flag) -> IOption* {
     const auto it = std::ranges::find_if(m_options, [&flag](const auto& option) {
        return std::ranges::contains(option->get_flags(), flag);
     });
     return it == m_options.end() ? nullptr : it->get();
 }
 
-inline void Argon::Context::setName(const std::string& name) {
+inline auto Argon::Context::setName(const std::string &name) -> void {
     m_name = name;
 }
 
-inline std::string Argon::Context::getPath() const {
+inline auto Argon::Context::getPath() const -> std::string {
     if (m_parent == nullptr) {
         return "";
     }
@@ -112,10 +113,10 @@ inline std::string Argon::Context::getPath() const {
 }
 
 template <typename T>
-T* Argon::Context::getOptionDynamic(const std::string& flag) {
+auto Argon::Context::getOptionDynamic(const std::string &flag) -> T* {
     return dynamic_cast<T*>(getOption(flag));
 }
 
-inline bool Argon::Context::containsLocalFlag(const std::string& flag) const {
+inline auto Argon::Context::containsLocalFlag(const std::string &flag) const -> bool {
     return std::ranges::contains(m_flags, flag);
 }

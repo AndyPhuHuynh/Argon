@@ -273,7 +273,9 @@ void Argon::Option<T>::set_value(const std::string& flag, const std::string& val
         return;
     }
     m_value = temp;
-    *m_out = temp;
+    if (m_out != nullptr) {
+        *m_out = temp;
+    }
 }
 
 inline Argon::IOption::IOption(const IOption& other) {

@@ -36,6 +36,9 @@ namespace Argon {
 
         template<typename ValueType, typename ... Args> requires(Argon::AllConvertibleTo<std::string_view, Args...>)
         auto getValue(const std::string &str, Args... args) -> std::optional<ValueType>;
+
+        template<typename Container, typename ... Args> requires(Argon::AllConvertibleTo<std::string_view, Args...>)
+        auto getMultiValue(const std::string &str, Args... args) -> std::optional<Container>;
     private:
         auto reset() -> void;
 
@@ -59,6 +62,12 @@ namespace Argon {
 
         template<typename ValueType, typename ... Args> requires(Argon::AllConvertibleTo<std::string_view, Args...>)
         auto getValue(Context &context, const std::string &flag, Args... args) -> std::optional<ValueType>;
+
+        template<typename Container>
+        auto getMultiValue(Context &context, const std::string &flag) -> std::optional<Container>;
+
+        template<typename Container, typename ... Args> requires(Argon::AllConvertibleTo<std::string_view, Args...>)
+        auto getMultiValue(Context &context, const std::string &flag, Args... args) -> std::optional<Container>;
     };
 
     Parser operator|(const IOption& left, const IOption& right);
@@ -365,11 +374,11 @@ auto Argon::Parser::getValue(Context &context, const std::string &flag) -> std::
     if (option == nullptr) {
         if (&context == &m_context) {
             std::cerr << std::format(
-                "Assertion Failed: Argon::Parser::getValue(): Unable to find matching option group for flag '{}'\n"
+                "Assertion Failed: Argon::Parser::getValue(): Unable to find matching flag '{}' for option\n"
                        "                  Ensure that the specified flag and group path are valid, and the given templated type is correct.\n", flag, context.getPath());
         } else {
             std::cerr << std::format(
-                "Assertion Failed: Argon::Parser::getValue(): Unable to find matching option group for flag '{}' inside group '{}'.\n"
+                "Assertion Failed: Argon::Parser::getValue(): Unable to find matching flag '{}' for option inside group '{}'.\n"
                        "                  Ensure that the specified flag and group path are valid, and the given templated type is correct.\n", flag, context.getPath());
         }
         std::abort();
@@ -383,17 +392,59 @@ auto Argon::Parser::getValue(Context &context, const std::string &flag, Args... 
     if (optionGroup == nullptr) {
         if (&context == &m_context) {
             std::cerr << std::format(
-                "Assertion Failed: Argon::Parser::getValue(): Unable to find matching option group for flag '{}'\n"
+                "Assertion Failed: Argon::Parser::getValue(): Unable to find matching flag '{}' for option group inside group '{}'\n"
                        "                  Ensure that the specified flag and group path are valid, and the given templated type is correct.\n", flag, context.getPath());
         } else {
             std::cerr << std::format(
-                "Assertion Failed: Argon::Parser::getValue(): Unable to find matching option group for flag '{}' inside group '{}'.\n"
+                "Assertion Failed: Argon::Parser::getValue(): Unable to find matching flag '{}' for option group inside group '{}'.\n"
                        "                  Ensure that the specified flag and group path are valid, and the given templated type is correct.\n", flag, context.getPath());
         }
         std::abort();
     }
 
     return getValue<ValueType>(optionGroup->get_context(), args...);
+}
+
+template<typename Container, typename ... Args> requires (Argon::AllConvertibleTo<std::string_view, Args...>)
+auto Argon::Parser::getMultiValue(const std::string &str, Args... args) -> std::optional<Container> {
+    return getMultiValue<Container>(m_context, str, args...);
+}
+
+template<typename Container>
+auto Argon::Parser::getMultiValue(Context &context, const std::string &flag) -> std::optional<Container> {
+    auto option = context.getOptionDynamic<MultiOption<Container>>(flag);
+    if (option == nullptr) {
+        if (&context == &m_context) {
+            std::cerr << std::format(
+                "Assertion Failed: Argon::Parser::getMultiValue(): Unable to find matching flag '{}' for multi option inside group '{}'\n"
+                       "                  Ensure that the specified flag and group path are valid, and the given templated type is correct.\n", flag, context.getPath());
+        } else {
+            std::cerr << std::format(
+                "Assertion Failed: Argon::Parser::getMultiValue(): Unable to find matching flag '{}' for multi option inside group '{}'.\n"
+                       "                  Ensure that the specified flag and group path are valid, and the given templated type is correct.\n", flag, context.getPath());
+        }
+        std::abort();
+    }
+    return option->get_value();
+}
+
+template<typename Container, typename ... Args> requires (Argon::AllConvertibleTo<std::string_view, Args...>)
+auto Argon::Parser::getMultiValue(Context &context, const std::string &flag, Args... args) -> std::optional<Container> {
+    const auto optionGroup = context.getOptionDynamic<OptionGroup>(flag);
+    if (optionGroup == nullptr) {
+        if (&context == &m_context) {
+            std::cerr << std::format(
+                "Assertion Failed: Argon::Parser::getMultiValue(): Unable to find matching flag '{}' for option group inside group '{}'\n"
+                       "                  Ensure that the specified flag and group path are valid, and the given templated type is correct.\n", flag, context.getPath());
+        } else {
+            std::cerr << std::format(
+                "Assertion Failed: Argon::Parser::getMultiValue(): Unable to find matching flag '{}' for option group inside group '{}'.\n"
+                       "                  Ensure that the specified flag and group path are valid, and the given templated type is correct.\n", flag, context.getPath());
+        }
+        std::abort();
+    }
+
+    return getMultiValue<Container>(optionGroup->get_context(), args...);
 }
 
 inline Argon::Parser Argon::operator|(const IOption &left, const IOption &right) {

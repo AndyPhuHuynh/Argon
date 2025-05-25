@@ -290,6 +290,91 @@ static void GetValueNested() {
     }
 }
 
+static void GetValueMultiOption() {
+    using namespace Argon;
+
+    std::array<int, 3> ints{};
+    std::vector<float> floats{};
+
+    auto parser = MultiOption(&ints)["--ints"]
+                | MultiOption(&floats)["--floats"];
+
+    const std::string input = "--ints 1 2 3 --floats 1.5 2.5 3.5";
+    parser.parseString(input);
+
+    const auto intsOpt = parser.getMultiValue<std::array<int, 3>>("--ints");
+    const auto floatsOpt = parser.getMultiValue<std::vector<float>>("--floats");
+
+    if (intsOpt.has_value()) {
+        std::cout << "Ints: \n";
+        for (const int x : ints) {
+            std::cout << x << "\n";
+        }
+    }
+
+    if (floatsOpt.has_value()) {
+        std::cout << "Floats: \n";
+        for (const float f : floats) {
+            std::cout << f << "\n";
+        }
+    }
+}
+
+static void GetMultiValueNested() {
+    using namespace Argon;
+
+    std::array<int, 3> one{};
+    std::array <float, 3> two{};
+    std::vector<float> three{};
+    std::vector<float> four{};
+
+    auto parser = MultiOption(&one)["--one"]
+                | (OptionGroup()["--g1"]
+                    + MultiOption(&two)["--two"]
+                    + (OptionGroup()["--g2"]
+                        + MultiOption(&three)["--three"]
+                        + (OptionGroup()["--g3"]
+                            + MultiOption(&four)["--four"])));
+
+    const std::string input = "--one 1 10 100 1000 --g1 [--two 2.0 2.2 2.22 --g2 [--three 1.5 2.5 --g3 [--four 4.5 5.5 6.5 7.5 8.5]]]";
+    parser.parseString(input);
+
+
+    const auto oneOpt = parser.getMultiValue<std::array<int, 3>>("--one");
+    const auto twoOpt = parser.getMultiValue<std::array<float ,3>>("--g1", "--two");
+    const auto threeOpt = parser.getMultiValue<std::vector<float>>("--g1", "--g2", "--three");
+    const auto fourOpt = parser.getMultiValue<std::vector<float>>("--g1", "--g2", "--g3", "--four");
+
+    if (oneOpt.has_value()) {
+        std::cout << "One: \n";
+        const auto oneArr = oneOpt.value();
+        for (const auto x : oneArr) {
+            std::cout << x << "\n";
+        }
+    }
+    if (twoOpt.has_value()) {
+        std::cout << "Two: \n";
+        const auto twoArr = twoOpt.value();
+        for (const auto x : twoArr) {
+            std::cout << x << "\n";
+        }
+    }
+    if (threeOpt.has_value()) {
+        std::cout << "Three: \n";
+        const auto threeVec = threeOpt.value();
+        for (const auto x : threeVec) {
+            std::cout << x << "\n";
+        }
+    }
+    if (fourOpt.has_value()) {
+        std::cout << "Four: \n";
+        const auto fourVec = fourOpt.value();
+        for (const auto x : fourVec) {
+            std::cout << x << "\n";
+        }
+    }
+}
+
 int main() {
     const auto start = std::chrono::steady_clock::now();
     using namespace Argon;
@@ -304,8 +389,10 @@ int main() {
     // runErrorTests();
     // GroupErrors();
     // BasicOption();
-    GetValue();
-    GetValueNested();
+    // GetValue();
+    // GetValueNested();
+    // GetValueMultiOption();
+    GetMultiValueNested();
     const auto end = std::chrono::steady_clock::now();
     const auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     std::cout << "Time: " << duration << "\n";

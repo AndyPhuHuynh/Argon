@@ -33,6 +33,7 @@ namespace Argon {
     template<typename T, size_t N>
     class MultiOption<std::array<T, N>> : public OptionBase, public OptionComponent<MultiOption<std::array<T, N>>>, public IsMultiOption{
         Converter<T> converter;
+        std::array<T, N> m_values;
         std::array<T, N>* m_out;
         size_t m_nextIndex = 0;
         bool m_maxCapacityError = false;
@@ -43,6 +44,8 @@ namespace Argon {
         
         MultiOption(std::array<T, N>* out, const ConversionFn<T>& conversion_func, const GenerateErrorMsgFn& generate_error_msg_func);
 
+        auto get_value() -> std::array<T, N>;
+
         void set_value(const std::string& flag, const std::string& value) override;
     };
 
@@ -50,14 +53,16 @@ namespace Argon {
     template<typename T>
     class MultiOption<std::vector<T>> : public OptionBase, public OptionComponent<MultiOption<std::vector<T>>>, public IsMultiOption {
         Converter<T> converter;
+        std::vector<T> m_values;
         std::vector<T>* m_out;
-
     public:
         explicit MultiOption(std::vector<T>* out);
 
         MultiOption(std::vector<T>* out, const ConversionFn<T>& conversion_func);
         
         MultiOption(std::vector<T>* out, const ConversionFn<T>& conversion_func, const GenerateErrorMsgFn& generate_error_msg_func);
+
+        auto get_value() -> std::vector<T>;
 
         void set_value(const std::string& flag, const std::string& value) override;
     };
@@ -165,6 +170,11 @@ namespace Argon {
         converter.generate_error_msg_fn = generate_error_msg_func;
     }
 
+    template<typename T, size_t N>
+    auto MultiOption<std::array<T, N>>::get_value() -> std::array<T, N> {
+        return m_values;
+    }
+
     template <typename T, size_t N>
     void MultiOption<std::array<T, N>>::set_value(const std::string& flag, const std::string& value) {
         if (m_maxCapacityError) {
@@ -177,13 +187,16 @@ namespace Argon {
             m_maxCapacityError = true;
             return;
         }
-        
-        converter.convert(flag, value, (*m_out)[m_nextIndex]);
+
+        converter.convert(flag, value, m_values[m_nextIndex]);
         if (converter.has_error()) {
             this->m_error = converter.get_error();
-        } else {
-            m_nextIndex++;
+            return;
         }
+        if (m_out != nullptr) {
+            (*m_out)[m_nextIndex] = m_values[m_nextIndex];
+        }
+        m_nextIndex++;
     }
 
     // MultiOption with std::vector
@@ -208,14 +221,22 @@ namespace Argon {
         converter.generate_error_msg_fn = generate_error_msg_func;
     }
 
+    template<typename T>
+    auto MultiOption<std::vector<T>>::get_value() -> std::vector<T> {
+        return m_values;
+    }
+
     template <typename T>
     void MultiOption<std::vector<T>>::set_value(const std::string& flag, const std::string& value) {
-        T outVal;
-        converter.convert(flag, value, outVal);
+        T temp;
+        converter.convert(flag, value, temp);
         if (converter.has_error()) {
             this->m_error = converter.get_error();
-        } else {
-            m_out->push_back(outVal);
+            return;
+        }
+        m_values.push_back(temp);
+        if (m_out != nullptr) {
+            m_out->push_back(temp);
         }
     }
 }

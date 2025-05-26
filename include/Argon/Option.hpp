@@ -95,9 +95,9 @@ namespace Argon {
         OptionGroup();
         OptionGroup(const OptionGroup&);
         OptionGroup& operator=(const OptionGroup&);
-        OptionGroup& operator+(const IOption& other);
+        OptionGroup& operator+(IOption& other);
 
-        void add_option(const IOption& option);
+        void add_option(IOption& option);
         IOption *get_option(const std::string& flag);
         Context& get_context();
     };
@@ -345,12 +345,12 @@ inline Argon::OptionGroup & Argon::OptionGroup::operator=(const OptionGroup &oth
     return *this;
 }
 
-inline Argon::OptionGroup& Argon::OptionGroup::operator+(const IOption& other) {
+inline Argon::OptionGroup& Argon::OptionGroup::operator+(IOption& other) {
     add_option(other);
     return *this;
 }
 
-inline void Argon::OptionGroup::add_option(const IOption& option) { //NOLINT (function is not const)
+inline void Argon::OptionGroup::add_option(IOption& option) { //NOLINT (function is not const)
     m_context->addOption(option);
 }
 

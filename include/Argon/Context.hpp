@@ -3,13 +3,17 @@
 #include <memory>
 #include <numeric>
 #include <string>
+#include <variant>
 #include <vector>
+
+#include "Traits.hpp"
 
 namespace Argon {
     class IOption;
-    
+    using OptionPtr = std::variant<IOption*, std::unique_ptr<IOption>>;
+
     class Context {
-        std::vector<std::unique_ptr<IOption>> m_options;
+        std::vector<OptionPtr> m_options;
         std::vector<std::string> m_flags;
         std::string m_name;
         Context *m_parent = nullptr;
@@ -19,21 +23,39 @@ namespace Argon {
         Context(const Context&);
         Context& operator=(const Context&);
         
-        auto addOption(const IOption &option) -> void;
+        auto addOption(IOption& option) -> void;
+        auto addOption(IOption&& option) -> void;
 
-        auto getOption(const std::string &flag) -> IOption *;
+        auto getOption(const std::string& flag) -> IOption *;
 
-        auto setName(const std::string &name) -> void;
+        auto setName(const std::string& name) -> void;
         [[nodiscard]] auto getPath() const -> std::string;
 
         template <typename T>
-        auto getOptionDynamic(const std::string &flag) -> T*;
+        auto getOptionDynamic(const std::string& flag) -> T*;
 
-        [[nodiscard]] auto containsLocalFlag(const std::string &flag) const -> bool;
+        [[nodiscard]] auto containsLocalFlag(const std::string& flag) const -> bool;
     };
 }
 
-// --------------------------------------------- Implementations -------------------------------------------------------
+//---------------------------------------------------Free Functions-----------------------------------------------------
+
+namespace Argon {
+    inline auto getRawPointer(const OptionPtr& optPtr) -> IOption* {
+        return std::visit([]<typename T>(const T& opt) -> IOption* {
+            if constexpr (std::is_same_v<T, IOption*>) {
+                return opt;
+            } else if constexpr (std::is_same_v<T, std::unique_ptr<IOption>>) {
+                return opt.get();
+            } else {
+                static_assert(always_false<T>, "Unhandled type in getRawPointer");
+                return nullptr;
+            }
+        }, optPtr);
+    }
+}
+
+//---------------------------------------------------Implementations----------------------------------------------------
 
 #include <algorithm>
 
@@ -43,8 +65,15 @@ inline Argon::Context::Context(std::string name) : m_name(std::move(name)) {}
 
 inline Argon::Context::Context(const Context& other) {
     for (const auto& option : other.m_options) {
-        m_options.push_back(option->clone());
-        if (auto *optionGroup = dynamic_cast<OptionGroup*>(m_options.back().get())) {
+        std::visit([&]<typename T>(const T& opt) -> void {
+            if constexpr (std::is_same_v<T, IOption*>) {
+                m_options.emplace_back(opt);
+            } else {
+                m_options.emplace_back(opt->clone());
+            }
+        }, option);
+
+        if (auto *optionGroup = dynamic_cast<OptionGroup*>(getRawPointer(m_options.back()))) {
             optionGroup->get_context().m_parent = this;
         }
     }
@@ -60,8 +89,15 @@ inline Argon::Context& Argon::Context::operator=(const Context& other) {
 
     m_options.clear();
     for (const auto& option : other.m_options) {
-        m_options.push_back(option->clone());
-        if (auto *optionGroup = dynamic_cast<OptionGroup*>(m_options.back().get())) {
+        std::visit([&]<typename T>(const T& opt) -> void {
+            if constexpr (std::is_same_v<T, IOption*>) {
+                m_options.emplace_back(opt);
+            } else {
+                m_options.emplace_back(opt->clone());
+            }
+        }, option);
+
+        if (auto *optionGroup = dynamic_cast<OptionGroup*>(getRawPointer(m_options.back()))) {
             optionGroup->get_context().m_parent = this;
         }
     }
@@ -71,22 +107,34 @@ inline Argon::Context& Argon::Context::operator=(const Context& other) {
     return *this;
 }
 
-inline void Argon::Context::addOption(const IOption& option) {
+inline void Argon::Context::addOption(IOption& option) {
     m_flags.insert(m_flags.end(), option.get_flags().begin(), option.get_flags().end());
-    m_options.push_back(option.clone());
-    if (const auto optionGroup = dynamic_cast<OptionGroup*>(m_options.back().get())) {
+    m_options.emplace_back(&option);
+    if (const auto optionGroup = dynamic_cast<OptionGroup*>(&option)) {
         optionGroup->get_context().m_parent = this;
     }
 }
 
-inline auto Argon::Context::getOption(const std::string &flag) -> IOption* {
-    const auto it = std::ranges::find_if(m_options, [&flag](const auto& option) {
-       return std::ranges::contains(option->get_flags(), flag);
-    });
-    return it == m_options.end() ? nullptr : it->get();
+inline auto Argon::Context::addOption(IOption&& option) -> void {
+    m_flags.insert(m_flags.end(), option.get_flags().begin(), option.get_flags().end());
+    const auto& newOpt = m_options.emplace_back(option.clone());
+    if (const auto optionGroup = dynamic_cast<OptionGroup*>(getRawPointer(newOpt))) {
+        optionGroup->get_context().m_parent = this;
+    }
 }
 
-inline auto Argon::Context::setName(const std::string &name) -> void {
+inline auto Argon::Context::getOption(const std::string& flag) -> IOption* {
+    const auto it = std::ranges::find_if(m_options, [&flag](const OptionPtr& option) {
+        return std::visit([&flag]<typename T>(const T& opt) -> bool {
+            return std::ranges::contains(opt->get_flags(), flag);
+        }, option);
+    });
+
+    return it == m_options.end() ? nullptr : getRawPointer(*it);
+
+}
+
+inline auto Argon::Context::setName(const std::string& name) -> void {
     m_name = name;
 }
 
@@ -113,10 +161,10 @@ inline auto Argon::Context::getPath() const -> std::string {
 }
 
 template <typename T>
-auto Argon::Context::getOptionDynamic(const std::string &flag) -> T* {
+auto Argon::Context::getOptionDynamic(const std::string& flag) -> T* {
     return dynamic_cast<T*>(getOption(flag));
 }
 
-inline auto Argon::Context::containsLocalFlag(const std::string &flag) const -> bool {
+inline auto Argon::Context::containsLocalFlag(const std::string& flag) const -> bool {
     return std::ranges::contains(m_flags, flag);
 }

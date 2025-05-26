@@ -347,28 +347,28 @@ static void GetMultiValueNested() {
 
     if (oneOpt.has_value()) {
         std::cout << "One: \n";
-        const auto oneArr = oneOpt.value();
+        const auto& oneArr = oneOpt.value();
         for (const auto x : oneArr) {
             std::cout << x << "\n";
         }
     }
     if (twoOpt.has_value()) {
         std::cout << "Two: \n";
-        const auto twoArr = twoOpt.value();
+        const auto& twoArr = twoOpt.value();
         for (const auto x : twoArr) {
             std::cout << x << "\n";
         }
     }
     if (threeOpt.has_value()) {
         std::cout << "Three: \n";
-        const auto threeVec = threeOpt.value();
+        const auto& threeVec = threeOpt.value();
         for (const auto x : threeVec) {
             std::cout << x << "\n";
         }
     }
     if (fourOpt.has_value()) {
         std::cout << "Four: \n";
-        const auto fourVec = fourOpt.value();
+        const auto& fourVec = fourOpt.value();
         for (const auto x : fourVec) {
             std::cout << x << "\n";
         }
@@ -388,11 +388,11 @@ int main() {
     // runOptionsTests();
     // runErrorTests();
     // GroupErrors();
-    // BasicOption();
+    BasicOption();
     // GetValue();
     // GetValueNested();
     // GetValueMultiOption();
-    GetMultiValueNested();
+    // GetMultiValueNested();
     const auto end = std::chrono::steady_clock::now();
     const auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     std::cout << "Time: " << duration << "\n";

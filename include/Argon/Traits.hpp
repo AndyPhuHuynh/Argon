@@ -102,9 +102,18 @@ namespace Argon {
         return "string";
     }
 
+    template <typename T, typename U>
+    concept IsType = std::same_as<std::decay_t<T>, U>;
+
+    template<typename Derived, typename Base>
+    concept InheritsFrom = std::is_base_of_v<Base, std::decay_t<Derived>>;
+
     template<typename T, typename... Args>
     concept AllSame = (std::same_as<std::decay_t<Args>, T> && ...);
 
     template<typename T, typename... Args>
     concept AllConvertibleTo = (std::convertible_to<Args, T> && ...);
+
+    template<typename>
+    inline constexpr bool always_false = false;
 }

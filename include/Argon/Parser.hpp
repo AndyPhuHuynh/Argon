@@ -8,6 +8,7 @@
 #include "Context.hpp"
 #include "Error.hpp"
 #include "Scanner.hpp"
+#include "Traits.hpp"
 
 namespace Argon {
     class Parser {
@@ -21,9 +22,10 @@ namespace Argon {
         bool m_mismatchedRBRACK = false;
     public:
         Parser() = default;
-        explicit Parser(const IOption& option);
+        explicit Parser(IOption& option);
 
-        void addOption(const IOption& option);
+        void addOption(IOption& option);
+        void addOption(IOption&& option);
 
         void addError(const std::string& error, int pos);
         void addErrorGroup(const std::string& groupName, int startPos, int endPos);
@@ -32,13 +34,13 @@ namespace Argon {
         void printErrors(PrintMode analysisPrintMode, TextMode analysisTextMode = TextMode::Ascii) const;
         
         void parseString(const std::string& str);
-        Parser& operator|(const IOption& option);
+        Parser& operator|(InheritsFrom<IOption> auto&& option);
 
         template<typename ValueType, typename ... Args> requires(Argon::AllConvertibleTo<std::string_view, Args...>)
-        auto getValue(const std::string &str, Args... args) -> std::optional<ValueType>;
+        auto getValue(const std::string& str, Args... args) -> std::optional<ValueType>;
 
         template<typename Container, typename ... Args> requires(Argon::AllConvertibleTo<std::string_view, Args...>)
-        auto getMultiValue(const std::string &str, Args... args) -> std::optional<Container>;
+        auto getMultiValue(const std::string& str, Args... args) -> std::optional<Container>;
     private:
         auto reset() -> void;
 
@@ -46,44 +48,48 @@ namespace Argon {
 
         auto parseOptionBundle(Context& context) -> std::unique_ptr<OptionBaseAst>;
 
-        auto parseSingleOption(const Context &context, const Token &flag) -> std::unique_ptr<OptionAst>;
-        auto parseMultiOption(const Context &context, const Token &flag) -> std::unique_ptr<MultiOptionAst>;
+        auto parseSingleOption(const Context& context, const Token& flag) -> std::unique_ptr<OptionAst>;
+        auto parseMultiOption(const Context& context, const Token& flag) -> std::unique_ptr<MultiOptionAst>;
 
-        auto parseGroupContents(OptionGroupAst &optionGroupAst, Context &nextContext) -> void;
-        auto parseOptionGroup(Context &context, const Token &flag) -> std::unique_ptr<OptionGroupAst>;
+        auto parseGroupContents(OptionGroupAst& optionGroupAst, Context& nextContext) -> void;
+        auto parseOptionGroup(Context& context, const Token& flag) -> std::unique_ptr<OptionGroupAst>;
 
-        auto getNextValidFlag(const Context &context, bool printErrors = true) -> std::optional<Token>;
+        auto getNextValidFlag(const Context& context, bool printErrors = true) -> std::optional<Token>;
 
         auto getNextToken() -> Token;
         auto skipScope() -> void;
 
         template<typename ValueType>
-        auto getValue(Context &context, const std::string &flag) -> std::optional<ValueType>;
+        auto getValue(Context& context, const std::string& flag) -> std::optional<ValueType>;
 
         template<typename ValueType, typename ... Args> requires(Argon::AllConvertibleTo<std::string_view, Args...>)
-        auto getValue(Context &context, const std::string &flag, Args... args) -> std::optional<ValueType>;
+        auto getValue(Context& context, const std::string& flag, Args... args) -> std::optional<ValueType>;
 
         template<typename Container>
-        auto getMultiValue(Context &context, const std::string &flag) -> std::optional<Container>;
+        auto getMultiValue(Context& context, const std::string& flag) -> std::optional<Container>;
 
         template<typename Container, typename ... Args> requires(Argon::AllConvertibleTo<std::string_view, Args...>)
-        auto getMultiValue(Context &context, const std::string &flag, Args... args) -> std::optional<Container>;
+        auto getMultiValue(Context& context, const std::string& flag, Args... args) -> std::optional<Container>;
     };
 
-    Parser operator|(const IOption& left, const IOption& right);
+    Parser operator|(InheritsFrom<IOption> auto&& left, InheritsFrom<IOption> auto&& right);
 }
 
 // --------------------------------------------- Implementations -------------------------------------------------------
 
 #include "MultiOption.hpp"
 
-inline Argon::Parser::Parser(const IOption &option) {
+inline Argon::Parser::Parser(IOption &option) {
     addOption(option);
 }
 
-inline void Argon::Parser::addOption(const IOption& option) {
+inline void Argon::Parser::addOption(IOption& option) {
     m_context.addOption(option);
- }
+}
+
+inline void Argon::Parser::addOption(IOption&& option) {
+    m_context.addOption(std::move(option));
+}
 
 inline void Argon::Parser::addError(const std::string& error, const int pos) {
     m_analysisErrors.addErrorMessage(error, pos);
@@ -159,7 +165,7 @@ inline auto Argon::Parser::parseOptionBundle(Context& context) -> std::unique_pt
     return nullptr;
 }
 
-inline auto Argon::Parser::parseSingleOption(const Context &context, const Token &flag) -> std::unique_ptr<OptionAst> {
+inline auto Argon::Parser::parseSingleOption(const Context& context, const Token& flag) -> std::unique_ptr<OptionAst> {
     // Get value
     Token value = m_scanner.peekToken();
     if (value.kind != TokenKind::IDENTIFIER) {
@@ -195,7 +201,7 @@ inline auto Argon::Parser::parseSingleOption(const Context &context, const Token
     return std::make_unique<OptionAst>(flag, value);
 }
 
-inline auto Argon::Parser::parseMultiOption(const Context &context, const Token &flag) -> std::unique_ptr<MultiOptionAst> {
+inline auto Argon::Parser::parseMultiOption(const Context& context, const Token& flag) -> std::unique_ptr<MultiOptionAst> {
     auto multiOptionAst = std::make_unique<MultiOptionAst>(flag);
 
     while (true) {
@@ -211,7 +217,7 @@ inline auto Argon::Parser::parseMultiOption(const Context &context, const Token 
     }
 }
 
-inline auto Argon::Parser::parseGroupContents(OptionGroupAst &optionGroupAst, Context &nextContext) -> void { // NOLINT(misc-no-recursion)
+inline auto Argon::Parser::parseGroupContents(OptionGroupAst& optionGroupAst, Context& nextContext) -> void { // NOLINT(misc-no-recursion)
     while (true) {
         const Token nextToken = m_scanner.peekToken();
 
@@ -234,7 +240,7 @@ inline auto Argon::Parser::parseGroupContents(OptionGroupAst &optionGroupAst, Co
     }
 }
 
-inline auto Argon::Parser::parseOptionGroup(Context &context, const Token &flag) -> std::unique_ptr<OptionGroupAst> { // NOLINT(misc-no-recursion)
+inline auto Argon::Parser::parseOptionGroup(Context& context, const Token& flag) -> std::unique_ptr<OptionGroupAst> { // NOLINT(misc-no-recursion)
     const Token lbrack = m_scanner.peekToken();
     if (lbrack.kind != TokenKind::LBRACK) {
         m_syntaxErrors.addErrorMessage(std::format("Expected '[', got '{}' at position {}", lbrack.image, lbrack.position), lbrack.position);
@@ -303,8 +309,8 @@ inline auto Argon::Parser::getNextValidFlag(const Context& context, const bool p
     }
 }
 
-inline auto Argon::Parser::operator|(const IOption &option) -> Parser& {
-    addOption(option);
+auto Argon::Parser::operator|(InheritsFrom<IOption> auto&& option) -> Parser& {
+    addOption(std::forward<IOption>(option));
     return *this;
 }
 
@@ -364,18 +370,18 @@ inline auto Argon::Parser::skipScope() -> void {
 }
 
 template<typename ValueType, typename ... Args> requires (Argon::AllConvertibleTo<std::string_view, Args...>)
-auto Argon::Parser::getValue(const std::string &str, Args... args) -> std::optional<ValueType> {
+auto Argon::Parser::getValue(const std::string& str, Args... args) -> std::optional<ValueType> {
     return getValue<ValueType>(m_context, str, args...);
 }
 
 template<typename ValueType>
-auto Argon::Parser::getValue(Context &context, const std::string &flag) -> std::optional<ValueType> {
+auto Argon::Parser::getValue(Context& context, const std::string& flag) -> std::optional<ValueType> {
     auto option = context.getOptionDynamic<Option<ValueType>>(flag);
     if (option == nullptr) {
         if (&context == &m_context) {
             std::cerr << std::format(
-                "Assertion Failed: Argon::Parser::getValue(): Unable to find matching flag '{}' for option\n"
-                       "                  Ensure that the specified flag and group path are valid, and the given templated type is correct.\n", flag, context.getPath());
+                "Assertion Failed: Argon::Parser::getValue(): Unable to find matching flag '{}' for option.\n"
+                       "                  Ensure that the specified flag and group path are valid, and the given templated type is correct.\n", flag);
         } else {
             std::cerr << std::format(
                 "Assertion Failed: Argon::Parser::getValue(): Unable to find matching flag '{}' for option inside group '{}'.\n"
@@ -387,13 +393,13 @@ auto Argon::Parser::getValue(Context &context, const std::string &flag) -> std::
 }
 
 template<typename ValueType, typename ... Args> requires (Argon::AllConvertibleTo<std::string_view, Args...>)
-auto Argon::Parser::getValue(Context &context, const std::string &flag, Args... args) -> std::optional<ValueType> {
+auto Argon::Parser::getValue(Context& context, const std::string& flag, Args... args) -> std::optional<ValueType> {
     const auto optionGroup = context.getOptionDynamic<OptionGroup>(flag);
     if (optionGroup == nullptr) {
         if (&context == &m_context) {
             std::cerr << std::format(
-                "Assertion Failed: Argon::Parser::getValue(): Unable to find matching flag '{}' for option group inside group '{}'\n"
-                       "                  Ensure that the specified flag and group path are valid, and the given templated type is correct.\n", flag, context.getPath());
+                "Assertion Failed: Argon::Parser::getValue(): Unable to find matching flag '{}' for option group.\n"
+                       "                  Ensure that the specified flag and group path are valid, and the given templated type is correct.\n", flag);
         } else {
             std::cerr << std::format(
                 "Assertion Failed: Argon::Parser::getValue(): Unable to find matching flag '{}' for option group inside group '{}'.\n"
@@ -406,18 +412,18 @@ auto Argon::Parser::getValue(Context &context, const std::string &flag, Args... 
 }
 
 template<typename Container, typename ... Args> requires (Argon::AllConvertibleTo<std::string_view, Args...>)
-auto Argon::Parser::getMultiValue(const std::string &str, Args... args) -> std::optional<Container> {
+auto Argon::Parser::getMultiValue(const std::string& str, Args... args) -> std::optional<Container> {
     return getMultiValue<Container>(m_context, str, args...);
 }
 
 template<typename Container>
-auto Argon::Parser::getMultiValue(Context &context, const std::string &flag) -> std::optional<Container> {
+auto Argon::Parser::getMultiValue(Context& context, const std::string& flag) -> std::optional<Container> {
     auto option = context.getOptionDynamic<MultiOption<Container>>(flag);
     if (option == nullptr) {
         if (&context == &m_context) {
             std::cerr << std::format(
-                "Assertion Failed: Argon::Parser::getMultiValue(): Unable to find matching flag '{}' for multi option inside group '{}'\n"
-                       "                  Ensure that the specified flag and group path are valid, and the given templated type is correct.\n", flag, context.getPath());
+                "Assertion Failed: Argon::Parser::getMultiValue(): Unable to find matching flag '{}' for multi option.\n"
+                       "                  Ensure that the specified flag and group path are valid, and the given templated type is correct.\n", flag);
         } else {
             std::cerr << std::format(
                 "Assertion Failed: Argon::Parser::getMultiValue(): Unable to find matching flag '{}' for multi option inside group '{}'.\n"
@@ -429,13 +435,13 @@ auto Argon::Parser::getMultiValue(Context &context, const std::string &flag) -> 
 }
 
 template<typename Container, typename ... Args> requires (Argon::AllConvertibleTo<std::string_view, Args...>)
-auto Argon::Parser::getMultiValue(Context &context, const std::string &flag, Args... args) -> std::optional<Container> {
+auto Argon::Parser::getMultiValue(Context& context, const std::string& flag, Args... args) -> std::optional<Container> {
     const auto optionGroup = context.getOptionDynamic<OptionGroup>(flag);
     if (optionGroup == nullptr) {
         if (&context == &m_context) {
             std::cerr << std::format(
-                "Assertion Failed: Argon::Parser::getMultiValue(): Unable to find matching flag '{}' for option group inside group '{}'\n"
-                       "                  Ensure that the specified flag and group path are valid, and the given templated type is correct.\n", flag, context.getPath());
+                "Assertion Failed: Argon::Parser::getMultiValue(): Unable to find matching flag '{}' for option group.\n"
+                       "                  Ensure that the specified flag and group path are valid, and the given templated type is correct.\n", flag);
         } else {
             std::cerr << std::format(
                 "Assertion Failed: Argon::Parser::getMultiValue(): Unable to find matching flag '{}' for option group inside group '{}'.\n"
@@ -447,9 +453,9 @@ auto Argon::Parser::getMultiValue(Context &context, const std::string &flag, Arg
     return getMultiValue<Container>(optionGroup->get_context(), args...);
 }
 
-inline Argon::Parser Argon::operator|(const IOption &left, const IOption &right) {
+Argon::Parser Argon::operator|(InheritsFrom<IOption> auto&& left, InheritsFrom<IOption> auto&& right) {
     Parser parser;
-    parser.addOption(left);
-    parser.addOption(right);
+    parser.addOption(std::forward<IOption>(left));
+    parser.addOption(std::forward<IOption>(right));
     return parser;
 }

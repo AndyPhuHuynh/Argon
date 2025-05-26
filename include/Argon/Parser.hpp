@@ -20,27 +20,37 @@ namespace Argon {
 
         std::vector<Token> m_brackets;
         bool m_mismatchedRBRACK = false;
+
     public:
         Parser() = default;
-        explicit Parser(IOption& option);
 
-        void addOption(IOption& option);
-        void addOption(IOption&& option);
+        template<typename T> requires DerivesFrom<T, IOption>
+        explicit Parser(T&& option);
 
-        void addError(const std::string& error, int pos);
-        void addErrorGroup(const std::string& groupName, int startPos, int endPos);
-        void removeErrorGroup(int startPos);
+        template<typename T> requires DerivesFrom<T, IOption>
+        auto addOption(T&& option) -> void;
+
+        auto addError(const std::string& error, int pos) -> void;
+
+        auto addErrorGroup(const std::string& groupName, int startPos, int endPos) -> void;
+
+        auto removeErrorGroup(int startPos) -> void;
+
         [[nodiscard]] bool hasErrors() const;
-        void printErrors(PrintMode analysisPrintMode, TextMode analysisTextMode = TextMode::Ascii) const;
-        
-        void parseString(const std::string& str);
-        Parser& operator|(InheritsFrom<IOption> auto&& option);
 
-        template<typename ValueType, typename ... Args> requires(Argon::AllConvertibleTo<std::string_view, Args...>)
+        auto printErrors(PrintMode analysisPrintMode, TextMode analysisTextMode = TextMode::Ascii) const -> void;
+
+        auto parseString(const std::string& str) -> void;
+
+        template<typename T> requires DerivesFrom<T, IOption>
+        auto operator|(T&& option) -> Parser&;
+
+        template<typename ValueType, typename... Args> requires(Argon::AllConvertibleTo<std::string_view, Args...>)
         auto getValue(const std::string& str, Args... args) -> std::optional<ValueType>;
 
-        template<typename Container, typename ... Args> requires(Argon::AllConvertibleTo<std::string_view, Args...>)
+        template<typename Container, typename... Args> requires(Argon::AllConvertibleTo<std::string_view, Args...>)
         auto getMultiValue(const std::string& str, Args... args) -> std::optional<Container>;
+
     private:
         auto reset() -> void;
 
@@ -49,68 +59,70 @@ namespace Argon {
         auto parseOptionBundle(Context& context) -> std::unique_ptr<OptionBaseAst>;
 
         auto parseSingleOption(const Context& context, const Token& flag) -> std::unique_ptr<OptionAst>;
+
         auto parseMultiOption(const Context& context, const Token& flag) -> std::unique_ptr<MultiOptionAst>;
 
         auto parseGroupContents(OptionGroupAst& optionGroupAst, Context& nextContext) -> void;
+
         auto parseOptionGroup(Context& context, const Token& flag) -> std::unique_ptr<OptionGroupAst>;
 
         auto getNextValidFlag(const Context& context, bool printErrors = true) -> std::optional<Token>;
 
         auto getNextToken() -> Token;
+
         auto skipScope() -> void;
 
         template<typename ValueType>
         auto getValue(Context& context, const std::string& flag) -> std::optional<ValueType>;
 
-        template<typename ValueType, typename ... Args> requires(Argon::AllConvertibleTo<std::string_view, Args...>)
+        template<typename ValueType, typename... Args> requires(Argon::AllConvertibleTo<std::string_view, Args...>)
         auto getValue(Context& context, const std::string& flag, Args... args) -> std::optional<ValueType>;
 
         template<typename Container>
         auto getMultiValue(Context& context, const std::string& flag) -> std::optional<Container>;
 
-        template<typename Container, typename ... Args> requires(Argon::AllConvertibleTo<std::string_view, Args...>)
+        template<typename Container, typename... Args> requires(Argon::AllConvertibleTo<std::string_view, Args...>)
         auto getMultiValue(Context& context, const std::string& flag, Args... args) -> std::optional<Container>;
     };
 
-    Parser operator|(InheritsFrom<IOption> auto&& left, InheritsFrom<IOption> auto&& right);
+    template<typename Left, typename Right> requires DerivesFrom<Left, IOption> && DerivesFrom<Right, IOption>
+    auto operator|(Left&& left, Right&& right) -> Parser;
 }
 
 // --------------------------------------------- Implementations -------------------------------------------------------
 
 #include "MultiOption.hpp"
 
-inline Argon::Parser::Parser(IOption &option) {
-    addOption(option);
+template<typename T> requires Argon::DerivesFrom<T, Argon::IOption>
+Argon::Parser::Parser(T&& option) {
+    addOption(std::forward<T>(option));
 }
 
-inline void Argon::Parser::addOption(IOption& option) {
-    m_context.addOption(option);
+template<typename T> requires Argon::DerivesFrom<T, Argon::IOption>
+auto Argon::Parser::addOption(T&& option) -> void {
+    m_context.addOption(std::forward<T>(option));
 }
 
-inline void Argon::Parser::addOption(IOption&& option) {
-    m_context.addOption(std::move(option));
-}
-
-inline void Argon::Parser::addError(const std::string& error, const int pos) {
+inline auto Argon::Parser::addError(const std::string& error, const int pos) -> void {
     m_analysisErrors.addErrorMessage(error, pos);
 }
 
-inline void Argon::Parser::addErrorGroup(const std::string& groupName, const int startPos, const int endPos) {
+inline auto Argon::Parser::addErrorGroup(const std::string& groupName, const int startPos, const int endPos) -> void {
     m_analysisErrors.addErrorGroup(groupName, startPos, endPos);
 }
 
-inline void Argon::Parser::removeErrorGroup(const int startPos) {
+inline auto Argon::Parser::removeErrorGroup(const int startPos) -> void {
     m_analysisErrors.removeErrorGroup(startPos);
 }
 
-inline bool Argon::Parser::hasErrors() const {
+inline auto Argon::Parser::hasErrors() const -> bool {
     return m_syntaxErrors.hasErrors() || m_analysisErrors.hasErrors();
 }
 
-inline void Argon::Parser::printErrors(const PrintMode analysisPrintMode, const TextMode analysisTextMode) const {
+inline auto Argon::Parser::printErrors(const PrintMode analysisPrintMode,
+                                       const TextMode analysisTextMode) const -> void {
     if (m_syntaxErrors.hasErrors()) {
         m_syntaxErrors.printErrorsFlatMode();
-        return;
     }
     if (!m_analysisErrors.hasErrors()) return;
 
@@ -123,7 +135,7 @@ inline void Argon::Parser::printErrors(const PrintMode analysisPrintMode, const 
     }
 }
 
-inline void Argon::Parser::parseString(const std::string& str) {
+inline auto Argon::Parser::parseString(const std::string& str) -> void {
     reset();
     m_scanner = Scanner(str);
     StatementAst ast = parseStatement();
@@ -152,13 +164,13 @@ inline auto Argon::Parser::parseOptionBundle(Context& context) -> std::unique_pt
     const auto& flagToken = opt.value();
 
     IOption *iOption = context.getOption(flagToken.image);
-    if (dynamic_cast<IsSingleOption*>(iOption)) {
+    if (dynamic_cast<IsSingleOption *>(iOption)) {
         return parseSingleOption(context, flagToken);
     }
-    if (dynamic_cast<IsMultiOption*>(iOption)) {
+    if (dynamic_cast<IsMultiOption *>(iOption)) {
         return parseMultiOption(context, flagToken);
     }
-    if (dynamic_cast<OptionGroup*>(iOption)) {
+    if (dynamic_cast<OptionGroup *>(iOption)) {
         return parseOptionGroup(context, flagToken);
     }
 
@@ -169,7 +181,8 @@ inline auto Argon::Parser::parseSingleOption(const Context& context, const Token
     // Get value
     Token value = m_scanner.peekToken();
     if (value.kind != TokenKind::IDENTIFIER) {
-        m_syntaxErrors.addErrorMessage(std::format("Expected flag value, got '{}' at position {}", value.image, value.position), value.position);
+        m_syntaxErrors.addErrorMessage(
+            std::format("Expected flag value, got '{}' at position {}", value.image, value.position), value.position);
         getNextValidFlag(context, false);
         if (m_scanner.peekToken().kind != TokenKind::END) {
             m_scanner.rewind(1);
@@ -186,7 +199,8 @@ inline auto Argon::Parser::parseSingleOption(const Context& context, const Token
             );
         } else {
             m_syntaxErrors.addErrorMessage(
-                std::format("No value provided for flag '{}' inside group '{}' at position {}", flag.image, context.getPath(), flag.position),
+                std::format("No value provided for flag '{}' inside group '{}' at position {}", flag.image,
+                            context.getPath(), flag.position),
                 value.position
             );
         }
@@ -201,13 +215,15 @@ inline auto Argon::Parser::parseSingleOption(const Context& context, const Token
     return std::make_unique<OptionAst>(flag, value);
 }
 
-inline auto Argon::Parser::parseMultiOption(const Context& context, const Token& flag) -> std::unique_ptr<MultiOptionAst> {
+inline auto Argon::Parser::parseMultiOption(const Context& context,
+                                            const Token& flag) -> std::unique_ptr<MultiOptionAst> {
     auto multiOptionAst = std::make_unique<MultiOptionAst>(flag);
 
     while (true) {
         Token nextToken = m_scanner.peekToken();
 
-        const bool endOfMultiOption = nextToken.kind != TokenKind::IDENTIFIER || context.containsLocalFlag(nextToken.image);
+        const bool endOfMultiOption = nextToken.kind != TokenKind::IDENTIFIER || context.containsLocalFlag(
+                                          nextToken.image);
         if (endOfMultiOption) {
             return multiOptionAst;
         }
@@ -232,7 +248,8 @@ inline auto Argon::Parser::parseGroupContents(OptionGroupAst& optionGroupAst, Co
             getNextToken();
             optionGroupAst.endPos = nextToken.position;
             m_analysisErrors.addErrorGroup(optionGroupAst.flag.value, optionGroupAst.flag.pos, optionGroupAst.endPos);
-            m_syntaxErrors.addErrorMessage(std::format("No matching ']' found for group '{}'", optionGroupAst.flag.value), nextToken.position);
+            m_syntaxErrors.addErrorMessage(
+                std::format("No matching ']' found for group '{}'", optionGroupAst.flag.value), nextToken.position);
             return;
         }
 
@@ -243,7 +260,8 @@ inline auto Argon::Parser::parseGroupContents(OptionGroupAst& optionGroupAst, Co
 inline auto Argon::Parser::parseOptionGroup(Context& context, const Token& flag) -> std::unique_ptr<OptionGroupAst> { // NOLINT(misc-no-recursion)
     const Token lbrack = m_scanner.peekToken();
     if (lbrack.kind != TokenKind::LBRACK) {
-        m_syntaxErrors.addErrorMessage(std::format("Expected '[', got '{}' at position {}", lbrack.image, lbrack.position), lbrack.position);
+        m_syntaxErrors.addErrorMessage(
+            std::format("Expected '[', got '{}' at position {}", lbrack.image, lbrack.position), lbrack.position);
         return nullptr;
     }
     getNextToken();
@@ -260,7 +278,7 @@ inline auto Argon::Parser::parseOptionGroup(Context& context, const Token& flag)
 inline auto Argon::Parser::getNextValidFlag(const Context& context, const bool printErrors) -> std::optional<Token> {
     Token flag = m_scanner.peekToken();
 
-    const bool isIdentifier =  flag.kind == TokenKind::IDENTIFIER;
+    const bool isIdentifier = flag.kind == TokenKind::IDENTIFIER;
     const bool inContext = context.containsLocalFlag(flag.image);
 
     if (isIdentifier && inContext) {
@@ -281,7 +299,8 @@ inline auto Argon::Parser::getNextValidFlag(const Context& context, const bool p
             );
         } else {
             m_syntaxErrors.addErrorMessage(
-                std::format("Unknown flag '{}' inside group '{}' at position {}", flag.image, context.getPath(), flag.position),
+                std::format("Unknown flag '{}' inside group '{}' at position {}", flag.image, context.getPath(),
+                            flag.position),
                 flag.position
             );
         }
@@ -309,8 +328,9 @@ inline auto Argon::Parser::getNextValidFlag(const Context& context, const bool p
     }
 }
 
-auto Argon::Parser::operator|(InheritsFrom<IOption> auto&& option) -> Parser& {
-    addOption(std::forward<IOption>(option));
+template <typename T> requires Argon::DerivesFrom<T, Argon::IOption>
+auto Argon::Parser::operator|(T&& option) -> Parser& {
+    addOption(std::forward<T>(option));
     return *this;
 }
 
@@ -356,7 +376,7 @@ inline auto Argon::Parser::skipScope() -> void {
         }
 
         if (token.kind == TokenKind::END && !brackets.empty()) {
-            for (const auto& bracket : brackets) {
+            for (const auto& bracket: brackets) {
                 m_syntaxErrors.addErrorMessage(
                     std::format("Unmatched '[' found at position {}", bracket.position), bracket.position);
             }
@@ -369,41 +389,45 @@ inline auto Argon::Parser::skipScope() -> void {
     }
 }
 
-template<typename ValueType, typename ... Args> requires (Argon::AllConvertibleTo<std::string_view, Args...>)
+template<typename ValueType, typename... Args> requires (Argon::AllConvertibleTo<std::string_view, Args...>)
 auto Argon::Parser::getValue(const std::string& str, Args... args) -> std::optional<ValueType> {
     return getValue<ValueType>(m_context, str, args...);
 }
 
 template<typename ValueType>
 auto Argon::Parser::getValue(Context& context, const std::string& flag) -> std::optional<ValueType> {
-    auto option = context.getOptionDynamic<Option<ValueType>>(flag);
+    auto option = context.getOptionDynamic<Option<ValueType> >(flag);
     if (option == nullptr) {
         if (&context == &m_context) {
             std::cerr << std::format(
                 "Assertion Failed: Argon::Parser::getValue(): Unable to find matching flag '{}' for option.\n"
-                       "                  Ensure that the specified flag and group path are valid, and the given templated type is correct.\n", flag);
+                "                  Ensure that the specified flag and group path are valid, and the given templated type is correct.\n",
+                flag);
         } else {
             std::cerr << std::format(
                 "Assertion Failed: Argon::Parser::getValue(): Unable to find matching flag '{}' for option inside group '{}'.\n"
-                       "                  Ensure that the specified flag and group path are valid, and the given templated type is correct.\n", flag, context.getPath());
+                "                  Ensure that the specified flag and group path are valid, and the given templated type is correct.\n",
+                flag, context.getPath());
         }
         std::abort();
     }
     return option->get_value();
 }
 
-template<typename ValueType, typename ... Args> requires (Argon::AllConvertibleTo<std::string_view, Args...>)
+template<typename ValueType, typename... Args> requires (Argon::AllConvertibleTo<std::string_view, Args...>)
 auto Argon::Parser::getValue(Context& context, const std::string& flag, Args... args) -> std::optional<ValueType> {
     const auto optionGroup = context.getOptionDynamic<OptionGroup>(flag);
     if (optionGroup == nullptr) {
         if (&context == &m_context) {
             std::cerr << std::format(
                 "Assertion Failed: Argon::Parser::getValue(): Unable to find matching flag '{}' for option group.\n"
-                       "                  Ensure that the specified flag and group path are valid, and the given templated type is correct.\n", flag);
+                "                  Ensure that the specified flag and group path are valid, and the given templated type is correct.\n",
+                flag);
         } else {
             std::cerr << std::format(
                 "Assertion Failed: Argon::Parser::getValue(): Unable to find matching flag '{}' for option group inside group '{}'.\n"
-                       "                  Ensure that the specified flag and group path are valid, and the given templated type is correct.\n", flag, context.getPath());
+                "                  Ensure that the specified flag and group path are valid, and the given templated type is correct.\n",
+                flag, context.getPath());
         }
         std::abort();
     }
@@ -411,41 +435,45 @@ auto Argon::Parser::getValue(Context& context, const std::string& flag, Args... 
     return getValue<ValueType>(optionGroup->get_context(), args...);
 }
 
-template<typename Container, typename ... Args> requires (Argon::AllConvertibleTo<std::string_view, Args...>)
+template<typename Container, typename... Args> requires (Argon::AllConvertibleTo<std::string_view, Args...>)
 auto Argon::Parser::getMultiValue(const std::string& str, Args... args) -> std::optional<Container> {
     return getMultiValue<Container>(m_context, str, args...);
 }
 
 template<typename Container>
 auto Argon::Parser::getMultiValue(Context& context, const std::string& flag) -> std::optional<Container> {
-    auto option = context.getOptionDynamic<MultiOption<Container>>(flag);
+    auto option = context.getOptionDynamic<MultiOption<Container> >(flag);
     if (option == nullptr) {
         if (&context == &m_context) {
             std::cerr << std::format(
                 "Assertion Failed: Argon::Parser::getMultiValue(): Unable to find matching flag '{}' for multi option.\n"
-                       "                  Ensure that the specified flag and group path are valid, and the given templated type is correct.\n", flag);
+                "                  Ensure that the specified flag and group path are valid, and the given templated type is correct.\n",
+                flag);
         } else {
             std::cerr << std::format(
                 "Assertion Failed: Argon::Parser::getMultiValue(): Unable to find matching flag '{}' for multi option inside group '{}'.\n"
-                       "                  Ensure that the specified flag and group path are valid, and the given templated type is correct.\n", flag, context.getPath());
+                "                  Ensure that the specified flag and group path are valid, and the given templated type is correct.\n",
+                flag, context.getPath());
         }
         std::abort();
     }
     return option->get_value();
 }
 
-template<typename Container, typename ... Args> requires (Argon::AllConvertibleTo<std::string_view, Args...>)
+template<typename Container, typename... Args> requires (Argon::AllConvertibleTo<std::string_view, Args...>)
 auto Argon::Parser::getMultiValue(Context& context, const std::string& flag, Args... args) -> std::optional<Container> {
     const auto optionGroup = context.getOptionDynamic<OptionGroup>(flag);
     if (optionGroup == nullptr) {
         if (&context == &m_context) {
             std::cerr << std::format(
                 "Assertion Failed: Argon::Parser::getMultiValue(): Unable to find matching flag '{}' for option group.\n"
-                       "                  Ensure that the specified flag and group path are valid, and the given templated type is correct.\n", flag);
+                "                  Ensure that the specified flag and group path are valid, and the given templated type is correct.\n",
+                flag);
         } else {
             std::cerr << std::format(
                 "Assertion Failed: Argon::Parser::getMultiValue(): Unable to find matching flag '{}' for option group inside group '{}'.\n"
-                       "                  Ensure that the specified flag and group path are valid, and the given templated type is correct.\n", flag, context.getPath());
+                "                  Ensure that the specified flag and group path are valid, and the given templated type is correct.\n",
+                flag, context.getPath());
         }
         std::abort();
     }
@@ -453,9 +481,11 @@ auto Argon::Parser::getMultiValue(Context& context, const std::string& flag, Arg
     return getMultiValue<Container>(optionGroup->get_context(), args...);
 }
 
-Argon::Parser Argon::operator|(InheritsFrom<IOption> auto&& left, InheritsFrom<IOption> auto&& right) {
+template<typename Left, typename Right> requires
+    Argon::DerivesFrom<Left, Argon::IOption> && Argon::DerivesFrom<Right, Argon::IOption>
+auto Argon::operator|(Left&& left, Right&& right) -> Parser {
     Parser parser;
-    parser.addOption(std::forward<IOption>(left));
-    parser.addOption(std::forward<IOption>(right));
+    parser.addOption(std::forward<Left>(left));
+    parser.addOption(std::forward<Right>(right));
     return parser;
 }

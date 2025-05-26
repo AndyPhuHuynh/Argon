@@ -7,6 +7,8 @@
 #include <string>
 #include <vector>
 
+#include "Traits.hpp"
+
 namespace Argon {
     class IOption;
     template <typename T> class Option;
@@ -42,7 +44,8 @@ namespace Argon {
         OptionComponent() = default;
     public:
         [[nodiscard]] std::unique_ptr<IOption> clone() const override;
-        Derived& operator[](const std::string& tag);
+        Derived& operator[](const std::string& tag) &;
+        Derived&& operator[](const std::string& tag) &&;
     };
 
     class OptionBase {
@@ -95,9 +98,16 @@ namespace Argon {
         OptionGroup();
         OptionGroup(const OptionGroup&);
         OptionGroup& operator=(const OptionGroup&);
-        OptionGroup& operator+(IOption& other);
 
-        void add_option(IOption& option);
+        template <typename T> requires DerivesFrom<T, IOption>
+        OptionGroup& operator+(T&& other) &;
+
+        template <typename T> requires DerivesFrom<T, IOption>
+        OptionGroup&& operator+(T&& other) &&;
+
+        template <typename T> requires DerivesFrom<T, IOption>
+        void add_option(T&& option);
+
         IOption *get_option(const std::string& flag);
         Context& get_context();
     };
@@ -111,7 +121,6 @@ namespace Argon {
 
 #include "Context.hpp"
 #include "StringUtil.hpp"
-#include "Traits.hpp"
 
 //---------------------------------------------------Free Functions-----------------------------------------------------
 
@@ -168,9 +177,15 @@ std::unique_ptr<Argon::IOption> Argon::OptionComponent<Derived>::clone() const {
 }
 
 template <typename Derived>
-Derived&Argon::OptionComponent<Derived>::operator[](const std::string& tag) {
+Derived& Argon::OptionComponent<Derived>::operator[](const std::string& tag) & {
     m_flags.push_back(tag);
     return static_cast<Derived&>(*this);
+}
+
+template<typename Derived>
+Derived&& Argon::OptionComponent<Derived>::operator[](const std::string& tag) && {
+    m_flags.push_back(tag);
+    return static_cast<Derived&&>(*this);
 }
 
 template <typename T>
@@ -345,13 +360,21 @@ inline Argon::OptionGroup & Argon::OptionGroup::operator=(const OptionGroup &oth
     return *this;
 }
 
-inline Argon::OptionGroup& Argon::OptionGroup::operator+(IOption& other) {
-    add_option(other);
+template<typename T> requires Argon::DerivesFrom<T, Argon::IOption>
+Argon::OptionGroup& Argon::OptionGroup::operator+(T&& other) & {
+    m_context->addOption(std::forward<T>(other));
     return *this;
 }
 
-inline void Argon::OptionGroup::add_option(IOption& option) { //NOLINT (function is not const)
-    m_context->addOption(option);
+template <typename T> requires Argon::DerivesFrom<T, Argon::IOption>
+Argon::OptionGroup&& Argon::OptionGroup::operator+(T&& other) && {
+    m_context->addOption(std::forward<T>(other));
+    return std::move(*this);
+}
+
+template<typename T> requires Argon::DerivesFrom<T, Argon::IOption>
+void Argon::OptionGroup::add_option(T&& option) {
+    m_context->addOption(std::forward<T>(option));
 }
 
 inline Argon::IOption *Argon::OptionGroup::get_option(const std::string& flag) { //NOLINT (function is not const)

@@ -106,7 +106,7 @@ namespace Argon {
     concept IsType = std::same_as<std::decay_t<T>, U>;
 
     template<typename Derived, typename Base>
-    concept InheritsFrom = std::is_base_of_v<Base, std::decay_t<Derived>>;
+    concept DerivesFrom = std::is_base_of_v<Base, std::decay_t<Derived>>;
 
     template<typename T, typename... Args>
     concept AllSame = (std::same_as<std::decay_t<Args>, T> && ...);

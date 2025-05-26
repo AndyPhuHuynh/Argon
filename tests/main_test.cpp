@@ -21,22 +21,6 @@ static void boolTest() {
 
 static void StudentTest() {
     using namespace Argon;
-
-    // std::string name;
-    // int age;
-    // std::string major;
-    //
-    // Parser parser = Option(&name)["--name"]
-    //                 | Option(&age)["--age"]
-    //                 | Option(&major)["--major"];
-    //
-    // std::string input = "--one 1 --two 2 --three 3 --four 4";
-    // parser.parseString(input);
-    //
-    // return 0;
-    // runErrorTests();
-    // runScannerTests();
-    // runOptionsTests();
     
     std::string name;
     int age;
@@ -44,10 +28,6 @@ static void StudentTest() {
 
     std::string minor;
     std::string instrumentName;
-    
-    // Parser parser = Option(&name)["--name"]
-    //                 | Option(&age)["--age"]
-    //                 | Option(&major)["--major"];
 
     Parser parser = Option(&name)["--name"]
                     | OptionGroup()["--group"]
@@ -375,6 +355,27 @@ static void GetMultiValueNested() {
     }
 }
 
+static void LValue() {
+    using namespace Argon;
+
+    std::string name;
+    int age;
+    std::string major;
+
+    auto nameOption = Option(&name)["--name"];
+
+    auto parser = Parser();
+    parser.addOption(Option(&age)["--age"]);
+    parser.addOption(nameOption);
+
+    const std::string input = "--name John --age 20 --major CS";
+    parser.parseString(input);
+
+    std::cout << "Name: " << name << "\n";
+    std::cout << "Age: " << age << "\n";
+    std::cout << "Major: " << major << "\n";
+}
+
 int main() {
     const auto start = std::chrono::steady_clock::now();
     using namespace Argon;
@@ -388,11 +389,12 @@ int main() {
     // runOptionsTests();
     // runErrorTests();
     // GroupErrors();
-    BasicOption();
+    // BasicOption();
     // GetValue();
     // GetValueNested();
     // GetValueMultiOption();
     // GetMultiValueNested();
+    LValue();
     const auto end = std::chrono::steady_clock::now();
     const auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     std::cout << "Time: " << duration << "\n";

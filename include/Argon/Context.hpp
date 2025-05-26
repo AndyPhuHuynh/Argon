@@ -74,7 +74,7 @@ inline Argon::Context::Context(const Context& other) {
         }, option);
 
         if (auto *optionGroup = dynamic_cast<OptionGroup*>(getRawPointer(m_options.back()))) {
-            optionGroup->get_context().m_parent = this;
+            optionGroup->getContext().m_parent = this;
         }
     }
     m_flags = other.m_flags;
@@ -98,7 +98,7 @@ inline Argon::Context& Argon::Context::operator=(const Context& other) {
         }, option);
 
         if (auto *optionGroup = dynamic_cast<OptionGroup*>(getRawPointer(m_options.back()))) {
-            optionGroup->get_context().m_parent = this;
+            optionGroup->getContext().m_parent = this;
         }
     }
     m_flags = other.m_flags;
@@ -108,25 +108,25 @@ inline Argon::Context& Argon::Context::operator=(const Context& other) {
 }
 
 inline void Argon::Context::addOption(IOption& option) {
-    m_flags.insert(m_flags.end(), option.get_flags().begin(), option.get_flags().end());
+    m_flags.insert(m_flags.end(), option.getFlags().begin(), option.getFlags().end());
     m_options.emplace_back(&option);
     if (const auto optionGroup = dynamic_cast<OptionGroup*>(&option)) {
-        optionGroup->get_context().m_parent = this;
+        optionGroup->getContext().m_parent = this;
     }
 }
 
 inline auto Argon::Context::addOption(IOption&& option) -> void {
-    m_flags.insert(m_flags.end(), option.get_flags().begin(), option.get_flags().end());
+    m_flags.insert(m_flags.end(), option.getFlags().begin(), option.getFlags().end());
     const auto& newOpt = m_options.emplace_back(option.clone());
     if (const auto optionGroup = dynamic_cast<OptionGroup*>(getRawPointer(newOpt))) {
-        optionGroup->get_context().m_parent = this;
+        optionGroup->getContext().m_parent = this;
     }
 }
 
 inline auto Argon::Context::getOption(const std::string& flag) -> IOption* {
     const auto it = std::ranges::find_if(m_options, [&flag](const OptionPtr& option) {
         return std::visit([&flag]<typename T>(const T& opt) -> bool {
-            return std::ranges::contains(opt->get_flags(), flag);
+            return std::ranges::contains(opt->getFlags(), flag);
         }, option);
     });
 

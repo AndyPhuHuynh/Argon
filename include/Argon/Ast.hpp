@@ -124,9 +124,9 @@ inline void Argon::OptionAst::analyze(ErrorGroup& errorGroup, Context& context) 
         return;
     }
 
-    optionBase->set_value(flag.value, value.value);
-    if (iOption->has_error()) {
-        errorGroup.addErrorMessage(iOption->get_error(), value.pos);
+    optionBase->setValue(flag.value, value.value);
+    if (iOption->hasError()) {
+        errorGroup.addErrorMessage(iOption->getError(), value.pos);
     }
 }
 
@@ -154,9 +154,9 @@ inline void Argon::MultiOptionAst::analyze(ErrorGroup& errorGroup, Context &cont
     }
 
     for (const auto&[value, pos] : m_values) {
-        optionBase->set_value(flag.value, value);
-        if (iOption->has_error()) {
-            errorGroup.addErrorMessage(iOption->get_error(), pos);
+        optionBase->setValue(flag.value, value);
+        if (iOption->hasError()) {
+            errorGroup.addErrorMessage(iOption->getError(), pos);
         }
     }
 }
@@ -189,7 +189,7 @@ inline void Argon::OptionGroupAst::analyze(ErrorGroup& errorGroup, Context& cont
     }
 
     for (const auto& option : m_options) {
-        option->analyze(errorGroup, optionGroup->get_context());
+        option->analyze(errorGroup, optionGroup->getContext());
     }
 }
 

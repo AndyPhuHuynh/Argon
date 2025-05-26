@@ -28,11 +28,11 @@ namespace Argon {
         IOption& operator=(IOption&&) noexcept;
         virtual ~IOption() = default;
 
-        [[nodiscard]] const std::vector<std::string>& get_flags() const;
-        void print_flags() const;
-        [[nodiscard]] const std::string& get_error() const;
-        [[nodiscard]] bool has_error() const;
-        void clear_error();
+        [[nodiscard]] const std::vector<std::string>& getFlags() const;
+        void printFlags() const;
+        [[nodiscard]] const std::string& getError() const;
+        [[nodiscard]] bool hasError() const;
+        void clearError();
 
         [[nodiscard]] virtual std::unique_ptr<IOption> clone() const = 0;
     };
@@ -53,7 +53,7 @@ namespace Argon {
         OptionBase() = default;
         virtual ~OptionBase() = default;
 
-        virtual void set_value(const std::string& flag, const std::string& value) = 0;
+        virtual void setValue(const std::string& flag, const std::string& value) = 0;
     };
 
     template <typename T>
@@ -66,11 +66,11 @@ namespace Argon {
         GenerateErrorMsgFn generate_error_msg_fn = nullptr;
     private:
         std::string m_error;
-        void generate_error_msg(const std::string& flag, const std::string& invalidArg);
+        void generateErrorMsg(const std::string& flag, const std::string& invalidArg);
     public:
         void convert(const std::string& flag, const std::string& value, T& outValue);
-        [[nodiscard]] bool has_error() const;
-        std::string get_error();
+        [[nodiscard]] bool hasError() const;
+        std::string getError();
     };
 
     class IsSingleOption {};
@@ -87,9 +87,9 @@ namespace Argon {
 
         Option(T* out, const ConversionFn<T>& conversion_func, const GenerateErrorMsgFn& generate_error_msg_func);
 
-        std::optional<T> get_value();
+        std::optional<T> getValue();
     private:
-        void set_value(const std::string& flag, const std::string& value) override;
+        void setValue(const std::string& flag, const std::string& value) override;
     };
 
     class OptionGroup : public OptionComponent<OptionGroup> {
@@ -106,10 +106,10 @@ namespace Argon {
         OptionGroup&& operator+(T&& other) &&;
 
         template <typename T> requires DerivesFrom<T, IOption>
-        void add_option(T&& option);
+        void addOption(T&& option);
 
-        IOption *get_option(const std::string& flag);
-        Context& get_context();
+        IOption *getOption(const std::string& flag);
+        Context& getContext();
     };
 }
 
@@ -189,7 +189,7 @@ Derived&& Argon::OptionComponent<Derived>::operator[](const std::string& tag) &&
 }
 
 template <typename T>
-void Argon::Converter<T>::generate_error_msg(const std::string& flag, const std::string& invalidArg) {
+void Argon::Converter<T>::generateErrorMsg(const std::string& flag, const std::string& invalidArg) {
     // Generate custom error message if provided
     if (this->generate_error_msg_fn != nullptr) {
         this->m_error = this->generate_error_msg_fn(flag, invalidArg);
@@ -241,17 +241,17 @@ void Argon::Converter<T>::convert(const std::string& flag, const std::string& va
     }
     // Set error if not successful
     if (!success) {
-        generate_error_msg(flag, value);
+        generateErrorMsg(flag, value);
     }
 }
 
 template <typename T>
-bool Argon::Converter<T>::has_error() const {
+bool Argon::Converter<T>::hasError() const {
     return !m_error.empty();
 }
 
 template <typename T>
-std::string Argon::Converter<T>::get_error() {
+std::string Argon::Converter<T>::getError() {
     return m_error;
 }
 
@@ -275,16 +275,16 @@ Argon::Option<T>::Option(T* out, const ConversionFn<T>& conversion_func, const G
 }
 
 template<typename T>
-std::optional<T> Argon::Option<T>::get_value() {
+std::optional<T> Argon::Option<T>::getValue() {
     return m_value;
 }
 
 template <typename T>
-void Argon::Option<T>::set_value(const std::string& flag, const std::string& value) {
+void Argon::Option<T>::setValue(const std::string& flag, const std::string& value) {
     T temp;
     converter.convert(flag, value, temp);
-    if (converter.has_error()) {
-        this->m_error = converter.get_error();
+    if (converter.hasError()) {
+        this->m_error = converter.getError();
         return;
     }
     m_value = temp;
@@ -321,25 +321,25 @@ inline Argon::IOption& Argon::IOption::operator=(IOption&& other) noexcept {
     return *this;
 }
 
-inline const std::vector<std::string>& Argon::IOption::get_flags() const {
+inline const std::vector<std::string>& Argon::IOption::getFlags() const {
     return m_flags;
 }
 
-inline void Argon::IOption::print_flags() const {
+inline void Argon::IOption::printFlags() const {
     for (auto& tag : m_flags) {
         std::cout << tag << "\n";
     }
 }
 
-inline const std::string& Argon::IOption::get_error() const {
+inline const std::string& Argon::IOption::getError() const {
     return m_error;
 }
 
-inline auto Argon::IOption::has_error() const -> bool {
+inline auto Argon::IOption::hasError() const -> bool {
     return !m_error.empty();
 }
 
-inline void Argon::IOption::clear_error() {
+inline void Argon::IOption::clearError() {
     m_error.clear();
 }
 
@@ -373,14 +373,14 @@ Argon::OptionGroup&& Argon::OptionGroup::operator+(T&& other) && {
 }
 
 template<typename T> requires Argon::DerivesFrom<T, Argon::IOption>
-void Argon::OptionGroup::add_option(T&& option) {
+void Argon::OptionGroup::addOption(T&& option) {
     m_context->addOption(std::forward<T>(option));
 }
 
-inline Argon::IOption *Argon::OptionGroup::get_option(const std::string& flag) { //NOLINT (function is not const)
+inline Argon::IOption *Argon::OptionGroup::getOption(const std::string& flag) { //NOLINT (function is not const)
     return m_context->getOption(flag);
 }
 
-inline Argon::Context& Argon::OptionGroup::get_context() { //NOLINT (function is not const)
+inline Argon::Context& Argon::OptionGroup::getContext() { //NOLINT (function is not const)
     return *m_context;
 }

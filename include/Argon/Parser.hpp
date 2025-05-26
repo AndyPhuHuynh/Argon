@@ -267,7 +267,7 @@ inline auto Argon::Parser::parseOptionGroup(Context& context, const Token& flag)
     getNextToken();
 
     const auto optionGroup = context.getOptionDynamic<OptionGroup>(flag.image);
-    auto& nextContext = optionGroup->get_context();
+    auto& nextContext = optionGroup->getContext();
     nextContext.setName(flag.image);
 
     auto optionGroupAst = std::make_unique<OptionGroupAst>(flag);
@@ -411,7 +411,7 @@ auto Argon::Parser::getValue(Context& context, const std::string& flag) -> std::
         }
         std::abort();
     }
-    return option->get_value();
+    return option->getValue();
 }
 
 template<typename ValueType, typename... Args> requires (Argon::AllConvertibleTo<std::string_view, Args...>)
@@ -432,7 +432,7 @@ auto Argon::Parser::getValue(Context& context, const std::string& flag, Args... 
         std::abort();
     }
 
-    return getValue<ValueType>(optionGroup->get_context(), args...);
+    return getValue<ValueType>(optionGroup->getContext(), args...);
 }
 
 template<typename Container, typename... Args> requires (Argon::AllConvertibleTo<std::string_view, Args...>)
@@ -457,7 +457,7 @@ auto Argon::Parser::getMultiValue(Context& context, const std::string& flag) -> 
         }
         std::abort();
     }
-    return option->get_value();
+    return option->getValue();
 }
 
 template<typename Container, typename... Args> requires (Argon::AllConvertibleTo<std::string_view, Args...>)
@@ -478,7 +478,7 @@ auto Argon::Parser::getMultiValue(Context& context, const std::string& flag, Arg
         std::abort();
     }
 
-    return getMultiValue<Container>(optionGroup->get_context(), args...);
+    return getMultiValue<Container>(optionGroup->getContext(), args...);
 }
 
 template<typename Left, typename Right> requires

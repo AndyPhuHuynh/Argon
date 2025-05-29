@@ -201,7 +201,38 @@ static void BasicOption() {
     std::cout << "Major: " << major << "\n";
 }
 
-static void GetValue() {
+static void GetValueLValue() {
+    using namespace Argon;
+
+    std::string name;
+    int age;
+    std::string major;
+
+    auto nameOption     = Option(&name)["--name"];
+    auto ageOption      = Option(&age)["--age"];
+    auto majorOption    = Option(&major)["--major"];
+
+    auto parser = nameOption | ageOption | majorOption;
+
+    const std::string input = "--name John --age 20 --major CS";
+    parser.parseString(input);
+
+    const auto& nameOpt = nameOption.getValue();
+    const auto& ageOpt = ageOption.getValue();
+    const auto& majorOpt = majorOption.getValue();
+
+    if (nameOpt.has_value()) {
+        std::cout << "Name: " << nameOpt.value() << "\n";
+    }
+    if (ageOpt.has_value()) {
+        std::cout << "Age: " << ageOpt.value() << "\n";
+    }
+    if (majorOpt.has_value()) {
+        std::cout << "Major: " << majorOpt.value() << "\n";
+    }
+}
+
+static void GetValueRValue() {
     using namespace Argon;
 
     std::string name;
@@ -218,7 +249,6 @@ static void GetValue() {
     const auto nameOpt = parser.getValue<std::string>("--name");
     const auto ageOpt = parser.getValue<int>("--age");
     const auto majorOpt = parser.getValue<std::string>("--major");
-    // const auto wrongOpt = parser.getValue<std::string>("--wrong", "what");
 
     if (nameOpt.has_value()) {
         std::cout << "Name: " << nameOpt.value() << "\n";
@@ -394,7 +424,7 @@ int main() {
     // GetValueNested();
     // GetValueMultiOption();
     // GetMultiValueNested();
-    LValue();
+    GetValueLValue();
     const auto end = std::chrono::steady_clock::now();
     const auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     std::cout << "Time: " << duration << "\n";

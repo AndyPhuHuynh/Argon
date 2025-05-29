@@ -87,7 +87,7 @@ namespace Argon {
 
         Option(T* out, const ConversionFn<T>& conversion_func, const GenerateErrorMsgFn& generate_error_msg_func);
 
-        std::optional<T> getValue();
+        const std::optional<T>& getValue() const;
     private:
         void setValue(const std::string& flag, const std::string& value) override;
     };
@@ -275,7 +275,7 @@ Argon::Option<T>::Option(T* out, const ConversionFn<T>& conversion_func, const G
 }
 
 template<typename T>
-std::optional<T> Argon::Option<T>::getValue() {
+const std::optional<T>& Argon::Option<T>::getValue() const {
     return m_value;
 }
 

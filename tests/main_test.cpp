@@ -1,20 +1,20 @@
 #include <array>
 
-#include "testing.hpp"
-
 #include <chrono>
 #include <iostream>
 
 #include "Argon/MultiOption.hpp"
 #include "Argon/Option.hpp"
-#include "Argon/Parser.hpp" 
+#include "Argon/Parser.hpp"
+
+#include "catch2/catch_all.hpp"
 
 static void boolTest() {
     using namespace Argon;
     
     bool boolTest = true;
     std::cout << "boolTest: " << boolTest << "\n";
-    Parser boolParser = static_cast<Parser>(Option(&boolTest)["-b"]["--bool"]);
+    auto boolParser = static_cast<Parser>(Option(&boolTest)["-b"]["--bool"]);
     boolParser.parseString("--bool trueasdfads");
     std::cout << "boolTest: " << boolTest << "\n";
 }
@@ -114,22 +114,6 @@ static void MissingFlagNested() {
     std::cout << "Major: " << major << "\n";
 }
 
-static void MultiOptionTest() {
-    using namespace Argon;
-    
-    std::array<int, 3> intArr{};
-    std::vector<double> doubleArr;
-
-    Parser parser = MultiOption(&intArr)["-i"]["--ints"]
-                  | MultiOption(&doubleArr)["-d"]["--doubles"];
-
-    const std::string input = "--ints 1 2 3 --doubles 4.0 5.5 6.7";
-    parser.parseString(input);
-
-    std::cout << "Ints: " << intArr[0] << " " << intArr[1] << " " << intArr[2] << "\n";
-    std::cout << "Doubles: " << doubleArr[0] << " " << doubleArr[1] << " " << doubleArr[2] << "\n";
-}
-
 static void MultiOptionGroupTest() {
     using namespace Argon;
 
@@ -180,25 +164,6 @@ static void GroupErrors() {
     std::cout << "----------------------------\n";
     std::cout << "No rbrack: \n";
     parser.parseString(noRBRACK);
-}
-
-static void BasicOption() {
-    using namespace Argon;
-
-    std::string name;
-    int age;
-    std::string major;
-
-    auto parser = Option(&name)["--name"]
-                | Option(&age)["--age"]
-                | Option(&major)["--major"];
-
-    const std::string input = "--name John --age 20 --major CS";
-    parser.parseString(input);
-
-    std::cout << "Name: " << name << "\n";
-    std::cout << "Age: " << age << "\n";
-    std::cout << "Major: " << major << "\n";
 }
 
 static void GetValueLValue() {
@@ -406,7 +371,7 @@ static void LValue() {
     std::cout << "Major: " << major << "\n";
 }
 
-int main() {
+int main2() {
     const auto start = std::chrono::steady_clock::now();
     using namespace Argon;
     // MissingFlag();

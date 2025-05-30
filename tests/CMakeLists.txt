@@ -1,6 +1,11 @@
-set (INCLUDE_FILES
-    ${CMAKE_CURRENT_SOURCE_DIR}/testing.hpp
+include (FetchContent)
+
+FetchContent_Declare(
+    Catch2
+    GIT_REPOSITORY https://github.com/catchorg/Catch2.git
+    GIT_TAG v3.8.1
 )
+FetchContent_MakeAvailable(Catch2)
 
 set (SOURCE_FILES
     ${CMAKE_CURRENT_SOURCE_DIR}/error_tests.cpp
@@ -11,9 +16,10 @@ set (SOURCE_FILES
 
 add_executable(ArgonTests ${SOURCE_FILES})
 
-target_sources(ArgonTests PRIVATE ${INCLUDE_FILES})
-
-target_link_libraries(ArgonTests PRIVATE Argon)
+target_link_libraries(ArgonTests PRIVATE Argon Catch2::Catch2WithMain)
 
 enable_testing()
 add_test(NAME ArgonTests COMMAND ArgonTests)
+
+include(Catch)
+catch_discover_tests(ArgonTests)

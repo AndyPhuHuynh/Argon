@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <optional>
+#include <ostream>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -26,7 +27,9 @@ namespace Argon {
         Token(TokenKind kind, std::string image);
         Token(TokenKind kind, int position);
         Token(TokenKind kind, std::string image, int position);
-        bool operator==(std::vector<Token>::const_reference token) const;
+
+        auto operator==(const Token& token) const -> bool;
+
         [[nodiscard]] bool isOneOf(const std::initializer_list<TokenKind>& kinds) const;
     };
 
@@ -40,8 +43,9 @@ namespace Argon {
         [[nodiscard]] bool seeTokenKind(TokenKind kind) const;
         [[nodiscard]] bool seeTokenKind(const std::initializer_list<TokenKind>& kinds) const;
         [[nodiscard]] std::optional<char> peekChar() const;
-        std::optional<char> nextChar();
-        Token getNextToken();
+        auto nextChar() -> std::optional<char>;
+        auto getNextToken() -> Token;
+        [[nodiscard]] auto getAllTokens() const -> const std::vector<Token>&;
         [[nodiscard]] Token peekToken() const;
         
         void recordPosition();
@@ -80,8 +84,10 @@ inline Argon::Token::Token(const TokenKind kind, const int position) : kind(kind
 inline Argon::Token::Token(const TokenKind kind, std::string image, const int position)
     : kind(kind), image(std::move(image)), position(position) {}
 
-inline bool Argon::Token::operator==(std::vector<Token>::const_reference token) const {
-    return kind == token.kind && image == token.image;
+inline bool Argon::Token::operator==(const Token& token) const {
+    return (kind == token.kind) &&
+           (image == token.image) &&
+           (position == token.position);
 }
 
 inline bool Argon::Token::isOneOf(const std::initializer_list<TokenKind> &kinds) const {
@@ -140,6 +146,10 @@ inline Argon::Token Argon::Scanner::getNextToken() {
     } else {
         return m_tokens[m_tokenPos++];
     }
+}
+
+inline auto Argon::Scanner::getAllTokens() const -> const std::vector<Token>& {
+    return m_tokens;
 }
 
 inline void Argon::Scanner::recordPosition() {
@@ -215,3 +225,23 @@ inline Argon::Token Argon::Scanner::getEndToken() const {
     return m_tokens.back();
 }
 
+inline auto operator<<(std::ostream& os, const Argon::TokenKind kind) -> std::ostream& {
+    switch (kind) {
+        case Argon::TokenKind::NONE:        return os << "NONE";
+        case Argon::TokenKind::LBRACK:      return os << "LBRACK";
+        case Argon::TokenKind::RBRACK:      return os << "RBRACK";
+        case Argon::TokenKind::IDENTIFIER:  return os << "IDENTIFIER";
+        case Argon::TokenKind::EQUALS:      return os << "EQUALS";
+        case Argon::TokenKind::END:         return os << "END";
+    }
+    return os << "UNKNOWN";
+}
+
+inline auto operator<<(std::ostream& os, const Argon::Token& token) -> std::ostream& {
+    os  << "Token("
+        << "kind=" << token.kind
+        << ", image=\"" << token.image << "\""
+        << ", position=" << token.position
+        << ")";
+    return os;
+}

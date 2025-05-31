@@ -16,6 +16,12 @@ namespace Argon {
     template<typename T>
     constexpr bool is_non_bool_integral = std::is_integral_v<T> && !std::is_same_v<T, bool>;
 
+    template <typename T>
+    constexpr bool is_numeric_char_type =
+        std::is_same_v<T, char> ||
+        std::is_same_v<T, signed char> ||
+        std::is_same_v<T, unsigned char>;
+
     template<typename T>
     std::string type_name() {
         return "unknown type";

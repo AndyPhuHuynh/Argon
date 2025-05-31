@@ -42,7 +42,7 @@ TEST_CASE("Basic option test 2", "[options]") {
     CHECK(major == "CS");
 }
 
-TEST_CASE("Option all built-in types", "[options]") {
+TEST_CASE("Option all built-in numeric types", "[options]") {
     bool                fb  = true;
     bool                tb  = false;
     char                c   = 0;
@@ -68,25 +68,55 @@ TEST_CASE("Option all built-in types", "[options]") {
                 | Option(&sl)  ["-sl"]      | Option(&ul)  ["-ul"]
                 | Option(&sll) ["-sll"]     | Option(&ull) ["-ull"]
                 | Option(&f)   ["-f"]       | Option(&d)   ["-d"]       | Option(&ld) ["-ld"];
-    const std::string input = "-fb   false          -tb  false "
-                              "-sc  -10             -uc  10                 -c a "
-                              "-ss  -300            -us  300 "
-                              "-si  -123456         -ui  123456 "
-                              "-sl  -123456         -ul  123456 "
-                              "-sll -1234567891011  -ull 1234567891011 "
-                              "-f    0.123456       -d   0.123456           -ld 0.123456 ";
-    parser.parseString(input);
 
-    CHECK(fb  == false);            CHECK(tb == false);
-    CHECK(sc  == -10);              CHECK(uc == 10);    CHECK(c == 'a');
-    CHECK(ss  == -300);             CHECK(us == 300);
-    CHECK(si  == -123456);          CHECK(ui == 123456);
-    CHECK(sl  == -123456);          CHECK(ul == 123456);
-    CHECK(sll == -1234567891011);   CHECK(ull == 1234567891011);
-    CHECK(f   ==  Catch::Approx(0.123456) .epsilon(1e-6));
-    CHECK(d   ==  Catch::Approx(0.123456) .epsilon(1e-6));
-    CHECK(ld  ==  Catch::Approx(0.123456) .epsilon(1e-6));
+    SECTION("Booleans") {
+        const std::string input = "-fb   false          -tb  true ";
+        parser.parseString(input);
+        CHECK(fb  == false); CHECK(tb == true);
+    }
+
+    SECTION("Base 10") {
+        const std::string input = "-sc  -10             -uc  10                 -c a "
+                                  "-ss  -300            -us  300 "
+                                  "-si  -123456         -ui  123456 "
+                                  "-sl  -123456         -ul  123456 "
+                                  "-sll -1234567891011  -ull 1234567891011 "
+                                  "-f    0.123456       -d   0.123456           -ld 0.123456 ";
+        parser.parseString(input);
+
+        CHECK(!parser.hasErrors());
+        CHECK(sc  == -10);              CHECK(uc  == 10);           CHECK(c == 'a');
+        CHECK(ss  == -300);             CHECK(us  == 300);
+        CHECK(si  == -123456);          CHECK(ui  == 123456);
+        CHECK(sl  == -123456);          CHECK(ul  == 123456);
+        CHECK(sll == -1234567891011);   CHECK(ull == 1234567891011);
+        CHECK(f   ==  Catch::Approx(0.123456) .epsilon(1e-6));
+        CHECK(d   ==  Catch::Approx(0.123456) .epsilon(1e-6));
+        CHECK(ld  ==  Catch::Approx(0.123456) .epsilon(1e-6));
+    }
+
+    SECTION("Hexadecimal") {
+        const std::string input = "-sc  -0x1            -uc  0x1 "
+                                  "-ss  -0x123          -us  0x123 "
+                                  "-si  -0x12345        -ui  0x12345 "
+                                  "-sl  -0x12345        -ul  0x12345 "
+                                  "-sll -0x123456789    -ull 0x123456789 "
+                                  "-f   -0x1.5p1        -d   0x1.5p1        -ld 0x1.5p1 ";
+        parser.parseString(input);
+        parser.printErrors(PrintMode::Tree);
+        CHECK(!parser.hasErrors());
+        CHECK(sc  == -0x1);             CHECK(uc  == 0x1);
+        CHECK(ss  == -0x123);           CHECK(us  == 0x123);
+        CHECK(si  == -0x12345);         CHECK(ui  == 0x12345);
+        CHECK(sl  == -0x12345);         CHECK(ul  == 0x12345);
+        CHECK(sll == -0x123456789);     CHECK(ull == 0x123456789);
+        CHECK(f   ==  Catch::Approx(-0x1.5p1) .epsilon(1e-6));
+        CHECK(d   ==  Catch::Approx( 0x1.5p1) .epsilon(1e-6));
+        CHECK(ld  ==  Catch::Approx( 0x1.5p1) .epsilon(1e-6));
+    }
 }
+
+
 
 struct Student {
     std::string name = "default";

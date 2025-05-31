@@ -1,9 +1,13 @@
 ﻿#pragma once
 
+#include <algorithm>
+#include <cstdlib>
 #include <functional>
+#include <iostream>
 #include <limits>
 #include <memory>
 #include <optional>
+#include <sstream>
 #include <string>
 #include <vector>
 
@@ -115,47 +119,68 @@ namespace Argon {
 
 //------------------------------------------------------Includes--------------------------------------------------------
 
-#include <algorithm>
-#include <iostream>
-#include <sstream>
-
 #include "Context.hpp"
 #include "StringUtil.hpp"
 
 //---------------------------------------------------Free Functions-----------------------------------------------------
 
 namespace Argon {
-template <typename T>
-bool parseNonBoolIntegralType(const std::string& arg, T& out) {
-    static_assert(is_non_bool_integral<T>);
-    T min = std::numeric_limits<T>::min();
-    T max = std::numeric_limits<T>::max();
+enum class Base {
+    Invalid = 0,
+    Binary = 2,
+    Octal = 8,
+    Decimal = 10,
+    Hexadecimal = 16,
+};
 
-    try {
-        if (std::is_unsigned_v<T>) {
-            size_t pos;
-            unsigned long long result = std::stoull(arg, &pos);
-            if (result > max || pos != arg.size()) {
-                return false;
-            }
-            out = static_cast<T>(result);
-        } else {
-            size_t pos;
-            long long result = std::stoll(arg, &pos);
-            if (result < min || result > max || pos != arg.size()) {
-                return false;
-            }
-            out = static_cast<T>(result);
-        }
-        return true;
-    } catch (const std::invalid_argument&) {
-        return false;
-    } catch (const std::out_of_range&) {
-        return false;
+inline auto getBaseFromPrefix(const std::string_view arg) -> Base {
+    size_t zeroIndex = 0, baseIndex = 1;
+    if (!arg.empty() && (arg[0] == '-' || arg[0] == '+')) {
+        zeroIndex = 1;
+        baseIndex = 2;
     }
+
+    if (arg.length() <= baseIndex)
+        return Base::Decimal;
+
+    if (arg[zeroIndex] != '0' || std::isdigit(arg[baseIndex]))  return Base::Decimal;
+    if (arg[baseIndex] == 'b' || arg[baseIndex] == 'B')         return Base::Binary;
+    if (arg[baseIndex] == 'o' || arg[baseIndex] == 'O')         return Base::Octal;
+    if (arg[baseIndex] == 'x' || arg[baseIndex] == 'X')         return Base::Hexadecimal;
+
+    return Base::Invalid;
 }
 
-inline bool parseBool(const std::string& arg, bool& out) {
+template <typename T> requires std::is_integral_v<T>
+auto parseIntegralType(const std::string& arg, T& out) -> bool {
+    if (arg.empty()) return false;
+    const auto base = getBaseFromPrefix(arg);
+    if (base == Base::Invalid) return false;
+
+    // Calculate begin offset
+    int beginOffset = 0;
+    if (base != Base::Decimal)          { beginOffset += 2; }
+    if (arg[0] == '-' || arg[0] == '+') { beginOffset += 1; }
+
+    // Calculate begin and end pointers
+    const char *begin = arg.data() + beginOffset;
+    const char *end   = arg.data() + arg.size();
+    if (begin == end) return false;
+
+    auto [ptr, ec] = std::from_chars(begin, end, out, static_cast<int>(base));
+
+    // Check for negative sign
+    if (arg[0] == '-') {
+        if constexpr (std::is_unsigned_v<T>) {
+            return false;
+        } else {
+            out *= -1;
+        }
+    }
+    return ec == std::errc() && ptr == end;
+}
+
+inline auto parseBool(const std::string& arg, bool& out) -> bool {
     std::string boolStr = arg;
     StringUtil::to_lower(boolStr);
     if (boolStr == "true") {
@@ -167,7 +192,36 @@ inline bool parseBool(const std::string& arg, bool& out) {
     }
     return false;
 }
+
+template <typename T> requires is_numeric_char_type<T>
+auto parseNumericChar(const std::string& arg, T& out) -> bool {
+    if (arg.length() == 1) {
+        out = static_cast<T>(arg[0]);
+        return true;
+    }
+    return parseIntegralType(arg, out);
 }
+
+template <typename T> requires std::is_floating_point_v<T>
+auto parseFloatingPoint(const std::string& arg, T& out) -> bool {
+    if (arg.empty()) return false;
+
+    const char *cstr = arg.data();
+    char *end = nullptr;
+    errno = 0;
+
+    if constexpr (std::is_same_v<T, float>) {
+        out = std::strtof(cstr, &end);
+    } else if constexpr (std::is_same_v<T, double>) {
+        out = std::strtod(cstr, &end);
+    } else if constexpr (std::is_same_v<T, long double>) {
+        out = std::strtold(cstr, &end);
+    }
+
+    return errno == 0 && end == cstr + arg.length();
+}
+
+} // Namespace Argon
 
 //---------------------------------------------------Implementations----------------------------------------------------
 
@@ -203,7 +257,7 @@ void Argon::Converter<T>::generateErrorMsg(const std::string& flag, const std::s
 
     if constexpr (is_non_bool_integral<T>) {
         ss << " in the range of [" << StringUtil::format_with_commas(static_cast<int64_t>(std::numeric_limits<T>::min())) <<
-            " to " << StringUtil::format_with_commas(static_cast<int64_t>(std::numeric_limits<T>::max())) << "]";
+              " to " << StringUtil::format_with_commas(static_cast<int64_t>(std::numeric_limits<T>::max())) << "]";
     } else if constexpr (std::is_same_v<T, bool>) {
         ss << " true or false";
     }
@@ -220,9 +274,17 @@ void Argon::Converter<T>::convert(const std::string& flag, const std::string& va
     if (this->conversion_fn != nullptr) {
         success = this->conversion_fn(value, outValue);
     }
+    // Parse as a character
+    else if constexpr (is_numeric_char_type<T>) {
+        success = parseNumericChar<T>(value, outValue);
+    }
+    // Parse as a floating point
+    else if constexpr (std::is_floating_point_v<T>) {
+        success = parseFloatingPoint<T>(value, outValue);
+    }
     // Parse as non-bool integral if valid
     else if constexpr (is_non_bool_integral<T>) {
-        success = parseNonBoolIntegralType<T>(value, outValue);
+        success = parseIntegralType<T>(value, outValue);
     }
     // Parse as boolean if T is a boolean
     else if constexpr (std::is_same_v<T, bool>) {

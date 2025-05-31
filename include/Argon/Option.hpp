@@ -128,7 +128,6 @@ namespace Argon {
 enum class Base {
     Invalid = 0,
     Binary = 2,
-    Octal = 8,
     Decimal = 10,
     Hexadecimal = 16,
 };
@@ -145,7 +144,6 @@ inline auto getBaseFromPrefix(const std::string_view arg) -> Base {
 
     if (arg[zeroIndex] != '0' || std::isdigit(arg[baseIndex]))  return Base::Decimal;
     if (arg[baseIndex] == 'b' || arg[baseIndex] == 'B')         return Base::Binary;
-    if (arg[baseIndex] == 'o' || arg[baseIndex] == 'O')         return Base::Octal;
     if (arg[baseIndex] == 'x' || arg[baseIndex] == 'X')         return Base::Hexadecimal;
 
     return Base::Invalid;

@@ -114,6 +114,22 @@ TEST_CASE("Option all built-in numeric types", "[options]") {
         CHECK(d   ==  Catch::Approx( 0x1.5p1) .epsilon(1e-6));
         CHECK(ld  ==  Catch::Approx( 0x1.5p1) .epsilon(1e-6));
     }
+
+    SECTION("Binary") {
+        const std::string input = "-sc  -0b1        -uc  0b1 "
+                                  "-ss  -0b11       -us  0b11 "
+                                  "-si  -0b111      -ui  0b111 "
+                                  "-sl  -0b1111     -ul  0b1111 "
+                                  "-sll -0b11111    -ull 0b11111 ";
+        parser.parseString(input);
+        parser.printErrors(PrintMode::Tree);
+        CHECK(!parser.hasErrors());
+        CHECK(sc  == -0b1);         CHECK(uc  == 0b1);
+        CHECK(ss  == -0b11);        CHECK(us  == 0b11);
+        CHECK(si  == -0b111);       CHECK(ui  == 0b111);
+        CHECK(sl  == -0b1111);      CHECK(ul  == 0b1111);
+        CHECK(sll == -0b11111);     CHECK(ull == 0b11111);
+    }
 }
 
 

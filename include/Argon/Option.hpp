@@ -6,7 +6,6 @@
 #include <iostream>
 #include <limits>
 #include <memory>
-#include <optional>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -82,18 +81,20 @@ namespace Argon {
     template <typename T>
     class Option : public OptionBase, public OptionComponent<Option<T>>, public IsSingleOption {
         Converter<T> converter;
-        std::optional<T> m_value;
+        T m_value;
         T *m_out = nullptr;
     public:
+        Option() = default;
+
         explicit Option(T* out);
 
         Option(T* out, const ConversionFn<T>& conversion_func);
 
         Option(T* out, const ConversionFn<T>& conversion_func, const GenerateErrorMsgFn& generate_error_msg_func);
 
-        const std::optional<T>& getValue() const;
+        auto getValue() const -> const T&;
     private:
-        void setValue(const std::string& flag, const std::string& value) override;
+        auto setValue(const std::string& flag, const std::string& value) -> void override;
     };
 
     class OptionGroup : public OptionComponent<OptionGroup> {
@@ -101,19 +102,19 @@ namespace Argon {
     public:
         OptionGroup();
         OptionGroup(const OptionGroup&);
-        OptionGroup& operator=(const OptionGroup&);
+        auto operator=(const OptionGroup&) -> OptionGroup&;
 
         template <typename T> requires DerivesFrom<T, IOption>
-        OptionGroup& operator+(T&& other) &;
+        auto operator+(T&& other) & -> OptionGroup&;
 
         template <typename T> requires DerivesFrom<T, IOption>
-        OptionGroup&& operator+(T&& other) &&;
+        auto operator+(T&& other) && -> OptionGroup&&;
 
         template <typename T> requires DerivesFrom<T, IOption>
-        void addOption(T&& option);
+        auto addOption(T&& option) -> void;
 
-        IOption *getOption(const std::string& flag);
-        Context& getContext();
+        auto getOption(const std::string& flag) -> IOption*;
+        auto getContext() -> Context&;
     };
 }
 
@@ -335,7 +336,7 @@ Argon::Option<T>::Option(T* out, const ConversionFn<T>& conversion_func, const G
 }
 
 template<typename T>
-const std::optional<T>& Argon::Option<T>::getValue() const {
+const T& Argon::Option<T>::getValue() const {
     return m_value;
 }
 

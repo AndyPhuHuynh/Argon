@@ -46,10 +46,10 @@ namespace Argon {
         auto operator|(T&& option) -> Parser&;
 
         template<typename ValueType, typename... Args> requires(Argon::AllConvertibleTo<std::string_view, Args...>)
-        auto getValue(const std::string& str, Args... args) -> std::optional<ValueType>;
+        auto getValue(const std::string& str, Args... args) -> const ValueType&;
 
         template<typename Container, typename... Args> requires(Argon::AllConvertibleTo<std::string_view, Args...>)
-        auto getMultiValue(const std::string& str, Args... args) -> std::optional<Container>;
+        auto getMultiValue(const std::string& str, Args... args) -> const Container&;
 
     private:
         auto reset() -> void;
@@ -73,16 +73,16 @@ namespace Argon {
         auto skipScope() -> void;
 
         template<typename ValueType>
-        auto getValue(Context& context, const std::string& flag) -> std::optional<ValueType>;
+        auto getValue(Context& context, const std::string& flag) -> const ValueType&;
 
         template<typename ValueType, typename... Args> requires(Argon::AllConvertibleTo<std::string_view, Args...>)
-        auto getValue(Context& context, const std::string& flag, Args... args) -> std::optional<ValueType>;
+        auto getValue(Context& context, const std::string& flag, Args... args) -> const ValueType&;
 
         template<typename Container>
-        auto getMultiValue(Context& context, const std::string& flag) -> std::optional<Container>;
+        auto getMultiValue(Context& context, const std::string& flag) -> const Container&;
 
         template<typename Container, typename... Args> requires(Argon::AllConvertibleTo<std::string_view, Args...>)
-        auto getMultiValue(Context& context, const std::string& flag, Args... args) -> std::optional<Container>;
+        auto getMultiValue(Context& context, const std::string& flag, Args... args) -> const Container&;
     };
 
     template<typename Left, typename Right> requires DerivesFrom<Left, IOption> && DerivesFrom<Right, IOption>
@@ -390,12 +390,12 @@ inline auto Argon::Parser::skipScope() -> void {
 }
 
 template<typename ValueType, typename... Args> requires (Argon::AllConvertibleTo<std::string_view, Args...>)
-auto Argon::Parser::getValue(const std::string& str, Args... args) -> std::optional<ValueType> {
+auto Argon::Parser::getValue(const std::string& str, Args... args) -> const ValueType& {
     return getValue<ValueType>(m_context, str, args...);
 }
 
 template<typename ValueType>
-auto Argon::Parser::getValue(Context& context, const std::string& flag) -> std::optional<ValueType> {
+auto Argon::Parser::getValue(Context& context, const std::string& flag) -> const ValueType& {
     auto option = context.getOptionDynamic<Option<ValueType> >(flag);
     if (option == nullptr) {
         if (&context == &m_context) {
@@ -415,7 +415,7 @@ auto Argon::Parser::getValue(Context& context, const std::string& flag) -> std::
 }
 
 template<typename ValueType, typename... Args> requires (Argon::AllConvertibleTo<std::string_view, Args...>)
-auto Argon::Parser::getValue(Context& context, const std::string& flag, Args... args) -> std::optional<ValueType> {
+auto Argon::Parser::getValue(Context& context, const std::string& flag, Args... args) -> const ValueType& {
     const auto optionGroup = context.getOptionDynamic<OptionGroup>(flag);
     if (optionGroup == nullptr) {
         if (&context == &m_context) {
@@ -436,13 +436,13 @@ auto Argon::Parser::getValue(Context& context, const std::string& flag, Args... 
 }
 
 template<typename Container, typename... Args> requires (Argon::AllConvertibleTo<std::string_view, Args...>)
-auto Argon::Parser::getMultiValue(const std::string& str, Args... args) -> std::optional<Container> {
+auto Argon::Parser::getMultiValue(const std::string& str, Args... args) -> const Container& {
     return getMultiValue<Container>(m_context, str, args...);
 }
 
 template<typename Container>
-auto Argon::Parser::getMultiValue(Context& context, const std::string& flag) -> std::optional<Container> {
-    auto option = context.getOptionDynamic<MultiOption<Container> >(flag);
+auto Argon::Parser::getMultiValue(Context& context, const std::string& flag) -> const Container& {
+    auto option = context.getOptionDynamic<MultiOption<Container>>(flag);
     if (option == nullptr) {
         if (&context == &m_context) {
             std::cerr << std::format(
@@ -461,7 +461,7 @@ auto Argon::Parser::getMultiValue(Context& context, const std::string& flag) -> 
 }
 
 template<typename Container, typename... Args> requires (Argon::AllConvertibleTo<std::string_view, Args...>)
-auto Argon::Parser::getMultiValue(Context& context, const std::string& flag, Args... args) -> std::optional<Container> {
+auto Argon::Parser::getMultiValue(Context& context, const std::string& flag, Args... args) -> const Container& {
     const auto optionGroup = context.getOptionDynamic<OptionGroup>(flag);
     if (optionGroup == nullptr) {
         if (&context == &m_context) {

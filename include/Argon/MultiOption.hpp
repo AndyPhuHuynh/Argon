@@ -25,7 +25,7 @@ namespace Argon {
         
         MultiOption(T (*out)[], const ConversionFn<T>& conversion_func, const GenerateErrorMsgFn& generate_error_msg_func);
         
-        void setValue(const std::string& flag, const std::string& value) override;
+        auto setValue(const std::string& flag, const std::string& value) -> void override;
     };
     
     // MultiOption with std::array
@@ -38,33 +38,38 @@ namespace Argon {
         size_t m_nextIndex = 0;
         bool m_maxCapacityError = false;
     public:
+        MultiOption() = default;
+
         explicit MultiOption(std::array<T, N>* out);
 
         MultiOption(std::array<T, N>* out, const ConversionFn<T>& conversion_func);
         
         MultiOption(std::array<T, N>* out, const ConversionFn<T>& conversion_func, const GenerateErrorMsgFn& generate_error_msg_func);
 
-        auto getValue() -> std::array<T, N>;
+        auto getValue() const -> const std::array<T, N>&;
 
-        void setValue(const std::string& flag, const std::string& value) override;
+        auto setValue(const std::string& flag, const std::string& value) -> void override;
     };
 
     // MultiOption with std::vector
+
     template<typename T>
     class MultiOption<std::vector<T>> : public OptionBase, public OptionComponent<MultiOption<std::vector<T>>>, public IsMultiOption {
         Converter<T> converter;
         std::vector<T> m_values;
         std::vector<T>* m_out;
     public:
+        MultiOption() = default;
+
         explicit MultiOption(std::vector<T>* out);
 
         MultiOption(std::vector<T>* out, const ConversionFn<T>& conversion_func);
         
         MultiOption(std::vector<T>* out, const ConversionFn<T>& conversion_func, const GenerateErrorMsgFn& generate_error_msg_func);
 
-        auto getValue() -> std::vector<T>;
+        auto getValue() const -> const std::vector<T>&;
 
-        void setValue(const std::string& flag, const std::string& value) override;
+        auto setValue(const std::string& flag, const std::string& value) -> void override;
     };
 }
 
@@ -171,7 +176,7 @@ namespace Argon {
     }
 
     template<typename T, size_t N>
-    auto MultiOption<std::array<T, N>>::getValue() -> std::array<T, N> {
+    auto MultiOption<std::array<T, N>>::getValue() const -> const std::array<T, N>& {
         return m_values;
     }
 
@@ -222,7 +227,7 @@ namespace Argon {
     }
 
     template<typename T>
-    auto MultiOption<std::vector<T>>::getValue() -> std::vector<T> {
+    auto MultiOption<std::vector<T>>::getValue() const -> const std::vector<T>& {
         return m_values;
     }
 

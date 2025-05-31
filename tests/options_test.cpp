@@ -6,24 +6,38 @@
 
 using namespace Argon;
 
-TEST_CASE("Basic option test case 1", "[options]") {
-    unsigned int width;
-    float height;
-    double depth;
-    int test;
+TEST_CASE("Basic option", "[options]") {
+    unsigned int width = 2;
+    float height = 2;
+    double depth = 2;
+    int test = 2;
 
     Option opt2 = Option(&height)["-h"]["--height"];
     Option opt3 = Option(&depth)["-d"]["--depth"];
 
     Parser parser = Option(&width)["-w"]["--width"] | opt2 | opt3 | Option(&test)["-t"]["--test"];
-    const std::string input = "--width 100 --height 50.1 --depth 69.123456 -t 152";
-    parser.parseString(input);
 
-    CHECK(!parser.hasErrors());
-    CHECK(width   == 100);
-    CHECK(height  == Catch::Approx(50.1)      .epsilon(1e-6));
-    CHECK(depth   == Catch::Approx(69.123456) .epsilon(1e-6));
-    CHECK(test    == 152);
+    SECTION("Input provided") {
+        const std::string input = "--width 100 --height 50.1 --depth 69.123456 -t 152";
+        parser.parseString(input);
+
+        CHECK(!parser.hasErrors());
+        CHECK(width   == 100);
+        CHECK(height  == Catch::Approx(50.1)      .epsilon(1e-6));
+        CHECK(depth   == Catch::Approx(69.123456) .epsilon(1e-6));
+        CHECK(test    == 152);
+    }
+
+    SECTION("No input provided") {
+        const std::string input;
+        parser.parseString(input);
+
+        CHECK(!parser.hasErrors());
+        CHECK(width   == 2);
+        CHECK(height  == Catch::Approx(2).epsilon(1e-6));
+        CHECK(depth   == Catch::Approx(2).epsilon(1e-6));
+        CHECK(test    == 2);
+    }
 }
 
 TEST_CASE("Basic option test 2", "[options]") {
@@ -181,12 +195,12 @@ TEST_CASE("Option with user defined type", "[options]") {
     CHECK(sally == Student{"Sally", 3});
 }
 
-TEST_CASE("Basic option group" "[option-group]") {
-    std::string name;
-    int age;
+TEST_CASE("Basic option group", "[option-group]") {
+    std::string name = "default";
+    int age = -1;
 
-    std::string major;
-    std::string minor;
+    std::string major = "default";
+    std::string minor = "default";
 
     auto parser = Option(&name)["--name"]
                 | Option(&age)["--age"]
@@ -196,14 +210,27 @@ TEST_CASE("Basic option group" "[option-group]") {
                     + Option(&minor)["--minor"]
                 );
 
-    const std::string input = "--name John --age 20 --degrees [--major CS --minor Music]";
-    parser.parseString(input);
+    SECTION("Input provided") {
+        const std::string input = "--name John --age 20 --degrees [--major CS --minor Music]";
+        parser.parseString(input);
 
-    CHECK(!parser.hasErrors());
-    CHECK(name == "John");
-    CHECK(age == 20);
-    CHECK(major == "CS");
-    CHECK(minor == "Music");
+        CHECK(!parser.hasErrors());
+        CHECK(name == "John");
+        CHECK(age == 20);
+        CHECK(major == "CS");
+        CHECK(minor == "Music");
+    }
+
+    SECTION("No input provided") {
+        const std::string input;
+        parser.parseString(input);
+
+        CHECK(!parser.hasErrors());
+        CHECK(name == "default");
+        CHECK(age == -1);
+        CHECK(major == "default");
+        CHECK(minor == "default");
+    }
 }
 
 TEST_CASE("Nested option groups", "[option-group]") {
@@ -285,73 +312,52 @@ TEST_CASE("Multioption inside group", "[options][multi][option-group]") {
 }
 
 TEST_CASE("Options getValue lvalue", "[options][getValue]") {
-    std::string name;
-    int age;
-    float gpa;
-
-    auto nameOption = Option(&name)["--name"];
-    auto ageOption  = Option(&age)["--age"];
-    auto gpaOption  = Option(&gpa)["--gpa"];
+    auto nameOption = Option<std::string>()["--name"];
+    auto ageOption  = Option<int>()["--age"];
+    auto gpaOption  = Option<float>()["--gpa"];
 
     auto parser = nameOption | ageOption | gpaOption;
 
     const std::string input = "--name John --age 0x14 --gpa 5.5";
     parser.parseString(input);
 
-    const auto& nameOpt = nameOption.getValue();
-    const auto& ageOpt  = ageOption.getValue();
-    const auto& gpaOpt  = gpaOption.getValue();
+    const auto& name    = nameOption.getValue();
+    const auto& age     = ageOption.getValue();
+    const auto& gpa     = gpaOption.getValue();
 
-    CHECK(nameOpt   .has_value());
-    CHECK(ageOpt    .has_value());
-    CHECK(gpaOpt    .has_value());
-
-    CHECK(nameOpt.value()   == "John");
-    CHECK(ageOpt.value()    == 20);
-    CHECK(gpaOpt.value()    == Catch::Approx(5.5).epsilon(1e-6));
+    CHECK(name          == "John");
+    CHECK(age           == 20);
+    CHECK(gpa           == Catch::Approx(5.5).epsilon(1e-6));
 }
 
 TEST_CASE("Parser getValue basic", "[options][getValue]") {
-    std::string name;
-    int age;
-    float gpa;
-
-    auto parser = Option(&name)["--name"]
-                | Option(&age)["--age"]
-                | Option(&gpa)["--gpa"];
+    auto parser = Option<std::string>()["--name"]
+                | Option<int>()["--age"]
+                | Option<float>()["--gpa"];
 
     const std::string input = "--name John --age 0x14 --gpa 5.5";
     parser.parseString(input);
 
-    auto nameOpt    = parser.getValue<std::string>  ("--name");
-    auto ageOpt     = parser.getValue<int>          ("--age");
-    auto gpaOpt     = parser.getValue<float>        ("--gpa");
+    const auto& name    = parser.getValue<std::string>  ("--name");
+    const auto& age     = parser.getValue<int>          ("--age");
+    const auto& gpa     = parser.getValue<float>        ("--gpa");
 
-    CHECK(nameOpt   .has_value());
-    CHECK(ageOpt    .has_value());
-    CHECK(gpaOpt    .has_value());
-
-    CHECK(nameOpt.value()   == "John");
-    CHECK(ageOpt.value()    == 20);
-    CHECK(gpaOpt.value()    == Catch::Approx(5.5).epsilon(1e-6));
+    CHECK(name          == "John");
+    CHECK(age           == 20);
+    CHECK(gpa           == Catch::Approx(5.5).epsilon(1e-6));
 }
 
 TEST_CASE("Parser getValue nested", "[options][getValue][option-group]") {
-    std::string one;
-    std::string two;
-    std::string three;
-    std::string four;
-
-    auto parser = Option(&one)["--one"]
+    auto parser = Option<std::string>()["--one"]
                 | (
                     OptionGroup()["--g1"]
-                    + Option(&two)["--two"]
+                    + Option<std::string>()["--two"]
                     + (
                         OptionGroup()["--g2"]
-                        + Option(&three)["--three"]
+                        + Option<std::string>()["--three"]
                         + (
                             OptionGroup()["--g3"]
-                            + Option(&four)["--four"]
+                            + Option<std::string>()["--four"]
                         )
                     )
                 );
@@ -359,42 +365,30 @@ TEST_CASE("Parser getValue nested", "[options][getValue][option-group]") {
     const std::string input = "--one 1 --g1 [--two 2 --g2 [--three 3 --g3 [--four 4]]]";
     parser.parseString(input);
 
-
-    const auto oneOpt   = parser.getValue<std::string>("--one");
-    const auto twoOpt   = parser.getValue<std::string>("--g1", "--two");
-    const auto threeOpt = parser.getValue<std::string>("--g1", "--g2", "--three");
-    const auto fourOpt  = parser.getValue<std::string>("--g1", "--g2", "--g3", "--four");
+    const auto& one      = parser.getValue<std::string>("--one");
+    const auto& two      = parser.getValue<std::string>("--g1", "--two");
+    const auto& three    = parser.getValue<std::string>("--g1", "--g2", "--three");
+    const auto& four     = parser.getValue<std::string>("--g1", "--g2", "--g3", "--four");
 
     CHECK(!parser.hasErrors());
 
-    REQUIRE(oneOpt      .has_value());
-    REQUIRE(twoOpt      .has_value());
-    REQUIRE(threeOpt    .has_value());
-    REQUIRE(fourOpt     .has_value());
-
-    CHECK(oneOpt.value()    == "1");
-    CHECK(twoOpt.value()    == "2");
-    CHECK(threeOpt.value()  == "3");
-    CHECK(fourOpt.value()   == "4");
+    CHECK(one   == "1");
+    CHECK(two   == "2");
+    CHECK(three == "3");
+    CHECK(four  == "4");
 }
 
 TEST_CASE("Parser getValue multioption", "[options][multi][getValue]") {
-    std::array<int, 3> ints{};
-    std::vector<float> floats{};
-
-    auto parser = MultiOption(&ints)["--ints"]
-                | MultiOption(&floats)["--floats"];
+    auto parser = MultiOption<std::array<int, 3>>()["--ints"]
+                | MultiOption<std::vector<float>>()["--floats"];
 
     const std::string input = "--ints 1 2 3 --floats 1.5 2.5 3.5";
     parser.parseString(input);
 
-    const auto intsOpt = parser.getMultiValue<std::array<int, 3>>("--ints");
-    const auto floatsOpt = parser.getMultiValue<std::vector<float>>("--floats");
+    const auto& ints = parser.getMultiValue<std::array<int, 3>>("--ints");
+    const auto& floats = parser.getMultiValue<std::vector<float>>("--floats");
 
     CHECK(!parser.hasErrors());
-
-    REQUIRE(intsOpt     .has_value());
-    REQUIRE(floatsOpt   .has_value());
 
     CHECK(ints[0] == 1);
     CHECK(ints[1] == 2);
@@ -408,23 +402,16 @@ TEST_CASE("Parser getValue multioption", "[options][multi][getValue]") {
 }
 
 TEST_CASE("Parser getValue multioption nested", "[options][multi][getValue][option-group]") {
-    using namespace Argon;
-
-    std::array<int,   4> one{};
-    std::array<float, 3> two{};
-    std::vector<float> three{};
-    std::vector<float>  four{};
-
-    auto parser = MultiOption(&one)["--one"]
+    auto parser = MultiOption<std::array<int, 4>>()["--one"]
                 | (
                     OptionGroup()["--g1"]
-                    + MultiOption(&two)["--two"]
+                    + MultiOption<std::array<float, 3>>()["--two"]
                     + (
                         OptionGroup()["--g2"]
-                        + MultiOption(&three)["--three"]
+                        + MultiOption<std::vector<float>>()["--three"]
                         + (
                             OptionGroup()["--g3"]
-                            + MultiOption(&four)["--four"]
+                            + MultiOption<std::vector<float>>()["--four"]
                         )
                     )
                 );
@@ -433,35 +420,28 @@ TEST_CASE("Parser getValue multioption nested", "[options][multi][getValue][opti
     parser.parseString(input);
 
 
-    const auto oneOpt   = parser.getMultiValue<std::array<int, 4>>      ("--one");
-    const auto twoOpt   = parser.getMultiValue<std::array<float ,3>>    ("--g1", "--two");
-    const auto threeOpt = parser.getMultiValue<std::vector<float>>      ("--g1", "--g2", "--three");
-    const auto fourOpt  = parser.getMultiValue<std::vector<float>>      ("--g1", "--g2", "--g3", "--four");
+    const auto& one     = parser.getMultiValue<std::array<int, 4>>      ("--one");
+    const auto& two     = parser.getMultiValue<std::array<float ,3>>    ("--g1", "--two");
+    const auto& three   = parser.getMultiValue<std::vector<float>>      ("--g1", "--g2", "--three");
+    const auto& four    = parser.getMultiValue<std::vector<float>>      ("--g1", "--g2", "--g3", "--four");
 
-    CHECK(!parser.hasErrors());
+    CHECK(one[0] == 1);
+    CHECK(one[1] == 10);
+    CHECK(one[2] == 100);
+    CHECK(one[3] == 1000);
 
-    REQUIRE(oneOpt    .has_value());
-    REQUIRE(twoOpt    .has_value());
-    REQUIRE(threeOpt  .has_value());
-    REQUIRE(fourOpt   .has_value());
+    CHECK(two[0] == Catch::Approx(2.0).epsilon(1e-6));
+    CHECK(two[1] == Catch::Approx(2.2).epsilon(1e-6));
+    CHECK(two[2] == Catch::Approx(2.3).epsilon(1e-6));
 
-    CHECK(oneOpt.value()[0] == 1);
-    CHECK(oneOpt.value()[1] == 10);
-    CHECK(oneOpt.value()[2] == 100);
-    CHECK(oneOpt.value()[3] == 1000);
+    REQUIRE(three.size() == 2);
+    CHECK(three[0] == Catch::Approx(1.5).epsilon(1e-6));
+    CHECK(three[1] == Catch::Approx(2.5).epsilon(1e-6));
 
-    CHECK(twoOpt.value()[0] == Catch::Approx(2.0).epsilon(1e-6));
-    CHECK(twoOpt.value()[1] == Catch::Approx(2.2).epsilon(1e-6));
-    CHECK(twoOpt.value()[2] == Catch::Approx(2.3).epsilon(1e-6));
-
-    REQUIRE(threeOpt.value().size() == 2);
-    CHECK(threeOpt.value()[0] == Catch::Approx(1.5).epsilon(1e-6));
-    CHECK(threeOpt.value()[1] == Catch::Approx(2.5).epsilon(1e-6));
-
-    REQUIRE(fourOpt.value().size() == 5);
-    CHECK(fourOpt.value()[0] == Catch::Approx(4.5).epsilon(1e-6));
-    CHECK(fourOpt.value()[1] == Catch::Approx(5.5).epsilon(1e-6));
-    CHECK(fourOpt.value()[2] == Catch::Approx(6.5).epsilon(1e-6));
-    CHECK(fourOpt.value()[3] == Catch::Approx(7.5).epsilon(1e-6));
-    CHECK(fourOpt.value()[4] == Catch::Approx(8.5).epsilon(1e-6));
+    REQUIRE(four.size() == 5);
+    CHECK(four[0] == Catch::Approx(4.5).epsilon(1e-6));
+    CHECK(four[1] == Catch::Approx(5.5).epsilon(1e-6));
+    CHECK(four[2] == Catch::Approx(6.5).epsilon(1e-6));
+    CHECK(four[3] == Catch::Approx(7.5).epsilon(1e-6));
+    CHECK(four[4] == Catch::Approx(8.5).epsilon(1e-6));
 }

@@ -1,13 +1,8 @@
-#include <array>
-
 #include <chrono>
 #include <iostream>
 
-#include "Argon/MultiOption.hpp"
 #include "Argon/Option.hpp"
 #include "Argon/Parser.hpp"
-
-#include "catch2/catch_all.hpp"
 
 static void UnknownGroup() {
     using namespace Argon;

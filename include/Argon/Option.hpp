@@ -22,7 +22,7 @@ namespace Argon {
     protected:
         std::vector<std::string> m_flags;
         std::string m_error;
-
+        bool m_isSet = false;
         IOption() = default;
     public:
         IOption(const IOption&);
@@ -31,13 +31,19 @@ namespace Argon {
         IOption& operator=(IOption&&) noexcept;
         virtual ~IOption() = default;
 
-        [[nodiscard]] const std::vector<std::string>& getFlags() const;
-        void printFlags() const;
-        [[nodiscard]] const std::string& getError() const;
-        [[nodiscard]] bool hasError() const;
-        void clearError();
+        [[nodiscard]] auto getFlags() const -> const std::vector<std::string>&;
 
-        [[nodiscard]] virtual std::unique_ptr<IOption> clone() const = 0;
+        auto printFlags() const -> void;
+
+        [[nodiscard]] auto getError() const -> const std::string&;
+
+        [[nodiscard]] auto hasError() const -> bool;
+
+        auto clearError() -> void;
+
+        [[nodiscard]] auto isSet() const -> bool;
+
+        [[nodiscard]] virtual auto clone() const -> std::unique_ptr<IOption> = 0;
     };
 
     template <typename Derived>

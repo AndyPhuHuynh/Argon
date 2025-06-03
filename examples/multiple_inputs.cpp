@@ -35,7 +35,7 @@ int main() {
 
     const std::string input = "--students 1 2 --school University";
 
-    parser.parseString(input);
+    parser.parse(input);
     std::cout << "school: " << school << '\n';
     std::cout << "students[0]: " << students[0].name << ", " << students[0].age << "\n";
     std::cout << "students[1]: " << students[1].name << ", " << students[1].age << "\n";

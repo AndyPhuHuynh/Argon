@@ -19,7 +19,7 @@ TEST_CASE("Basic option", "[options]") {
 
     SECTION("Input provided") {
         const std::string input = "--width 100 --height 50.1 --depth 69.123456 -t 152";
-        parser.parseString(input);
+        parser.parse(input);
 
         CHECK(!parser.hasErrors());
         CHECK(width   == 100);
@@ -30,7 +30,7 @@ TEST_CASE("Basic option", "[options]") {
 
     SECTION("No input provided") {
         const std::string input;
-        parser.parseString(input);
+        parser.parse(input);
 
         CHECK(!parser.hasErrors());
         CHECK(width   == 2);
@@ -50,7 +50,7 @@ TEST_CASE("Basic option test 2", "[options]") {
                 | Option(&major)["--major"];
 
     const std::string input = "--name John --age 20 --major CS";
-    parser.parseString(input);
+    parser.parse(input);
 
     CHECK(!parser.hasErrors());
     CHECK(name == "John");
@@ -87,7 +87,7 @@ TEST_CASE("Option all built-in numeric types", "[options]") {
 
     SECTION("Booleans") {
         const std::string input = "-fb   false          -tb  true ";
-        parser.parseString(input);
+        parser.parse(input);
         CHECK(fb  == false); CHECK(tb == true);
     }
 
@@ -98,7 +98,7 @@ TEST_CASE("Option all built-in numeric types", "[options]") {
                                   "-sl  -123456         -ul  123456 "
                                   "-sll -1234567891011  -ull 1234567891011 "
                                   "-f    0.123456       -d   0.123456           -ld 0.123456 ";
-        parser.parseString(input);
+        parser.parse(input);
 
         CHECK(!parser.hasErrors());
         CHECK(sc  == -10);              CHECK(uc  == 10);           CHECK(c == 'a');
@@ -118,7 +118,7 @@ TEST_CASE("Option all built-in numeric types", "[options]") {
                                   "-sl  -0x12345        -ul  0x12345 "
                                   "-sll -0x123456789    -ull 0x123456789 "
                                   "-f   -0x1.5p1        -d   0x1.5p1        -ld 0x1.5p1 ";
-        parser.parseString(input);
+        parser.parse(input);
         parser.printErrors(PrintMode::Tree);
         CHECK(!parser.hasErrors());
         CHECK(sc  == -0x1);             CHECK(uc  == 0x1);
@@ -137,7 +137,7 @@ TEST_CASE("Option all built-in numeric types", "[options]") {
                                   "-si  -0b111      -ui  0b111 "
                                   "-sl  -0b1111     -ul  0b1111 "
                                   "-sll -0b11111    -ull 0b11111 ";
-        parser.parseString(input);
+        parser.parse(input);
         parser.printErrors(PrintMode::Tree);
         CHECK(!parser.hasErrors());
         CHECK(sc  == -0b1);         CHECK(uc  == 0b1);
@@ -182,12 +182,12 @@ auto studentError = [](const std::string& flag, const std::string& invalidArg) -
 
 TEST_CASE("Option with user defined type", "[options]") {
     Student josh, john, sally;
-    auto parser = Option<Student>(&josh,  studentFromString, studentError)["--josh"]
-                | Option<Student>(&john,  studentFromString, studentError)["--john"]
-                | Option<Student>(&sally, studentFromString, studentError)["--sally"];
+    auto parser = Option(&josh)["--josh"]  .withConversionFn(studentFromString).withErrorMsgFn(studentError)
+                | Option(&john)["--john"]  .withConversionFn(studentFromString).withErrorMsgFn(studentError)
+                | Option(&sally)["--sally"].withConversionFn(studentFromString).withErrorMsgFn(studentError);
 
     const std::string input = "--josh 1 --john 2 --sally 3";
-    parser.parseString(input);
+    parser.parse(input);
 
     CHECK(!parser.hasErrors());
     CHECK(josh  == Student{"Josh", 1});
@@ -212,7 +212,7 @@ TEST_CASE("Basic option group", "[option-group]") {
 
     SECTION("Input provided") {
         const std::string input = "--name John --age 20 --degrees [--major CS --minor Music]";
-        parser.parseString(input);
+        parser.parse(input);
 
         CHECK(!parser.hasErrors());
         CHECK(name == "John");
@@ -223,7 +223,7 @@ TEST_CASE("Basic option group", "[option-group]") {
 
     SECTION("No input provided") {
         const std::string input;
-        parser.parseString(input);
+        parser.parse(input);
 
         CHECK(!parser.hasErrors());
         CHECK(name == "default");
@@ -257,7 +257,7 @@ TEST_CASE("Nested option groups", "[option-group]") {
                 );
 
     const std::string input = "--name John --age 20 --degrees [--major CS --instruments [--main piano --side drums] --minor Music]";
-    parser.parseString(input);
+    parser.parse(input);
 
     CHECK(!parser.hasErrors());
     CHECK(name  == "John");
@@ -276,7 +276,7 @@ TEST_CASE("Multioption test 1", "[options][multi]") {
                   | MultiOption(&doubleVec)["-d"]["--doubles"];
 
     const std::string input = "--ints 1 2 3 --doubles 4.0 5.5 6.7";
-    parser.parseString(input);
+    parser.parse(input);
 
     CHECK(!parser.hasErrors());
     CHECK(intArr[0] == 1);
@@ -299,7 +299,7 @@ TEST_CASE("Multioption inside group", "[options][multi][option-group]") {
                     );
 
     const std::string input = "--ints 1 2 3 --group [--doubles 4.0 5.5 6.7]";
-    parser.parseString(input);
+    parser.parse(input);
 
     CHECK(!parser.hasErrors());
     CHECK(intArr[0] == 1);
@@ -319,7 +319,7 @@ TEST_CASE("Options getValue lvalue", "[options][getValue]") {
     auto parser = nameOption | ageOption | gpaOption;
 
     const std::string input = "--name John --age 0x14 --gpa 5.5";
-    parser.parseString(input);
+    parser.parse(input);
 
     const auto& name    = nameOption.getValue();
     const auto& age     = ageOption.getValue();
@@ -336,7 +336,7 @@ TEST_CASE("Parser getValue basic", "[options][getValue]") {
                 | Option<float>()["--gpa"];
 
     const std::string input = "--name John --age 0x14 --gpa 5.5";
-    parser.parseString(input);
+    parser.parse(input);
 
     const auto& name    = parser.getValue<std::string>  ("--name");
     const auto& age     = parser.getValue<int>          ("--age");
@@ -363,7 +363,7 @@ TEST_CASE("Parser getValue nested", "[options][getValue][option-group]") {
                 );
 
     const std::string input = "--one 1 --g1 [--two 2 --g2 [--three 3 --g3 [--four 4]]]";
-    parser.parseString(input);
+    parser.parse(input);
 
     const auto& one      = parser.getValue<std::string>("--one");
     const auto& two      = parser.getValue<std::string>(FlagPath{"--g1", "--two"});
@@ -383,7 +383,7 @@ TEST_CASE("Parser getValue multioption", "[options][multi][getValue]") {
                 | MultiOption<std::vector<float>>()["--floats"];
 
     const std::string input = "--ints 1 2 3 --floats 1.5 2.5 3.5";
-    parser.parseString(input);
+    parser.parse(input);
 
     const auto& ints = parser.getMultiValue<std::array<int, 3>>("--ints");
     const auto& floats = parser.getMultiValue<std::vector<float>>("--floats");
@@ -417,7 +417,7 @@ TEST_CASE("Parser getValue multioption nested", "[options][multi][getValue][opti
                 );
 
     const std::string input = "--one 1 10 100 1000 --g1 [--two 2.0 2.2 2.3 --g2 [--three 1.5 2.5 --g3 [--four 4.5 5.5 6.5 7.5 8.5]]]";
-    parser.parseString(input);
+    parser.parse(input);
 
 
     const auto& one     = parser.getMultiValue<std::array<int, 4>>      ("--one");

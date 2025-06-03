@@ -101,7 +101,7 @@ static void SyntaxError1() {
     Parser parser = static_cast<Parser>(Option(&test)["--test"]);
 
     const std::string input = "[[[[[[[[[ --test ] 2";
-    parser.parseString(input);
+    parser.parse(input);
 
     std::cout << "Test: " << test << "\n";
 }

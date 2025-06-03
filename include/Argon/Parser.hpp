@@ -46,7 +46,9 @@ namespace Argon {
 
         auto printErrors(PrintMode analysisPrintMode, TextMode analysisTextMode = TextMode::Ascii) const -> void;
 
-        auto parseString(const std::string& str) -> void;
+        auto parse(int argc, const char **argv);
+
+        auto parse(const std::string& str) -> void;
 
         template<typename T> requires DerivesFrom<T, IOption>
         auto operator|(T&& option) -> Parser&;
@@ -64,6 +66,7 @@ namespace Argon {
         auto getMultiValue(const FlagPath& flagPath) -> const Container&;
 
         auto constraints() -> Constraints&;
+
     private:
         auto reset() -> void;
 
@@ -141,7 +144,16 @@ inline auto Argon::Parser::printErrors(const PrintMode analysisPrintMode,
     }
 }
 
-inline auto Argon::Parser::parseString(const std::string& str) -> void {
+inline auto Argon::Parser::parse(const int argc, const char **argv) {
+    std::string input;
+    for (int i = 1; i < argc; i++) {
+        input += argv[i];
+        input += " ";
+    }
+    parse(input);
+}
+
+inline auto Argon::Parser::parse(const std::string& str) -> void {
     reset();
     m_scanner = Scanner(str);
     StatementAst ast = parseStatement();

@@ -15,7 +15,7 @@ int main() {
                 | Argon::Option(&salary)["-s"]["--salary"];
     const std::string input = "--name Bob -a 20 --salary 15.5";
 
-    parser.parseString(input);
+    parser.parse(input);
     std::cout << "Name: " << name << "\n";
     std::cout << "Age: " << age << "\n";
     std::cout << "Salary: " << salary << "\n";

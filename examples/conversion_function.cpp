@@ -27,7 +27,7 @@ int main() {
                 | Argon::Option<Student>(&student2, studentConversionFn)["--second"];
 
     const std::string input = "--first 1 --second 3";
-    parser.parseString(input);
+    parser.parse(input);
     std::cout << "Student1: " << student1.name << ", " << student1.age << "\n";
     std::cout << "Student2: " << student2.name << ", " << student2.age << "\n";
 }

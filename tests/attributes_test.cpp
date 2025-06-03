@@ -27,12 +27,15 @@ TEST_CASE() {
 
     // c.mutuallyExclusive("-x", {"-y", "-z"});
     // parser.parseString("-x 10 -y 20 -z 30");
-    parser.parseString("-x 10");
+    // parser.parse("-x 10");
+
+    // auto v = parser.getValue<float>(FlagPath{"--what", "--the", "--heck"});
+    // auto v = parser.getValue<float>(FlagPath{"--what"});
+
+    const char *argv[] = {"argontest.exe", "-x", "10", "-y", "20", "-z", "30"};
+    parser.parse(7, argv);
 
     if (parser.hasErrors()) {
         parser.printErrors(PrintMode::Flat);
     }
-
-    // auto v = parser.getValue<float>(FlagPath{"--what", "--the", "--heck"});
-    // auto v = parser.getValue<float>(FlagPath{"--what"});
 }

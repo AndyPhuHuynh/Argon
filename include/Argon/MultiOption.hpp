@@ -1,4 +1,6 @@
-#pragma once
+#ifndef ARGON_MULTIOPTION_INCLUDE
+#define ARGON_MULTIOPTION_INCLUDE
+
 #include "Option.hpp"
 
 // Template Specializations
@@ -202,6 +204,7 @@ namespace Argon {
             (*m_out)[m_nextIndex] = m_values[m_nextIndex];
         }
         m_nextIndex++;
+        this->m_isSet = true;
     }
 
     // MultiOption with std::vector
@@ -243,5 +246,8 @@ namespace Argon {
         if (m_out != nullptr) {
             m_out->push_back(temp);
         }
+        this->m_isSet = true;
     }
 }
+
+#endif ARGON_MULTIOPTION_INCLUDE

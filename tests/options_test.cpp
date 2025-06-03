@@ -1,8 +1,8 @@
-﻿#include "Argon/Parser.hpp"
-#include "Argon/Option.hpp"
-
-#include "catch2/catch_approx.hpp"
+﻿#include "catch2/catch_approx.hpp"
 #include "catch2/catch_test_macros.hpp"
+
+#include "Argon/Parser.hpp"
+#include "Argon/Option.hpp"
 
 using namespace Argon;
 

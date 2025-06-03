@@ -1,4 +1,5 @@
-﻿#pragma once
+﻿#ifndef ARGON_CONTEXT_INCLUDE
+#define ARGON_CONTEXT_INCLUDE
 
 #include <memory>
 #include <numeric>
@@ -11,6 +12,8 @@
 namespace Argon {
     class IOption;
     using OptionPtr = std::variant<IOption*, std::unique_ptr<IOption>>;
+
+
 
     class Context {
         std::vector<OptionPtr> m_options;
@@ -131,7 +134,6 @@ inline auto Argon::Context::getOption(const std::string& flag) -> IOption* {
     });
 
     return it == m_options.end() ? nullptr : getRawPointer(*it);
-
 }
 
 inline auto Argon::Context::setName(const std::string& name) -> void {
@@ -168,3 +170,5 @@ auto Argon::Context::getOptionDynamic(const std::string& flag) -> T* {
 inline auto Argon::Context::containsLocalFlag(const std::string& flag) const -> bool {
     return std::ranges::contains(m_flags, flag);
 }
+
+#endif // ARGON_CONTEXT_INCLUDE

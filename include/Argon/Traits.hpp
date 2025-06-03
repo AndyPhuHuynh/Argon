@@ -1,4 +1,5 @@
-﻿#pragma once
+﻿#ifndef ARGON_TRAITS_INCLUDE
+#define ARGON_TRAITS_INCLUDE
 
 #include <concepts>
 #include <type_traits>
@@ -123,3 +124,5 @@ namespace Argon {
     template<typename>
     inline constexpr bool always_false = false;
 }
+
+#endif ARGON_TRAITS_INCLUDE

@@ -1,8 +1,8 @@
 ﻿#include <vector>
 
-#include <Argon/Scanner.hpp>
-
 #include "catch2/catch_test_macros.hpp"
+
+#include <Argon/Scanner.hpp>
 using namespace Argon;
 
 TEST_CASE("Scanner test 1", "[scanner]") {

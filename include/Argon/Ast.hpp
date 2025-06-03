@@ -1,4 +1,5 @@
-﻿# pragma once
+﻿#ifndef ARGON_AST_INCLUDE
+#define ARGON_AST_INCLUDE
 
 #include <memory>
 #include <string>
@@ -207,3 +208,5 @@ inline void Argon::StatementAst::analyze(ErrorGroup& errorGroup, Context& contex
         option->analyze(errorGroup, context);
     }
 }
+
+#endif // ARGON_AST_INCLUDE

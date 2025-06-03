@@ -1,4 +1,5 @@
-﻿#pragma once
+﻿#ifndef ARGON_OPTION_INCLUDE
+#define ARGON_OPTION_INCLUDE
 
 #include <algorithm>
 #include <cstdlib>
@@ -187,7 +188,7 @@ auto parseIntegralType(const std::string& arg, T& out) -> bool {
 
 inline auto parseBool(const std::string& arg, bool& out) -> bool {
     std::string boolStr = arg;
-    StringUtil::to_lower(boolStr);
+    to_lower(boolStr);
     if (boolStr == "true") {
         out = true;
         return true;
@@ -261,8 +262,8 @@ void Argon::Converter<T>::generateErrorMsg(const std::string& flag, const std::s
         << "expected " << type_name<T>();
 
     if constexpr (is_non_bool_integral<T>) {
-        ss << " in the range of [" << StringUtil::format_with_commas(static_cast<int64_t>(std::numeric_limits<T>::min())) <<
-              " to " << StringUtil::format_with_commas(static_cast<int64_t>(std::numeric_limits<T>::max())) << "]";
+        ss << " in the range of [" << format_with_commas(static_cast<int64_t>(std::numeric_limits<T>::min())) <<
+              " to " << format_with_commas(static_cast<int64_t>(std::numeric_limits<T>::max())) << "]";
     } else if constexpr (std::is_same_v<T, bool>) {
         ss << " true or false";
     }
@@ -358,6 +359,7 @@ void Argon::Option<T>::setValue(const std::string& flag, const std::string& valu
     if (m_out != nullptr) {
         *m_out = temp;
     }
+    this->m_isSet = true;
 }
 
 inline Argon::IOption::IOption(const IOption& other) {
@@ -410,6 +412,10 @@ inline void Argon::IOption::clearError() {
     m_error.clear();
 }
 
+inline auto Argon::IOption::isSet() const -> bool {
+    return m_isSet;
+}
+
 inline Argon::OptionGroup::OptionGroup() {
     m_context = std::make_unique<Context>();
 }
@@ -451,3 +457,5 @@ inline Argon::IOption *Argon::OptionGroup::getOption(const std::string& flag) { 
 inline Argon::Context& Argon::OptionGroup::getContext() { //NOLINT (function is not const)
     return *m_context;
 }
+
+#endif ARGON_OPTION_INCLUDE

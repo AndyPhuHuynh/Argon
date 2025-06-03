@@ -1,4 +1,5 @@
-﻿#pragma once
+﻿#ifndef ARGON_SCANNER_INCLUDE
+#define ARGON_SCANNER_INCLUDE
 
 #include <cstdint>
 #include <optional>
@@ -245,3 +246,5 @@ inline auto operator<<(std::ostream& os, const Argon::Token& token) -> std::ostr
         << ")";
     return os;
 }
+
+#endif // ARGON_SCANNER_INCLUDE

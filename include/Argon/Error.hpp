@@ -1,4 +1,5 @@
-﻿#pragma once
+﻿#ifndef ARGON_ERROR_INCLUDE
+#define ARGON_ERROR_INCLUDE
 
 #include <compare>
 #include <string>
@@ -391,3 +392,5 @@ inline size_t Argon::ErrorGroup::getIndexOfLastHasError() const {
     }
     return 0;
 }
+
+#endif // ARGON_ERROR_INCLUDE

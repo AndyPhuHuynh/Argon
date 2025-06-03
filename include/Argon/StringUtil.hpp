@@ -1,23 +1,11 @@
-﻿#pragma once
-
+﻿#ifndef ARGON_STRINGUTIL_INCLUDE
+#define ARGON_STRINGUTIL_INCLUDE
 #include <cstdint>
 #include <string>
+#include <string_view>
 #include <vector>
 
-namespace Argon::StringUtil {
-    std::vector<std::string> split_string(const std::string& str, char delimiter);
-    
-    std::string format_with_commas(int64_t value);
-
-    std::string format_with_underscores(int64_t value);
-
-    void to_lower(std::string& str);
-
-    void to_upper(std::string& str);
-}
-
-// --------------------------------------------- Implementations -------------------------------------------------------
-
+namespace Argon {
 #include <algorithm>
 
 /**
@@ -26,7 +14,7 @@ namespace Argon::StringUtil {
  * @param delimiter The character used as the delimiter
  * @return A vector of the tokens in the tokenized string
  */
-inline std::vector<std::string> Argon::StringUtil::split_string(const std::string& str, const char delimiter) {
+inline std::vector<std::string> split_string(const std::string& str, const char delimiter) {
     std::vector<std::string> tokens;
     size_t prevIndex = 0;
     const size_t length = str.length();
@@ -52,7 +40,7 @@ inline std::vector<std::string> Argon::StringUtil::split_string(const std::strin
     return tokens;
 }
 
-inline std::string Argon::StringUtil::format_with_commas(const int64_t value) {
+inline std::string format_with_commas(const int64_t value) {
     std::string num = std::to_string(value);
 
     if (num.length() <= 3) return num;
@@ -68,7 +56,7 @@ inline std::string Argon::StringUtil::format_with_commas(const int64_t value) {
     return num;
 }
 
-inline std::string Argon::StringUtil::format_with_underscores(const int64_t value) {
+inline std::string format_with_underscores(const int64_t value) {
     std::string num = std::to_string(value);
 
     if (num.length() <= 3) return num;
@@ -84,12 +72,15 @@ inline std::string Argon::StringUtil::format_with_underscores(const int64_t valu
     return num;
 }
 
-inline void Argon::StringUtil::to_lower(std::string& str) {
+inline void to_lower(std::string& str) {
     std::ranges::transform(str, str.begin(),
         [](const unsigned char c) { return static_cast<char>(std::tolower(c)); });
 }
 
-inline void Argon::StringUtil::to_upper(std::string& str) {
+inline void to_upper(std::string& str) {
     std::ranges::transform(str, str.begin(),
         [](const unsigned char c) { return static_cast<char>(std::toupper(c)); });
 }
+} // End namespace Argon::StringUtil
+
+#endif // ARGON_STRINGUTIL_INCLUDE

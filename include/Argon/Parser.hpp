@@ -1,10 +1,12 @@
-#pragma once
+#ifndef ARGON_PARSER_INCLUDE
+#define ARGON_PARSER_INCLUDE
 
 #include <cassert>
 #include <memory>
 #include <string>
 
 #include "Ast.hpp"
+#include "Attributes.hpp"
 #include "Context.hpp"
 #include "Error.hpp"
 #include "Scanner.hpp"
@@ -17,10 +19,12 @@ namespace Argon {
 
         ErrorGroup m_syntaxErrors = ErrorGroup("Syntax Errors", -1, -1);
         ErrorGroup m_analysisErrors = ErrorGroup("Analysis Errors", -1, -1);
+        std::vector<std::string> m_constraintErrors;
 
         std::vector<Token> m_brackets;
         bool m_mismatchedRBRACK = false;
 
+        Constraints m_constraints;
     public:
         Parser() = default;
 
@@ -51,6 +55,7 @@ namespace Argon {
         template<typename Container, typename... Args> requires(Argon::AllConvertibleTo<std::string_view, Args...>)
         auto getMultiValue(const std::string& str, Args... args) -> const Container&;
 
+        auto constraints() -> Constraints&;
     private:
         auto reset() -> void;
 
@@ -83,6 +88,8 @@ namespace Argon {
 
         template<typename Container, typename... Args> requires(Argon::AllConvertibleTo<std::string_view, Args...>)
         auto getMultiValue(Context& context, const std::string& flag, Args... args) -> const Container&;
+
+        auto validateConstraints() -> void;
     };
 
     template<typename Left, typename Right> requires DerivesFrom<Left, IOption> && DerivesFrom<Right, IOption>
@@ -116,7 +123,7 @@ inline auto Argon::Parser::removeErrorGroup(const int startPos) -> void {
 }
 
 inline auto Argon::Parser::hasErrors() const -> bool {
-    return m_syntaxErrors.hasErrors() || m_analysisErrors.hasErrors();
+    return m_syntaxErrors.hasErrors() || m_analysisErrors.hasErrors() || !m_constraintErrors.empty();
 }
 
 inline auto Argon::Parser::printErrors(const PrintMode analysisPrintMode,
@@ -124,14 +131,19 @@ inline auto Argon::Parser::printErrors(const PrintMode analysisPrintMode,
     if (m_syntaxErrors.hasErrors()) {
         m_syntaxErrors.printErrorsFlatMode();
     }
-    if (!m_analysisErrors.hasErrors()) return;
-
-    switch (analysisPrintMode) {
-        case PrintMode::Flat:
-            m_analysisErrors.printErrorsFlatMode();
-            return;
-        case PrintMode::Tree:
-            m_analysisErrors.printErrorsTreeMode(analysisTextMode);
+    if (m_analysisErrors.hasErrors()) {
+        switch (analysisPrintMode) {
+            case PrintMode::Flat:
+                m_analysisErrors.printErrorsFlatMode();
+                return;
+            case PrintMode::Tree:
+                m_analysisErrors.printErrorsTreeMode(analysisTextMode);
+        }
+    }
+    if (!m_constraintErrors.empty()) {
+        for (const auto& err : m_constraintErrors) {
+            std::cout << err << "\n";
+        }
     }
 }
 
@@ -140,9 +152,7 @@ inline auto Argon::Parser::parseString(const std::string& str) -> void {
     m_scanner = Scanner(str);
     StatementAst ast = parseStatement();
     ast.analyze(m_analysisErrors, m_context);
-    if (hasErrors()) {
-        printErrors(PrintMode::Flat, TextMode::Utf8);
-    }
+    validateConstraints();
 }
 
 inline auto Argon::Parser::parseStatement() -> StatementAst {
@@ -334,6 +344,10 @@ auto Argon::Parser::operator|(T&& option) -> Parser& {
     return *this;
 }
 
+inline auto Argon::Parser::constraints() -> Constraints& {
+    return m_constraints;
+}
+
 inline auto Argon::Parser::reset() -> void {
     m_syntaxErrors.clear();
     m_analysisErrors.clear();
@@ -387,6 +401,10 @@ inline auto Argon::Parser::skipScope() -> void {
             return;
         }
     }
+}
+
+inline auto Argon::Parser::validateConstraints() -> void {
+    m_constraints.validate(m_context, m_constraintErrors);
 }
 
 template<typename ValueType, typename... Args> requires (Argon::AllConvertibleTo<std::string_view, Args...>)
@@ -489,3 +507,5 @@ auto Argon::operator|(Left&& left, Right&& right) -> Parser {
     parser.addOption(std::forward<Right>(right));
     return parser;
 }
+
+#endif ARGON_PARSER_INCLUDE

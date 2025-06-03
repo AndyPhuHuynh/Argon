@@ -32,4 +32,7 @@ TEST_CASE() {
     if (parser.hasErrors()) {
         parser.printErrors(PrintMode::Flat);
     }
+
+    // auto v = parser.getValue<float>(FlagPath{"--what", "--the", "--heck"});
+    // auto v = parser.getValue<float>(FlagPath{"--what"});
 }

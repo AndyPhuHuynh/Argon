@@ -250,4 +250,4 @@ namespace Argon {
     }
 }
 
-#endif ARGON_MULTIOPTION_INCLUDE
+#endif // ARGON_MULTIOPTION_INCLUDE

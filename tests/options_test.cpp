@@ -366,9 +366,9 @@ TEST_CASE("Parser getValue nested", "[options][getValue][option-group]") {
     parser.parseString(input);
 
     const auto& one      = parser.getValue<std::string>("--one");
-    const auto& two      = parser.getValue<std::string>("--g1", "--two");
-    const auto& three    = parser.getValue<std::string>("--g1", "--g2", "--three");
-    const auto& four     = parser.getValue<std::string>("--g1", "--g2", "--g3", "--four");
+    const auto& two      = parser.getValue<std::string>(FlagPath{"--g1", "--two"});
+    const auto& three    = parser.getValue<std::string>(FlagPath{"--g1", "--g2", "--three"});
+    const auto& four     = parser.getValue<std::string>(FlagPath{"--g1", "--g2", "--g3", "--four"});
 
     CHECK(!parser.hasErrors());
 
@@ -421,9 +421,9 @@ TEST_CASE("Parser getValue multioption nested", "[options][multi][getValue][opti
 
 
     const auto& one     = parser.getMultiValue<std::array<int, 4>>      ("--one");
-    const auto& two     = parser.getMultiValue<std::array<float ,3>>    ("--g1", "--two");
-    const auto& three   = parser.getMultiValue<std::vector<float>>      ("--g1", "--g2", "--three");
-    const auto& four    = parser.getMultiValue<std::vector<float>>      ("--g1", "--g2", "--g3", "--four");
+    const auto& two     = parser.getMultiValue<std::array<float ,3>>    (FlagPath{"--g1", "--two"});
+    const auto& three   = parser.getMultiValue<std::vector<float>>      (FlagPath{"--g1", "--g2", "--three"});
+    const auto& four    = parser.getMultiValue<std::vector<float>>      (FlagPath{"--g1", "--g2", "--g3", "--four"});
 
     CHECK(one[0] == 1);
     CHECK(one[1] == 10);

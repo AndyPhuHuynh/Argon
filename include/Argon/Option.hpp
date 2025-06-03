@@ -458,4 +458,4 @@ inline Argon::Context& Argon::OptionGroup::getContext() { //NOLINT (function is 
     return *m_context;
 }
 
-#endif ARGON_OPTION_INCLUDE
+#endif // ARGON_OPTION_INCLUDE

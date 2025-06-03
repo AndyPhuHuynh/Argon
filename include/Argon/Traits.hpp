@@ -125,4 +125,4 @@ namespace Argon {
     inline constexpr bool always_false = false;
 }
 
-#endif ARGON_TRAITS_INCLUDE
+#endif // ARGON_TRAITS_INCLUDE

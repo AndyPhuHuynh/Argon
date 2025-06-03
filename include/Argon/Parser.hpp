@@ -9,6 +9,8 @@
 #include "Attributes.hpp"
 #include "Context.hpp"
 #include "Error.hpp"
+#include "Option.hpp"
+#include "MultiOption.hpp"
 #include "Scanner.hpp"
 #include "Traits.hpp"
 
@@ -49,11 +51,17 @@ namespace Argon {
         template<typename T> requires DerivesFrom<T, IOption>
         auto operator|(T&& option) -> Parser&;
 
-        template<typename ValueType, typename... Args> requires(Argon::AllConvertibleTo<std::string_view, Args...>)
-        auto getValue(const std::string& str, Args... args) -> const ValueType&;
+        template<typename ValueType>
+        auto getValue(const std::string& flag) -> const ValueType&;
 
-        template<typename Container, typename... Args> requires(Argon::AllConvertibleTo<std::string_view, Args...>)
-        auto getMultiValue(const std::string& str, Args... args) -> const Container&;
+        template<typename ValueType>
+        auto getValue(const FlagPath& flagPath) -> const ValueType&;
+
+        template<typename Container>
+        auto getMultiValue(const std::string& flag) -> const Container&;
+
+        template<typename Container>
+        auto getMultiValue(const FlagPath& flagPath) -> const Container&;
 
         auto constraints() -> Constraints&;
     private:
@@ -77,18 +85,6 @@ namespace Argon {
 
         auto skipScope() -> void;
 
-        template<typename ValueType>
-        auto getValue(Context& context, const std::string& flag) -> const ValueType&;
-
-        template<typename ValueType, typename... Args> requires(Argon::AllConvertibleTo<std::string_view, Args...>)
-        auto getValue(Context& context, const std::string& flag, Args... args) -> const ValueType&;
-
-        template<typename Container>
-        auto getMultiValue(Context& context, const std::string& flag) -> const Container&;
-
-        template<typename Container, typename... Args> requires(Argon::AllConvertibleTo<std::string_view, Args...>)
-        auto getMultiValue(Context& context, const std::string& flag, Args... args) -> const Container&;
-
         auto validateConstraints() -> void;
     };
 
@@ -97,8 +93,6 @@ namespace Argon {
 }
 
 // --------------------------------------------- Implementations -------------------------------------------------------
-
-#include "MultiOption.hpp"
 
 template<typename T> requires Argon::DerivesFrom<T, Argon::IOption>
 Argon::Parser::Parser(T&& option) {
@@ -344,6 +338,26 @@ auto Argon::Parser::operator|(T&& option) -> Parser& {
     return *this;
 }
 
+template<typename ValueType>
+auto Argon::Parser::getValue(const std::string& flag) -> const ValueType& {
+    return m_context.getValue<ValueType>(FlagPath(flag));
+}
+
+template<typename ValueType>
+auto Argon::Parser::getValue(const FlagPath& flagPath) -> const ValueType& {
+    return m_context.getValue<ValueType>(flagPath);
+}
+
+template<typename Container>
+auto Argon::Parser::getMultiValue(const std::string& flag) -> const Container& {
+    return m_context.getMultiValue<Container>(FlagPath(flag));
+}
+
+template<typename Container>
+auto Argon::Parser::getMultiValue(const FlagPath& flagPath) -> const Container& {
+    return m_context.getMultiValue<Container>(flagPath);
+}
+
 inline auto Argon::Parser::constraints() -> Constraints& {
     return m_constraints;
 }
@@ -407,98 +421,6 @@ inline auto Argon::Parser::validateConstraints() -> void {
     m_constraints.validate(m_context, m_constraintErrors);
 }
 
-template<typename ValueType, typename... Args> requires (Argon::AllConvertibleTo<std::string_view, Args...>)
-auto Argon::Parser::getValue(const std::string& str, Args... args) -> const ValueType& {
-    return getValue<ValueType>(m_context, str, args...);
-}
-
-template<typename ValueType>
-auto Argon::Parser::getValue(Context& context, const std::string& flag) -> const ValueType& {
-    auto option = context.getOptionDynamic<Option<ValueType> >(flag);
-    if (option == nullptr) {
-        if (&context == &m_context) {
-            std::cerr << std::format(
-                "Assertion Failed: Argon::Parser::getValue(): Unable to find matching flag '{}' for option.\n"
-                "                  Ensure that the specified flag and group path are valid, and the given templated type is correct.\n",
-                flag);
-        } else {
-            std::cerr << std::format(
-                "Assertion Failed: Argon::Parser::getValue(): Unable to find matching flag '{}' for option inside group '{}'.\n"
-                "                  Ensure that the specified flag and group path are valid, and the given templated type is correct.\n",
-                flag, context.getPath());
-        }
-        std::abort();
-    }
-    return option->getValue();
-}
-
-template<typename ValueType, typename... Args> requires (Argon::AllConvertibleTo<std::string_view, Args...>)
-auto Argon::Parser::getValue(Context& context, const std::string& flag, Args... args) -> const ValueType& {
-    const auto optionGroup = context.getOptionDynamic<OptionGroup>(flag);
-    if (optionGroup == nullptr) {
-        if (&context == &m_context) {
-            std::cerr << std::format(
-                "Assertion Failed: Argon::Parser::getValue(): Unable to find matching flag '{}' for option group.\n"
-                "                  Ensure that the specified flag and group path are valid, and the given templated type is correct.\n",
-                flag);
-        } else {
-            std::cerr << std::format(
-                "Assertion Failed: Argon::Parser::getValue(): Unable to find matching flag '{}' for option group inside group '{}'.\n"
-                "                  Ensure that the specified flag and group path are valid, and the given templated type is correct.\n",
-                flag, context.getPath());
-        }
-        std::abort();
-    }
-
-    return getValue<ValueType>(optionGroup->getContext(), args...);
-}
-
-template<typename Container, typename... Args> requires (Argon::AllConvertibleTo<std::string_view, Args...>)
-auto Argon::Parser::getMultiValue(const std::string& str, Args... args) -> const Container& {
-    return getMultiValue<Container>(m_context, str, args...);
-}
-
-template<typename Container>
-auto Argon::Parser::getMultiValue(Context& context, const std::string& flag) -> const Container& {
-    auto option = context.getOptionDynamic<MultiOption<Container>>(flag);
-    if (option == nullptr) {
-        if (&context == &m_context) {
-            std::cerr << std::format(
-                "Assertion Failed: Argon::Parser::getMultiValue(): Unable to find matching flag '{}' for multi option.\n"
-                "                  Ensure that the specified flag and group path are valid, and the given templated type is correct.\n",
-                flag);
-        } else {
-            std::cerr << std::format(
-                "Assertion Failed: Argon::Parser::getMultiValue(): Unable to find matching flag '{}' for multi option inside group '{}'.\n"
-                "                  Ensure that the specified flag and group path are valid, and the given templated type is correct.\n",
-                flag, context.getPath());
-        }
-        std::abort();
-    }
-    return option->getValue();
-}
-
-template<typename Container, typename... Args> requires (Argon::AllConvertibleTo<std::string_view, Args...>)
-auto Argon::Parser::getMultiValue(Context& context, const std::string& flag, Args... args) -> const Container& {
-    const auto optionGroup = context.getOptionDynamic<OptionGroup>(flag);
-    if (optionGroup == nullptr) {
-        if (&context == &m_context) {
-            std::cerr << std::format(
-                "Assertion Failed: Argon::Parser::getMultiValue(): Unable to find matching flag '{}' for option group.\n"
-                "                  Ensure that the specified flag and group path are valid, and the given templated type is correct.\n",
-                flag);
-        } else {
-            std::cerr << std::format(
-                "Assertion Failed: Argon::Parser::getMultiValue(): Unable to find matching flag '{}' for option group inside group '{}'.\n"
-                "                  Ensure that the specified flag and group path are valid, and the given templated type is correct.\n",
-                flag, context.getPath());
-        }
-        std::abort();
-    }
-
-    return getMultiValue<Container>(optionGroup->getContext(), args...);
-}
-
 template<typename Left, typename Right> requires
     Argon::DerivesFrom<Left, Argon::IOption> && Argon::DerivesFrom<Right, Argon::IOption>
 auto Argon::operator|(Left&& left, Right&& right) -> Parser {
@@ -508,4 +430,4 @@ auto Argon::operator|(Left&& left, Right&& right) -> Parser {
     return parser;
 }
 
-#endif ARGON_PARSER_INCLUDE
+#endif // ARGON_PARSER_INCLUDE

@@ -13,7 +13,12 @@ namespace Argon {
     class IOption;
     using OptionPtr = std::variant<IOption*, std::unique_ptr<IOption>>;
 
-
+    struct FlagPath {
+        std::vector<std::string> groupPath;
+        std::string flag;
+        explicit FlagPath(std::string_view flag);
+        FlagPath(std::initializer_list<std::string> flags);
+    };
 
     class Context {
         std::vector<OptionPtr> m_options;
@@ -27,17 +32,28 @@ namespace Argon {
         Context& operator=(const Context&);
         
         auto addOption(IOption& option) -> void;
+
         auto addOption(IOption&& option) -> void;
 
         auto getOption(const std::string& flag) -> IOption *;
 
-        auto setName(const std::string& name) -> void;
-        [[nodiscard]] auto getPath() const -> std::string;
-
         template <typename T>
         auto getOptionDynamic(const std::string& flag) -> T*;
 
+        auto setName(const std::string& name) -> void;
+
+        [[nodiscard]] auto getPath() const -> std::string;
+
         [[nodiscard]] auto containsLocalFlag(const std::string& flag) const -> bool;
+
+        template<typename ValueType>
+        auto getValue(const FlagPath& flagPath) -> const ValueType&;
+
+        template<typename Container>
+        auto getMultiValue(const FlagPath& flagPath) -> const Container&;
+
+    private:
+        auto resolveFlagGroup(const FlagPath& flagPath) -> Context&;
     };
 }
 
@@ -63,6 +79,21 @@ namespace Argon {
 #include <algorithm>
 
 #include "Option.hpp" // NOLINT (misc-unused-include)
+#include "MultiOption.hpp"
+
+inline Argon::FlagPath::FlagPath(const std::string_view flag) : flag(flag) {}
+
+inline Argon::FlagPath::FlagPath(const std::initializer_list<std::string> flags) {
+    if (flags.size() == 0) {
+        throw std::invalid_argument("FlagPath must contain at least one flag.");
+    }
+
+    const auto begin = std::begin(flags);
+    const auto end   = std::prev(std::end(flags));
+
+    groupPath.insert(std::end(groupPath), begin, end);
+    flag = *end;
+}
 
 inline Argon::Context::Context(std::string name) : m_name(std::move(name)) {}
 
@@ -136,6 +167,31 @@ inline auto Argon::Context::getOption(const std::string& flag) -> IOption* {
     return it == m_options.end() ? nullptr : getRawPointer(*it);
 }
 
+template <typename T>
+auto Argon::Context::getOptionDynamic(const std::string& flag) -> T* {
+    return dynamic_cast<T*>(getOption(flag));
+}
+
+template<typename ValueType>
+auto Argon::Context::getValue(const FlagPath& flagPath) -> const ValueType& {
+    auto& context = resolveFlagGroup(flagPath);
+    const auto opt = context.getOptionDynamic<Option<ValueType>>(flagPath.flag);
+    if (opt == nullptr) {
+        throw std::runtime_error("Option does not exist");
+    }
+    return opt->getValue();
+}
+
+template<typename Container>
+auto Argon::Context::getMultiValue(const FlagPath& flagPath) -> const Container& {
+    auto& context = resolveFlagGroup(flagPath);
+    const auto opt = context.getOptionDynamic<MultiOption<Container>>(flagPath.flag);
+    if (opt == nullptr) {
+        throw std::runtime_error("Option does not exist");
+    }
+    return opt->getValue();
+}
+
 inline auto Argon::Context::setName(const std::string& name) -> void {
     m_name = name;
 }
@@ -162,13 +218,21 @@ inline auto Argon::Context::getPath() const -> std::string {
     });
 }
 
-template <typename T>
-auto Argon::Context::getOptionDynamic(const std::string& flag) -> T* {
-    return dynamic_cast<T*>(getOption(flag));
-}
-
 inline auto Argon::Context::containsLocalFlag(const std::string& flag) const -> bool {
     return std::ranges::contains(m_flags, flag);
+}
+
+inline auto Argon::Context::resolveFlagGroup(const FlagPath& flagPath) -> Context& {
+    auto context = this;
+    // Loop through all the flags that represent groups
+    for (const auto& groupFlag : flagPath.groupPath) {
+        const auto optGroup = context->getOptionDynamic<OptionGroup>(groupFlag);
+        if (optGroup == nullptr) {
+            throw std::runtime_error("Option does not exist");
+        }
+        context = &optGroup->getContext();
+    }
+    return *context;
 }
 
 #endif // ARGON_CONTEXT_INCLUDE

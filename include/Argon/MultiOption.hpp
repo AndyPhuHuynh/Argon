@@ -17,7 +17,7 @@ namespace Argon {
     class MultiOption<T[]> : public OptionBase, public OptionComponent<MultiOption<T[]>>,
                              public IsMultiOption, public Converter<MultiOption<T[]>, T> {
         T (*m_out)[];
-        size_t m_size;
+        size_t m_size = 0;
         size_t m_nextIndex = 0;
         bool m_maxCapacityError = false;
     public:
@@ -29,16 +29,25 @@ namespace Argon {
     };
     
     // MultiOption with std::array
-    
+
+    class MultiOptionStdArrayBase : public IsMultiOption {
+    protected:
+        size_t m_maxSize;
+        size_t m_nextIndex = 0;
+
+        explicit MultiOptionStdArrayBase(size_t maxSize);
+    public:
+        [[nodiscard]] auto isAtMaxCapacity() const -> bool;
+    };
+
     template<typename T, size_t N>
     class MultiOption<std::array<T, N>> : public OptionBase, public OptionComponent<MultiOption<std::array<T, N>>>,
-                                          public IsMultiOption, public Converter<MultiOption<std::array<T, N>>, T>{
+                                          public MultiOptionStdArrayBase, public Converter<MultiOption<std::array<T, N>>, T>{
         std::array<T, N> m_values;
-        std::array<T, N>* m_out;
-        size_t m_nextIndex = 0;
+        std::array<T, N>* m_out = nullptr;
         bool m_maxCapacityError = false;
     public:
-        MultiOption() = default;
+        MultiOption();
 
         explicit MultiOption(std::array<T, N>* out);
 
@@ -115,10 +124,21 @@ namespace Argon {
         }
     }
 
+    // MultiOptionStdArrayBase
+
+    inline MultiOptionStdArrayBase::MultiOptionStdArrayBase(const size_t maxSize) : m_maxSize(maxSize) {}
+
+    inline auto MultiOptionStdArrayBase::isAtMaxCapacity() const -> bool {
+        return m_nextIndex == m_maxSize;
+    }
+
     // MultiOption with std::array
 
+    template<typename T, size_t N>
+    MultiOption<std::array<T, N>>::MultiOption() : MultiOptionStdArrayBase(N) {}
+
     template <typename T, size_t N>
-    MultiOption<std::array<T, N>>::MultiOption(std::array<T, N>* out) : m_out(out) {}
+    MultiOption<std::array<T, N>>::MultiOption(std::array<T, N>* out) : MultiOptionStdArrayBase(N), m_out(out) {}
 
     template<typename T, size_t N>
     auto MultiOption<std::array<T, N>>::getValue() const -> const std::array<T, N>& {

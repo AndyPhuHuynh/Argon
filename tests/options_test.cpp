@@ -18,8 +18,16 @@ TEST_CASE("Basic option", "[options]") {
     Parser parser = Option(&width)["-w"]["--width"] | opt2 | opt3 | Option(&test)["-t"]["--test"];
 
     SECTION("Input provided") {
-        const std::string input = "--width 100 --height 50.1 --depth 69.123456 -t 152";
-        parser.parse(input);
+        SECTION("std::string") {
+            const std::string input = "--width 100 --height 50.1 --depth 69.123456 -t 152";
+            parser.parse(input);
+        }
+
+        SECTION("C-Style argv") {
+            const char *argv[] = {"argon.exe", "--width", "100", "--height", "50.1", "--depth", "69.123456", "-t", "152"};
+            int argc = std::size(argv);
+            parser.parse(argc, argv);
+        }
 
         CHECK(!parser.hasErrors());
         CHECK(width   == 100);
@@ -148,8 +156,6 @@ TEST_CASE("Option all built-in numeric types", "[options]") {
     }
 }
 
-
-
 struct Student {
     std::string name = "default";
     int age = -1;
@@ -180,7 +186,7 @@ auto studentError = [](const std::string& flag, const std::string& invalidArg) -
     return std::format("Invalid value for flag '{}': expected either '1' or '2', got '{}'", flag, invalidArg);
 };
 
-TEST_CASE("Option with user defined type", "[options]") {
+TEST_CASE("Option with user defined type", "[options][custom-type]") {
     Student josh, john, sally;
     auto parser = Option(&josh)["--josh"]  .withConversionFn(studentFromString).withErrorMsgFn(studentError)
                 | Option(&john)["--john"]  .withConversionFn(studentFromString).withErrorMsgFn(studentError)
@@ -309,6 +315,18 @@ TEST_CASE("Multioption inside group", "[options][multi][option-group]") {
     CHECK(doubleVec[0] == 4.0);
     CHECK(doubleVec[1] == 5.5);
     CHECK(doubleVec[2] == 6.7);
+}
+
+TEST_CASE("Multioption user defined type", "[options][multi][custom-type]") {
+    std::array<Student, 3> studentArr;
+    auto parser = Parser(MultiOption(&studentArr)["--students"].withConversionFn(studentFromString));
+    const std::string input = "--students 1 2 3";
+    parser.parse(input);
+
+    CHECK(!parser.hasErrors());
+    CHECK(studentArr[0] == Student{"Josh", 1});
+    CHECK(studentArr[1] == Student{"John", 2});
+    CHECK(studentArr[2] == Student{"Sally", 3});
 }
 
 TEST_CASE("Options getValue lvalue", "[options][getValue]") {

@@ -17,11 +17,15 @@ namespace Argon {
         std::vector<std::string> groupPath;
         std::string flag;
 
+        FlagPath() = default;
+
         explicit FlagPath(std::string_view flag);
 
         FlagPath(std::initializer_list<std::string> flags);
 
         [[nodiscard]] auto getString() const -> std::string;
+
+        auto operator<=>(const FlagPath&) const = default;
     };
 
     class InvalidFlagPathException : public std::runtime_error {
@@ -44,7 +48,9 @@ namespace Argon {
 
         auto addOption(IOption&& option) -> void;
 
-        auto getOption(const std::string& flag) -> IOption *;
+        auto getOption(const std::string& flag) -> IOption*;
+
+        auto getOption(const FlagPath& flagPath) -> IOption*;
 
         template <typename T>
         auto getOptionDynamic(const std::string& flag) -> T*;
@@ -82,6 +88,21 @@ namespace Argon {
         }, optPtr);
     }
 }
+
+//-------------------------------------------------------Hashes---------------------------------------------------------
+
+template<>
+struct std::hash<Argon::FlagPath> {
+    std::size_t operator()(const Argon::FlagPath& flagPath) const noexcept {
+        std::size_t h = 0;
+        constexpr std::hash<std::string> string_hasher;
+        for (const auto& flag : flagPath.groupPath) {
+            h ^= string_hasher(flag) + 0x9e3779b9 + (h << 6) + (h >> 2);
+        }
+        h ^= string_hasher(flagPath.flag) + 0x9e3779b9 + (h << 6) + (h >> 2);
+        return h;
+    }
+};
 
 //---------------------------------------------------Implementations----------------------------------------------------
 
@@ -182,7 +203,7 @@ inline auto Context::addOption(IOption&& option) -> void {
     }
 }
 
-inline auto Context::getOption(const std::string& flag) -> IOption* {
+inline auto Context::getOption(const std::string& flag) -> IOption * {
     const auto it = std::ranges::find_if(m_options, [&flag](const OptionPtr& option) {
         return std::visit([&flag]<typename T>(const T& opt) -> bool {
             return std::ranges::contains(opt->getFlags(), flag);
@@ -192,8 +213,13 @@ inline auto Context::getOption(const std::string& flag) -> IOption* {
     return it == m_options.end() ? nullptr : getRawPointer(*it);
 }
 
+inline auto Context::getOption(const FlagPath& flagPath) -> IOption * {
+    auto& context = resolveFlagGroup(flagPath);
+    return context.getOption(flagPath.flag);
+}
+
 template <typename T>
-auto Context::getOptionDynamic(const std::string& flag) -> T* {
+auto Context::getOptionDynamic(const std::string& flag) -> T * {
     return dynamic_cast<T*>(getOption(flag));
 }
 

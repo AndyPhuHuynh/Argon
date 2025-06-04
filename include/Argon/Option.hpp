@@ -4,13 +4,13 @@
 #include <algorithm>
 #include <cstdlib>
 #include <functional>
-#include <iostream>
 #include <limits>
 #include <memory>
 #include <sstream>
 #include <string>
 #include <vector>
 
+#include "Flag.hpp"
 #include "Traits.hpp"
 
 namespace Argon {
@@ -21,7 +21,7 @@ namespace Argon {
 
     class IOption {
     protected:
-        std::vector<std::string> m_flags;
+        Flag m_flag;
         std::string m_error;
         bool m_isSet = false;
         IOption() = default;
@@ -32,9 +32,7 @@ namespace Argon {
         IOption& operator=(IOption&&) noexcept;
         virtual ~IOption() = default;
 
-        [[nodiscard]] auto getFlags() const -> const std::vector<std::string>&;
-
-        auto printFlags() const -> void;
+        [[nodiscard]] auto getFlag() const -> const Flag&;
 
         [[nodiscard]] auto getError() const -> const std::string&;
 
@@ -50,6 +48,7 @@ namespace Argon {
     template <typename Derived>
     class OptionComponent : public IOption {
         friend Derived;
+        bool m_mainFlagSet = false;
 
         OptionComponent() = default;
     public:
@@ -252,13 +251,23 @@ auto OptionComponent<Derived>::clone() const -> std::unique_ptr<IOption> {
 
 template <typename Derived>
 auto OptionComponent<Derived>::operator[](const std::string& tag) & -> Derived& {
-    m_flags.push_back(tag);
+    if (!m_mainFlagSet) {
+        m_mainFlagSet = true;
+        m_flag.mainFlag = tag;
+    } else {
+        m_flag.aliases.push_back(tag);
+    }
     return static_cast<Derived&>(*this);
 }
 
 template<typename Derived>
 auto OptionComponent<Derived>::operator[](const std::string& tag) && -> Derived&& {
-    m_flags.push_back(tag);
+    if (!m_mainFlagSet) {
+        m_mainFlagSet = true;
+        m_flag.mainFlag = tag;
+    } else {
+        m_flag.aliases.push_back(tag);
+    }
     return static_cast<Derived&&>(*this);
 }
 
@@ -393,41 +402,39 @@ auto Option<T>::setValue(const std::string& flag, const std::string& value) -> v
 }
 
 inline IOption::IOption(const IOption& other) {
-    m_flags = other.m_flags;
-    m_error = other.m_error;
+    m_flag          = other.m_flag;
+    m_error         = other.m_error;
+    m_isSet         = other.m_isSet;
 }
 
 inline auto IOption::operator=(const IOption& other) -> IOption& {
     if (this != &other) {
-        m_flags = other.m_flags;
-        m_error = other.m_error;
+        m_flag          = other.m_flag;
+        m_error         = other.m_error;
+        m_isSet         = other.m_isSet;
     }
     return *this;
 }
 
 inline IOption::IOption(IOption&& other) noexcept {
     if (this != &other) {
-        m_flags = std::move(other.m_flags);
-        m_error = std::move(other.m_error);
+        m_flag          = std::move(other.m_flag);
+        m_error         = std::move(other.m_error);
+        m_isSet         = other.m_isSet;
     }
 }
 
 inline auto IOption::operator=(IOption&& other) noexcept -> IOption& {
     if (this != &other) {
-        m_flags = std::move(other.m_flags);
-        m_error = std::move(other.m_error);
+        m_flag          = std::move(other.m_flag);
+        m_error         = std::move(other.m_error);
+        m_isSet         = other.m_isSet;
     }
     return *this;
 }
 
-inline auto IOption::getFlags() const -> const std::vector<std::string>& {
-    return m_flags;
-}
-
-inline auto IOption::printFlags() const -> void {
-    for (auto& tag : m_flags) {
-        std::cout << tag << "\n";
-    }
+inline auto IOption::getFlag() const -> const Flag& {
+    return m_flag;
 }
 
 inline auto IOption::getError() const -> const std::string& {

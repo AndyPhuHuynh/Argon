@@ -7,9 +7,10 @@
 #include <unordered_map>
 #include <vector>
 
+#include "Flag.hpp"
+
 namespace Argon {
     class Context;
-    struct FlagPath;
 
     class Constraints {
     public:
@@ -68,6 +69,8 @@ inline auto Constraints::dependsOn(const FlagPath& flagPath,
 }
 
 inline auto Constraints::validate(Context& rootContext, std::vector<std::string>& errorMsgs) const -> void {
+    auto res = rootContext.collectAllSetOptions();
+
     checkRequiredFlags      (rootContext, errorMsgs);
     checkMutuallyExclusive  (rootContext, errorMsgs);
     checkDependentFlags     (rootContext, errorMsgs);

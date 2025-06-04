@@ -4,38 +4,20 @@
 #include <memory>
 #include <numeric>
 #include <string>
+#include <string_view>
 #include <variant>
 #include <vector>
 
+#include "Flag.hpp"
 #include "Traits.hpp"
 
 namespace Argon {
     class IOption;
     using OptionPtr = std::variant<IOption*, std::unique_ptr<IOption>>;
 
-    struct FlagPath {
-        std::vector<std::string> groupPath;
-        std::string flag;
-
-        FlagPath() = default;
-
-        explicit FlagPath(std::string_view flag);
-
-        FlagPath(std::initializer_list<std::string> flags);
-
-        [[nodiscard]] auto getString() const -> std::string;
-
-        auto operator<=>(const FlagPath&) const = default;
-    };
-
-    class InvalidFlagPathException : public std::runtime_error {
-    public:
-        explicit InvalidFlagPathException(const FlagPath& flagPath);
-    };
-
     class Context {
         std::vector<OptionPtr> m_options;
-        std::vector<std::string> m_flags;
+        std::vector<Flag> m_flags;
         std::string m_name;
         Context *m_parent = nullptr;
     public:
@@ -48,7 +30,7 @@ namespace Argon {
 
         auto addOption(IOption&& option) -> void;
 
-        auto getOption(const std::string& flag) -> IOption*;
+        auto getOption(std::string_view flag) -> IOption*;
 
         auto getOption(const FlagPath& flagPath) -> IOption*;
 
@@ -59,7 +41,7 @@ namespace Argon {
 
         [[nodiscard]] auto getPath() const -> std::string;
 
-        [[nodiscard]] auto containsLocalFlag(const std::string& flag) const -> bool;
+        [[nodiscard]] auto containsLocalFlag(std::string_view flag) const -> bool;
 
         template<typename ValueType>
         auto getValue(const FlagPath& flagPath) -> const ValueType&;
@@ -67,8 +49,12 @@ namespace Argon {
         template<typename Container>
         auto getMultiValue(const FlagPath& flagPath) -> const Container&;
 
+        auto collectAllSetOptions() -> std::unordered_map<FlagPath, IOption*>;
+
     private:
         auto resolveFlagGroup(const FlagPath& flagPath) -> Context&;
+
+        auto collectAllSetOptions(std::unordered_map<FlagPath, IOption *>& map, std::vector<Flag> pathSoFar) -> void;
     };
 }
 
@@ -89,21 +75,6 @@ namespace Argon {
     }
 }
 
-//-------------------------------------------------------Hashes---------------------------------------------------------
-
-template<>
-struct std::hash<Argon::FlagPath> {
-    std::size_t operator()(const Argon::FlagPath& flagPath) const noexcept {
-        std::size_t h = 0;
-        constexpr std::hash<std::string> string_hasher;
-        for (const auto& flag : flagPath.groupPath) {
-            h ^= string_hasher(flag) + 0x9e3779b9 + (h << 6) + (h >> 2);
-        }
-        h ^= string_hasher(flagPath.flag) + 0x9e3779b9 + (h << 6) + (h >> 2);
-        return h;
-    }
-};
-
 //---------------------------------------------------Implementations----------------------------------------------------
 
 #include <algorithm>
@@ -112,34 +83,6 @@ struct std::hash<Argon::FlagPath> {
 #include "MultiOption.hpp"
 
 namespace Argon {
-inline FlagPath::FlagPath(const std::string_view flag) : flag(flag) {}
-
-inline FlagPath::FlagPath(const std::initializer_list<std::string> flags) {
-    if (flags.size() == 0) {
-        throw std::invalid_argument("FlagPath must contain at least one flag.");
-    }
-
-    const auto begin = std::begin(flags);
-    const auto end   = std::prev(std::end(flags));
-
-    groupPath.insert(std::end(groupPath), begin, end);
-    flag = *end;
-}
-
-inline auto FlagPath::getString() const -> std::string {
-    if (groupPath.empty()) return flag;
-
-    return std::accumulate(std::next(groupPath.begin()), groupPath.end(), groupPath.front(), []
-        (const std::string& str1, const std::string& str2) -> std::string {
-            return str1 + " > " + str2;
-    }) + " > " + flag;
-}
-
-inline InvalidFlagPathException::InvalidFlagPathException(const FlagPath& flagPath)
-    : std::runtime_error(std::format(
-        "Invalid flag path: {}. Check to see if the specified path and templated type are correct.",
-        flagPath.getString())) {
-}
 
 inline Context::Context(std::string name) : m_name(std::move(name)) {}
 
@@ -188,7 +131,7 @@ inline auto Context::operator=(const Context& other) -> Context& {
 }
 
 inline auto Context::addOption(IOption& option) -> void {
-    m_flags.insert(m_flags.end(), option.getFlags().begin(), option.getFlags().end());
+    m_flags.emplace_back(option.getFlag());
     m_options.emplace_back(&option);
     if (const auto optionGroup = dynamic_cast<OptionGroup*>(&option)) {
         optionGroup->getContext().m_parent = this;
@@ -196,17 +139,17 @@ inline auto Context::addOption(IOption& option) -> void {
 }
 
 inline auto Context::addOption(IOption&& option) -> void {
-    m_flags.insert(m_flags.end(), option.getFlags().begin(), option.getFlags().end());
+    m_flags.emplace_back(option.getFlag());
     const auto& newOpt = m_options.emplace_back(option.clone());
     if (const auto optionGroup = dynamic_cast<OptionGroup*>(getRawPointer(newOpt))) {
         optionGroup->getContext().m_parent = this;
     }
 }
 
-inline auto Context::getOption(const std::string& flag) -> IOption * {
+inline auto Context::getOption(const std::string_view flag) -> IOption * {
     const auto it = std::ranges::find_if(m_options, [&flag](const OptionPtr& option) {
         return std::visit([&flag]<typename T>(const T& opt) -> bool {
-            return std::ranges::contains(opt->getFlags(), flag);
+            return opt->getFlag().containsFlag(flag);
         }, option);
     });
 
@@ -215,7 +158,7 @@ inline auto Context::getOption(const std::string& flag) -> IOption * {
 
 inline auto Context::getOption(const FlagPath& flagPath) -> IOption * {
     auto& context = resolveFlagGroup(flagPath);
-    return context.getOption(flagPath.flag);
+    return context.getOption(flagPath.flag.mainFlag);
 }
 
 template <typename T>
@@ -226,7 +169,7 @@ auto Context::getOptionDynamic(const std::string& flag) -> T * {
 template<typename ValueType>
 auto Context::getValue(const FlagPath& flagPath) -> const ValueType& {
     auto& context = resolveFlagGroup(flagPath);
-    const auto opt = context.getOptionDynamic<Option<ValueType>>(flagPath.flag);
+    const auto opt = context.getOptionDynamic<Option<ValueType>>(flagPath.flag.mainFlag);
     if (opt == nullptr) {
         throw InvalidFlagPathException(flagPath);
     }
@@ -236,7 +179,7 @@ auto Context::getValue(const FlagPath& flagPath) -> const ValueType& {
 template<typename Container>
 auto Context::getMultiValue(const FlagPath& flagPath) -> const Container& {
     auto& context = resolveFlagGroup(flagPath);
-    const auto opt = context.getOptionDynamic<MultiOption<Container>>(flagPath.flag);
+    const auto opt = context.getOptionDynamic<MultiOption<Container>>(flagPath.flag.mainFlag);
     if (opt == nullptr) {
         throw InvalidFlagPathException(flagPath);
     }
@@ -269,15 +212,23 @@ inline auto Context::getPath() const -> std::string {
     });
 }
 
-inline auto Context::containsLocalFlag(const std::string& flag) const -> bool {
-    return std::ranges::contains(m_flags, flag);
+inline auto Context::containsLocalFlag(const std::string_view flag) const -> bool {
+    return std::ranges::any_of(m_flags, [&flag](const Flag& flagInList) {
+        return flagInList.containsFlag(flag);
+    });
+}
+
+inline auto Context::collectAllSetOptions() -> std::unordered_map<FlagPath, IOption *> {
+    std::unordered_map<FlagPath, IOption *> result;
+    collectAllSetOptions(result, std::vector<Flag>());
+    return result;
 }
 
 inline auto Context::resolveFlagGroup(const FlagPath& flagPath) -> Context& {
     auto context = this;
     // Loop through all the flags that represent groups
     for (const auto& groupFlag : flagPath.groupPath) {
-        const auto optGroup = context->getOptionDynamic<OptionGroup>(groupFlag);
+        const auto optGroup = context->getOptionDynamic<OptionGroup>(groupFlag.mainFlag);
         if (optGroup == nullptr) {
             throw InvalidFlagPathException(flagPath);
         }
@@ -285,6 +236,35 @@ inline auto Context::resolveFlagGroup(const FlagPath& flagPath) -> Context& {
     }
     return *context;
 }
+
+inline auto Context::collectAllSetOptions(std::unordered_map<FlagPath, IOption *>& map,
+                                          std::vector<Flag> pathSoFar) -> void {
+    for (const auto& opt : m_options) {
+        std::visit([&]<typename T>(const T& optPtr) {
+            IOption *ptr = nullptr;
+            if constexpr (std::is_same_v<T, IOption*>) {
+                ptr = optPtr;
+            } else if constexpr (std::is_same_v<T, std::unique_ptr<IOption>>) {
+                ptr = optPtr.get();
+            }
+            if (ptr == nullptr) {
+                throw std::runtime_error("Unhandled type in collectAllSetOptions()");
+            }
+            if (const auto groupPtr = dynamic_cast<OptionGroup*>(ptr); groupPtr != nullptr) {
+                auto newVec = pathSoFar;
+                newVec.emplace_back(optPtr->getFlag());
+                groupPtr->getContext().collectAllSetOptions(map, newVec);
+                return;
+            }
+
+            if (!ptr->isSet()) return;
+
+            map[FlagPath(pathSoFar, ptr->getFlag())] = ptr;
+
+        }, opt);
+    }
+}
+
 } // End namespace Argon
 
 #endif // ARGON_CONTEXT_INCLUDE

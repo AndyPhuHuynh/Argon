@@ -37,6 +37,8 @@ namespace Argon {
 
         explicit MultiOptionStdArrayBase(size_t maxSize);
     public:
+        [[nodiscard]] auto getMaxSize() const -> size_t;
+
         [[nodiscard]] auto isAtMaxCapacity() const -> bool;
     };
 
@@ -127,6 +129,10 @@ namespace Argon {
     // MultiOptionStdArrayBase
 
     inline MultiOptionStdArrayBase::MultiOptionStdArrayBase(const size_t maxSize) : m_maxSize(maxSize) {}
+
+    inline auto MultiOptionStdArrayBase::getMaxSize() const -> size_t {
+        return m_maxSize;
+    }
 
     inline auto MultiOptionStdArrayBase::isAtMaxCapacity() const -> bool {
         return m_nextIndex == m_maxSize;

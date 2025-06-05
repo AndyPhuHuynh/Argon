@@ -27,13 +27,13 @@ namespace Argon {
         std::unordered_map<FlagPath, std::set<FlagPath>> m_mutuallyExclusiveFlags;
         std::unordered_map<FlagPath, std::set<FlagPath>> m_dependentFlags;
 
-        auto checkMultiOptionStdArray   (Context& rootContext, std::vector<std::string>& errorMsgs) const -> void;
+        static auto checkMultiOptionStdArray    (const OptionMap& setOptions, std::vector<std::string>& errorMsgs) -> void;
 
-        auto checkRequiredFlags         (Context& rootContext, std::vector<std::string>& errorMsgs) const -> void;
+        auto checkRequiredFlags                 (const OptionMap& setOptions, std::vector<std::string>& errorMsgs) const -> void;
 
-        auto checkMutuallyExclusive     (Context& rootContext, std::vector<std::string>& errorMsgs) const -> void;
+        auto checkMutuallyExclusive             (const OptionMap& setOptions, std::vector<std::string>& errorMsgs) const -> void;
 
-        auto checkDependentFlags        (Context& rootContext, std::vector<std::string>& errorMsgs) const -> void;
+        auto checkDependentFlags                (const OptionMap& setOptions, std::vector<std::string>& errorMsgs) const -> void;
     };
 }
 
@@ -69,50 +69,55 @@ inline auto Constraints::dependsOn(const FlagPath& flagPath,
 }
 
 inline auto Constraints::validate(Context& rootContext, std::vector<std::string>& errorMsgs) const -> void {
-    auto res = rootContext.collectAllSetOptions();
+    const auto setOptions = rootContext.collectAllSetOptions();
 
-    checkRequiredFlags      (rootContext, errorMsgs);
-    checkMutuallyExclusive  (rootContext, errorMsgs);
-    checkDependentFlags     (rootContext, errorMsgs);
+    checkMultiOptionStdArray(setOptions, errorMsgs);
+    checkRequiredFlags      (setOptions, errorMsgs);
+    checkMutuallyExclusive  (setOptions, errorMsgs);
+    checkDependentFlags     (setOptions, errorMsgs);
 }
 
-inline auto Constraints::checkRequiredFlags(Context& rootContext, std::vector<std::string>& errorMsgs) const -> void {
-    for (const auto& requiredFlag : m_requiredFlags) {
-        const auto opt = rootContext.getOption(requiredFlag);
-        if (opt == nullptr) {
-            throw InvalidFlagPathException(requiredFlag);
+inline auto Constraints::checkMultiOptionStdArray(const OptionMap& setOptions, std::vector<std::string>& errorMsgs) -> void {
+    for (const auto& [flag, option] : setOptions) {
+        const auto multiOption = dynamic_cast<MultiOptionStdArrayBase*>(option);
+        if (multiOption == nullptr) continue;
+
+        if (!multiOption->isAtMaxCapacity()) {
+            errorMsgs.emplace_back(std::format(
+                "Flag '{}' must have exactly {} values specified",
+                flag.getString(), multiOption->getMaxSize()));
         }
-        if (!opt->isSet()) {
+    }
+}
+
+inline auto Constraints::checkRequiredFlags(const OptionMap& setOptions, std::vector<std::string>& errorMsgs) const -> void {
+    for (const auto& requiredFlag : m_requiredFlags) {
+        const FlagPathWithAlias *flag = containsFlag(setOptions, requiredFlag);
+        if (flag == nullptr) {
             errorMsgs.emplace_back(std::format("Flag '{}' is a required flag and must be set", requiredFlag.getString()));
         }
     }
 }
 
-inline auto Constraints::checkMutuallyExclusive(Context& rootContext, std::vector<std::string>& errorMsgs) const -> void {
+inline auto Constraints::checkMutuallyExclusive(const OptionMap& setOptions, std::vector<std::string>& errorMsgs) const -> void {
     std::vector<std::string> errorFlags;
-    for (auto& [flag, exclusiveFlags] : m_mutuallyExclusiveFlags) {
-        const auto opt = rootContext.getOption(flag);
-        // Option doesn't exist in context
-        if (opt == nullptr) {
-            throw InvalidFlagPathException(flag);
-        };
-
-        // Option not specified
-        if (!opt->isSet()) continue;
+    for (auto& [flagToCheck, exclusiveFlags] : m_mutuallyExclusiveFlags) {
+        errorFlags.clear();
+        const FlagPathWithAlias *flag = containsFlag(setOptions, flagToCheck);
+        // Flag to check is not set
+        if (flag == nullptr) continue;
 
         // Check the exclusive flags list
         for (const auto& errorFlag : exclusiveFlags) {
-            const auto errOpt = rootContext.getOption(errorFlag);
-            if (errOpt == nullptr) {
-                throw InvalidFlagPathException(errorFlag);
-            }
-            if (errOpt->isSet()) {
+            const FlagPathWithAlias *errorFlagAlias = containsFlag(setOptions, errorFlag);
+            // If error flag is set
+            if (errorFlagAlias != nullptr) {
                 errorFlags.push_back(errorFlag.getString());
             }
         }
         if (!errorFlags.empty()) {
             auto& msg = errorMsgs.emplace_back();
-            msg += std::format("Flag '{}' is mutually exclusive with flags: ", flag.getString());
+            msg += std::format("Flag '{}' is mutually exclusive with flags: ", flag->getString());
             for (size_t i = 0; i < errorFlags.size(); i++) {
                 msg += std::format("'{}'", errorFlags[i]);
                 if (i != errorFlags.size() - 1) {
@@ -123,38 +128,31 @@ inline auto Constraints::checkMutuallyExclusive(Context& rootContext, std::vecto
     }
 }
 
-inline auto Constraints::checkDependentFlags(Context& rootContext, std::vector<std::string>& errorMsgs) const -> void {
+inline auto Constraints::checkDependentFlags(const OptionMap& setOptions, std::vector<std::string>& errorMsgs) const -> void {
     std::vector<std::string> errorFlags;
-    for (auto& [flag, dependentFlags] : m_dependentFlags) {
-        const auto opt = rootContext.getOption(flag);
-        // Option doesn't exist in context
-        if (opt == nullptr) {
-            throw InvalidFlagPathException(flag);
-        };
+    for (auto& [flagToCheck, dependentFlags] : m_dependentFlags) {
+        errorFlags.clear();
+        const FlagPathWithAlias *flag = containsFlag(setOptions, flagToCheck);
+        // Flag to check is not set
+        if (flag == nullptr) continue;
 
-        // Option not specified
-        if (!opt->isSet()) continue;
-
-        // Check the dependent flags list
+        // Check the exclusive flags list
         for (const auto& errorFlag : dependentFlags) {
-            const auto errOpt = rootContext.getOption(errorFlag);
-            if (errOpt == nullptr) {
-                throw InvalidFlagPathException(errorFlag);
-            }
-            if (!errOpt->isSet()) {
+            const FlagPathWithAlias *errorFlagAlias = containsFlag(setOptions, errorFlag);
+            // If error flag is not set
+            if (errorFlagAlias == nullptr) {
                 errorFlags.push_back(errorFlag.getString());
             }
         }
         if (!errorFlags.empty()) {
             auto& msg = errorMsgs.emplace_back();
-            msg += std::format("Flag '{}' requires flags: ", flag.getString());
+            msg += std::format("Flag '{}' is mutually exclusive with flags: ", flag->getString());
             for (size_t i = 0; i < errorFlags.size(); i++) {
                 msg += std::format("'{}'", errorFlags[i]);
                 if (i != errorFlags.size() - 1) {
                     msg += ", ";
                 }
             }
-            msg += " to be set";
         }
     }
 }

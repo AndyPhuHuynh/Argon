@@ -1,7 +1,6 @@
 #ifndef ARGON_PARSER_INCLUDE
 #define ARGON_PARSER_INCLUDE
 
-#include <cassert>
 #include <memory>
 #include <string>
 
@@ -97,29 +96,31 @@ namespace Argon {
 
 // --------------------------------------------- Implementations -------------------------------------------------------
 
-template<typename T> requires Argon::DerivesFrom<T, Argon::IOption>
-Argon::Parser::Parser(T&& option) {
+namespace Argon {
+template<typename T> requires DerivesFrom<T, IOption>
+Parser::Parser(T&& option) {
     addOption(std::forward<T>(option));
 }
 
-template<typename T> requires Argon::DerivesFrom<T, Argon::IOption>
-auto Argon::Parser::addOption(T&& option) -> void {
+
+template<typename T> requires DerivesFrom<T, IOption>
+auto Parser::addOption(T&& option) -> void {
     m_context.addOption(std::forward<T>(option));
 }
 
-inline auto Argon::Parser::addError(const std::string& error, const int pos) -> void {
+inline auto Parser::addError(const std::string& error, const int pos) -> void {
     m_analysisErrors.addErrorMessage(error, pos);
 }
 
-inline auto Argon::Parser::addErrorGroup(const std::string& groupName, const int startPos, const int endPos) -> void {
+inline auto Parser::addErrorGroup(const std::string& groupName, const int startPos, const int endPos) -> void {
     m_analysisErrors.addErrorGroup(groupName, startPos, endPos);
 }
 
-inline auto Argon::Parser::removeErrorGroup(const int startPos) -> void {
+inline auto Parser::removeErrorGroup(const int startPos) -> void {
     m_analysisErrors.removeErrorGroup(startPos);
 }
 
-inline auto Argon::Parser::hasErrors() const -> bool {
+inline auto Parser::hasErrors() const -> bool {
     return m_syntaxErrors.hasErrors() || m_analysisErrors.hasErrors() || !m_constraintErrors.empty();
 }
 
@@ -144,7 +145,7 @@ inline auto Argon::Parser::printErrors(const PrintMode analysisPrintMode,
     }
 }
 
-inline auto Argon::Parser::parse(const int argc, const char **argv) {
+inline auto Parser::parse(const int argc, const char **argv) {
     std::string input;
     for (int i = 1; i < argc; i++) {
         input += argv[i];
@@ -153,7 +154,7 @@ inline auto Argon::Parser::parse(const int argc, const char **argv) {
     parse(input);
 }
 
-inline auto Argon::Parser::parse(const std::string& str) -> void {
+inline auto Parser::parse(const std::string& str) -> void {
     reset();
     m_scanner = Scanner(str);
     StatementAst ast = parseStatement();
@@ -161,7 +162,7 @@ inline auto Argon::Parser::parse(const std::string& str) -> void {
     validateConstraints();
 }
 
-inline auto Argon::Parser::parseStatement() -> StatementAst {
+inline auto Parser::parseStatement() -> StatementAst {
     StatementAst statement;
     while (!m_scanner.seeTokenKind(TokenKind::END)) {
         // Handle rbrack that gets leftover after SkipScope
@@ -174,7 +175,7 @@ inline auto Argon::Parser::parseStatement() -> StatementAst {
     return statement;
 }
 
-inline auto Argon::Parser::parseOptionBundle(Context& context) -> std::unique_ptr<OptionBaseAst> { // NOLINT(misc-no-recursion)
+inline auto Parser::parseOptionBundle(Context& context) -> std::unique_ptr<OptionBaseAst> { // NOLINT(misc-no-recursion)
     const auto opt = getNextValidFlag(context);
     if (!opt.has_value()) { return nullptr; }
     const auto& flagToken = opt.value();
@@ -193,7 +194,7 @@ inline auto Argon::Parser::parseOptionBundle(Context& context) -> std::unique_pt
     return nullptr;
 }
 
-inline auto Argon::Parser::parseSingleOption(const Context& context, const Token& flag) -> std::unique_ptr<OptionAst> {
+inline auto Parser::parseSingleOption(const Context& context, const Token& flag) -> std::unique_ptr<OptionAst> {
     // Get value
     Token value = m_scanner.peekToken();
     if (value.kind != TokenKind::IDENTIFIER) {
@@ -231,7 +232,7 @@ inline auto Argon::Parser::parseSingleOption(const Context& context, const Token
     return std::make_unique<OptionAst>(flag, value);
 }
 
-inline auto Argon::Parser::parseMultiOption(const Context& context,
+inline auto Parser::parseMultiOption(const Context& context,
                                             const Token& flag) -> std::unique_ptr<MultiOptionAst> {
     auto multiOptionAst = std::make_unique<MultiOptionAst>(flag);
 
@@ -249,7 +250,7 @@ inline auto Argon::Parser::parseMultiOption(const Context& context,
     }
 }
 
-inline auto Argon::Parser::parseGroupContents(OptionGroupAst& optionGroupAst, Context& nextContext) -> void { // NOLINT(misc-no-recursion)
+inline auto Parser::parseGroupContents(OptionGroupAst& optionGroupAst, Context& nextContext) -> void { // NOLINT(misc-no-recursion)
     while (true) {
         const Token nextToken = m_scanner.peekToken();
 
@@ -273,7 +274,7 @@ inline auto Argon::Parser::parseGroupContents(OptionGroupAst& optionGroupAst, Co
     }
 }
 
-inline auto Argon::Parser::parseOptionGroup(Context& context, const Token& flag) -> std::unique_ptr<OptionGroupAst> { // NOLINT(misc-no-recursion)
+inline auto Parser::parseOptionGroup(Context& context, const Token& flag) -> std::unique_ptr<OptionGroupAst> { // NOLINT(misc-no-recursion)
     const Token lbrack = m_scanner.peekToken();
     if (lbrack.kind != TokenKind::LBRACK) {
         m_syntaxErrors.addErrorMessage(
@@ -291,7 +292,7 @@ inline auto Argon::Parser::parseOptionGroup(Context& context, const Token& flag)
     return optionGroupAst;
 }
 
-inline auto Argon::Parser::getNextValidFlag(const Context& context, const bool printErrors) -> std::optional<Token> {
+inline auto Parser::getNextValidFlag(const Context& context, const bool printErrors) -> std::optional<Token> {
     Token flag = m_scanner.peekToken();
 
     const bool isIdentifier = flag.kind == TokenKind::IDENTIFIER;
@@ -344,43 +345,43 @@ inline auto Argon::Parser::getNextValidFlag(const Context& context, const bool p
     }
 }
 
-template <typename T> requires Argon::DerivesFrom<T, Argon::IOption>
-auto Argon::Parser::operator|(T&& option) -> Parser& {
+template <typename T> requires DerivesFrom<T, IOption>
+auto Parser::operator|(T&& option) -> Parser& {
     addOption(std::forward<T>(option));
     return *this;
 }
 
 template<typename ValueType>
-auto Argon::Parser::getValue(const std::string& flag) -> const ValueType& {
+auto Parser::getValue(const std::string& flag) -> const ValueType& {
     return m_context.getValue<ValueType>(FlagPath(flag));
 }
 
 template<typename ValueType>
-auto Argon::Parser::getValue(const FlagPath& flagPath) -> const ValueType& {
+auto Parser::getValue(const FlagPath& flagPath) -> const ValueType& {
     return m_context.getValue<ValueType>(flagPath);
 }
 
 template<typename Container>
-auto Argon::Parser::getMultiValue(const std::string& flag) -> const Container& {
+auto Parser::getMultiValue(const std::string& flag) -> const Container& {
     return m_context.getMultiValue<Container>(FlagPath(flag));
 }
 
 template<typename Container>
-auto Argon::Parser::getMultiValue(const FlagPath& flagPath) -> const Container& {
+auto Parser::getMultiValue(const FlagPath& flagPath) -> const Container& {
     return m_context.getMultiValue<Container>(flagPath);
 }
 
-inline auto Argon::Parser::constraints() -> Constraints& {
+inline auto Parser::constraints() -> Constraints& {
     return m_constraints;
 }
 
-inline auto Argon::Parser::reset() -> void {
+inline auto Parser::reset() -> void {
     m_syntaxErrors.clear();
     m_analysisErrors.clear();
     m_brackets.clear();
 }
 
-inline auto Argon::Parser::getNextToken() -> Token {
+inline auto Parser::getNextToken() -> Token {
     m_mismatchedRBRACK = false;
     const Token nextToken = m_scanner.getNextToken();
     if (nextToken.kind == TokenKind::LBRACK) {
@@ -399,7 +400,7 @@ inline auto Argon::Parser::getNextToken() -> Token {
     return nextToken;
 }
 
-inline auto Argon::Parser::skipScope() -> void {
+inline auto Parser::skipScope() -> void {
     if (m_scanner.peekToken().kind != TokenKind::LBRACK) return;
     std::vector<Token> brackets;
     while (true) {
@@ -429,17 +430,17 @@ inline auto Argon::Parser::skipScope() -> void {
     }
 }
 
-inline auto Argon::Parser::validateConstraints() -> void {
+inline auto Parser::validateConstraints() -> void {
     m_constraints.validate(m_context, m_constraintErrors);
 }
 
 template<typename Left, typename Right> requires
-    Argon::DerivesFrom<Left, Argon::IOption> && Argon::DerivesFrom<Right, Argon::IOption>
-auto Argon::operator|(Left&& left, Right&& right) -> Parser {
+    Argon::DerivesFrom<Left, IOption> && Argon::DerivesFrom<Right, IOption>
+auto operator|(Left&& left, Right&& right) -> Parser {
     Parser parser;
     parser.addOption(std::forward<Left>(left));
     parser.addOption(std::forward<Right>(right));
     return parser;
 }
-
+} // End namespace Argon
 #endif // ARGON_PARSER_INCLUDE

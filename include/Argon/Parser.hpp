@@ -74,7 +74,7 @@ namespace Argon {
 
         auto parseOptionBundle(Context& context) -> std::unique_ptr<OptionBaseAst>;
 
-        auto parseSingleOption(const Context& context, const Token& flag) -> std::unique_ptr<OptionAst>;
+        auto parseSingleOption(Context& context, const Token& flag) -> std::unique_ptr<OptionAst>;
 
         auto parseMultiOption(const Context& context, const Token& flag) -> std::unique_ptr<MultiOptionAst>;
 
@@ -213,9 +213,17 @@ inline auto Parser::parseOptionBundle(Context& context) -> std::unique_ptr<Optio
     return nullptr;
 }
 
-inline auto Parser::parseSingleOption(const Context& context, const Token& flag) -> std::unique_ptr<OptionAst> {
-    // Get optional equal sign
+inline auto Parser::parseSingleOption(Context& context, const Token& flag) -> std::unique_ptr<OptionAst> {
     Token value = m_scanner.peekToken();
+
+    // Boolean flag with no explicit value
+    const bool nextTokenIsAnotherFlag = value.kind == TokenKind::IDENTIFIER && context.containsLocalFlag(value.image);
+    if (context.getOptionDynamic<Option<bool>>(flag.image) &&
+        (!value.isOneOf({TokenKind::IDENTIFIER, TokenKind::EQUALS}) || nextTokenIsAnotherFlag)) {
+        return std::make_unique<OptionAst>(flag, Token(TokenKind::IDENTIFIER, "true", flag.position));
+    }
+
+    // Get optional equal sign
     if (value.kind == TokenKind::EQUALS) {
         getNextToken();
         value = m_scanner.peekToken();
@@ -255,7 +263,7 @@ inline auto Parser::parseSingleOption(const Context& context, const Token& flag)
 }
 
 inline auto Parser::parseMultiOption(const Context& context,
-                                            const Token& flag) -> std::unique_ptr<MultiOptionAst> {
+                                     const Token& flag) -> std::unique_ptr<MultiOptionAst> {
     auto multiOptionAst = std::make_unique<MultiOptionAst>(flag);
 
     while (true) {

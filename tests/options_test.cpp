@@ -521,3 +521,69 @@ TEST_CASE("Multioption default values") {
     CHECK(vector[2] == 3);
     CHECK(vector[3] == 4);
 }
+
+TEST_CASE("Booleans options", "[options]") {
+    bool debug = false, verbose = false, nestedDebug = false, nestedVerbose = false;
+    int x, y, z;
+
+    auto parser = Option(&debug)["--debug"]
+                | Option(&verbose)["--verbose"]
+                | Option(&x)["-x"]
+                | (
+                    OptionGroup()["--group"]
+                    + Option(&nestedDebug)["--debug"]
+                    + Option(&nestedVerbose)["--verbose"]
+                    + Option(&y)["-y"]
+                )
+                | Option(&z)["-z"];
+
+    SECTION("No explicit flags by themselves") {
+        parser.parse("--debug --verbose");
+
+        CHECK(!parser.hasErrors());
+        CHECK(debug   == true);
+        CHECK(verbose == true);
+    }
+
+    SECTION("No explicit flags with other values") {
+        parser.parse("--debug -x 10 --verbose -z 30");
+
+        CHECK(!parser.hasErrors());
+        CHECK(debug   == true);
+        CHECK(verbose == true);
+        CHECK(x       == 10);
+        CHECK(z       == 30);
+    }
+
+    SECTION("Both explicit") {
+        parser.parse("--debug true --verbose=true");
+
+        CHECK(!parser.hasErrors());
+        CHECK(debug   == true);
+        CHECK(verbose == true);
+
+        if (parser.hasErrors()) {
+            parser.printErrors(PrintMode::Flat);
+        }
+    }
+
+    SECTION("Only one explicit") {
+        parser.parse("--debug -x 30 --verbose=true");
+
+        CHECK(!parser.hasErrors());
+        CHECK(debug   == true);
+        CHECK(verbose == true);
+        CHECK(x       == 30);
+    }
+
+    SECTION("Nested implicit") {
+        parser.parse("--debug true --group [--debug=true --verbose -y 20]");
+
+        CHECK(!parser.hasErrors());
+        CHECK(debug         == true);
+        CHECK(verbose       == false);
+        CHECK(nestedDebug   == true);
+        CHECK(nestedVerbose == true);
+        CHECK(y             == 20);
+    }
+}

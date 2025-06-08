@@ -437,7 +437,6 @@ TEST_CASE("Parser getValue multioption nested", "[options][multi][getValue][opti
     const std::string input = "--one 1 10 100 1000 --g1 [--two 2.0 2.2 2.3 --g2 [--three 1.5 2.5 --g3 [--four 4.5 5.5 6.5 7.5 8.5]]]";
     parser.parse(input);
 
-
     const auto& one     = parser.getMultiValue<std::array<int, 4>>      ("--one");
     const auto& two     = parser.getMultiValue<std::array<float ,3>>    (FlagPath{"--g1", "--two"});
     const auto& three   = parser.getMultiValue<std::vector<float>>      (FlagPath{"--g1", "--g2", "--three"});
@@ -462,4 +461,36 @@ TEST_CASE("Parser getValue multioption nested", "[options][multi][getValue][opti
     CHECK(four[2] == Catch::Approx(6.5).epsilon(1e-6));
     CHECK(four[3] == Catch::Approx(7.5).epsilon(1e-6));
     CHECK(four[4] == Catch::Approx(8.5).epsilon(1e-6));
+}
+
+TEST_CASE("Option default values", "[options][default-value]") {
+    auto parser = Option(5)["-i"]
+                | Option(5.5f)["-f"]
+                | Option<std::string>("hello world!")["-s"];
+
+    const int   i = parser.getValue<int>("-i");
+    const float f = parser.getValue<float>("-f");
+    const auto  s = parser.getValue<std::string>("-s");
+
+    CHECK(!parser.hasErrors());
+    CHECK(i == 5);
+    CHECK(f == 5.5f);
+    CHECK(s == "hello world!");
+}
+
+TEST_CASE("Multioption default values") {
+    auto parser = MultiOption<std::array<int, 2>>({1, 2})["--array"]
+                | MultiOption<std::vector<int>>({1, 2, 3, 4})["--vector"];
+
+    const auto& array  = parser.getMultiValue<std::array<int, 2>>("--array");
+    const auto& vector = parser.getMultiValue<std::vector<int>>("--vector");
+
+    CHECK(!parser.hasErrors());
+    CHECK(array[0] == 1);
+    CHECK(array[1] == 2);
+    REQUIRE(vector.size() == 4);
+    CHECK(vector[0] == 1);
+    CHECK(vector[1] == 2);
+    CHECK(vector[2] == 3);
+    CHECK(vector[3] == 4);
 }

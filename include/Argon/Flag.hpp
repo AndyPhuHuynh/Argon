@@ -47,9 +47,11 @@ struct FlagPath {
 
     FlagPath(std::initializer_list<std::string> flags);
 
+    auto operator<=>(const FlagPath&) const = default;
+
     [[nodiscard]] auto getString() const -> std::string;
 
-    auto operator<=>(const FlagPath&) const = default;
+    auto extendPath(std::string_view newFlag) -> void;
 };
 
 class InvalidFlagPathException : public std::runtime_error {
@@ -173,6 +175,16 @@ inline auto FlagPath::getString() const -> std::string {
         (const std::string& str1, const std::string& str2) -> std::string {
             return str1 + " > " + str2;
     }) + " > " + flag;
+}
+
+inline auto FlagPath::extendPath(const std::string_view newFlag) -> void {
+    if (flag.empty()) {
+        flag = newFlag;
+        return;
+    }
+
+    groupPath.emplace_back(flag);
+    flag = newFlag;
 }
 
 inline InvalidFlagPathException::InvalidFlagPathException(const FlagPath& flagPath)

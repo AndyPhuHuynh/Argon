@@ -9,8 +9,10 @@ add_custom_target(Documentation SOURCES ${DOC_FILES})
 
 set(INCLUDE_FILES
     ${CMAKE_SOURCE_DIR}/include/Argon/Ast.hpp
+    ${CMAKE_SOURCE_DIR}/include/Argon/Attributes.hpp
     ${CMAKE_SOURCE_DIR}/include/Argon/Context.hpp
     ${CMAKE_SOURCE_DIR}/include/Argon/Error.hpp
+    ${CMAKE_SOURCE_DIR}/include/Argon/Flag.hpp
     ${CMAKE_SOURCE_DIR}/include/Argon/MultiOption.hpp
     ${CMAKE_SOURCE_DIR}/include/Argon/Option.hpp
     ${CMAKE_SOURCE_DIR}/include/Argon/Parser.hpp
@@ -18,8 +20,6 @@ set(INCLUDE_FILES
     ${CMAKE_SOURCE_DIR}/include/Argon/StringUtil.hpp
     ${CMAKE_SOURCE_DIR}/include/Argon/Traits.hpp
 )
-
-file(GLOB TPP_FILES ${CMAKE_SOURCE_DIR}/include/Argon/*.tpp)
 
 add_library(Argon INTERFACE)
 

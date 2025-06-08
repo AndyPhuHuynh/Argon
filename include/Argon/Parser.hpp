@@ -18,6 +18,7 @@ namespace Argon {
         Context m_context;
         Scanner m_scanner;
 
+        std::vector<std::string> m_contextValidationErrors;
         ErrorGroup m_syntaxErrors = ErrorGroup("Syntax Errors", -1, -1);
         ErrorGroup m_analysisErrors = ErrorGroup("Analysis Errors", -1, -1);
         std::vector<std::string> m_constraintErrors;
@@ -47,7 +48,7 @@ namespace Argon {
 
         auto parse(int argc, const char **argv);
 
-        auto parse(const std::string& str) -> void;
+        auto parse(const std::string& str) -> bool;
 
         template<typename T> requires DerivesFrom<T, IOption>
         auto operator|(T&& option) -> Parser&;
@@ -121,13 +122,22 @@ inline auto Parser::removeErrorGroup(const int startPos) -> void {
 }
 
 inline auto Parser::hasErrors() const -> bool {
-    return m_syntaxErrors.hasErrors() || m_analysisErrors.hasErrors() || !m_constraintErrors.empty();
+    return !m_contextValidationErrors.empty() || m_syntaxErrors.hasErrors() ||
+            m_analysisErrors.hasErrors() || !m_constraintErrors.empty();
 }
 
-inline auto Argon::Parser::printErrors(const PrintMode analysisPrintMode,
-                                       const TextMode analysisTextMode) const -> void {
+inline auto Parser::printErrors(const PrintMode analysisPrintMode,
+                                const TextMode analysisTextMode) const -> void {
+    if (!m_contextValidationErrors.empty()) {
+        std::cout << "Parser is in an invalid state:\n";
+        for (const auto& err : m_contextValidationErrors) {
+            std::cout << " - " << err << "\n";
+        }
+        return;
+    }
     if (m_syntaxErrors.hasErrors()) {
         m_syntaxErrors.printErrorsFlatMode();
+        return;
     }
     if (m_analysisErrors.hasErrors()) {
         switch (analysisPrintMode) {
@@ -137,6 +147,7 @@ inline auto Argon::Parser::printErrors(const PrintMode analysisPrintMode,
             case PrintMode::Tree:
                 m_analysisErrors.printErrorsTreeMode(analysisTextMode);
         }
+        return;
     }
     if (!m_constraintErrors.empty()) {
         for (const auto& err : m_constraintErrors) {
@@ -154,12 +165,18 @@ inline auto Parser::parse(const int argc, const char **argv) {
     parse(input);
 }
 
-inline auto Parser::parse(const std::string& str) -> void {
+inline auto Parser::parse(const std::string& str) -> bool {
+    m_context.validate(m_contextValidationErrors);
+    if (!m_contextValidationErrors.empty()) {
+        return false;
+    }
+
     reset();
     m_scanner = Scanner(str);
     StatementAst ast = parseStatement();
     ast.analyze(m_analysisErrors, m_context);
     validateConstraints();
+    return !hasErrors();
 }
 
 inline auto Parser::parseStatement() -> StatementAst {

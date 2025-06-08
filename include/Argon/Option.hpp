@@ -391,7 +391,7 @@ auto Option<T>::setValue(const std::string& flag, const std::string& value) -> v
     T temp;
     this->convert(flag, value, temp);
     if (this->hasConversionError()) {
-        this->m_conversionError = this->getConversionError();
+        this->m_error = this->getConversionError();
         return;
     }
     m_value = temp;

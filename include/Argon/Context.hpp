@@ -37,7 +37,7 @@ namespace Argon {
         auto getOption(const FlagPath& flagPath) -> IOption*;
 
         template <typename T>
-        auto getOptionDynamic(const std::string& flag) -> T*;
+        auto getOptionDynamic(const std::string& flag) -> T *;
 
         auto setName(const std::string& name) -> void;
 
@@ -53,18 +53,22 @@ namespace Argon {
 
         auto collectAllSetOptions() -> OptionMap;
 
+        auto validate(std::vector<std::string>& errorMsgs) -> void;
+
     private:
         auto resolveFlagGroup(const FlagPath& flagPath) -> Context&;
 
         auto collectAllSetOptions(OptionMap& map, const std::vector<Flag>& pathSoFar) -> void;
+
+        auto validate(const FlagPath& pathSoFar, std::vector<std::string>& errorMsgs) -> void;
     };
 }
 
 //---------------------------------------------------Free Functions-----------------------------------------------------
 
 namespace Argon {
-inline auto getRawPointer(const OptionPtr& optPtr) -> IOption* {
-    return std::visit([]<typename T>(const T& opt) -> IOption* {
+inline auto getRawPointer(const OptionPtr& optPtr) -> IOption * {
+    return std::visit([]<typename T>(const T& opt) -> IOption * {
         if constexpr (std::is_same_v<T, IOption*>) {
             return opt;
         } else if constexpr (std::is_same_v<T, std::unique_ptr<IOption>>) {
@@ -87,6 +91,7 @@ inline auto containsFlag(const OptionMap& map, const FlagPath& flag) -> const Fl
 //---------------------------------------------------Implementations----------------------------------------------------
 
 #include <algorithm>
+#include <set>
 
 #include "Option.hpp" // NOLINT (misc-unused-include)
 #include "MultiOption.hpp"
@@ -233,6 +238,10 @@ inline auto Context::collectAllSetOptions() -> OptionMap {
     return result;
 }
 
+inline auto Context::validate(std::vector<std::string>& errorMsgs) -> void {
+    validate(FlagPath(), errorMsgs);
+}
+
 inline auto Context::resolveFlagGroup(const FlagPath& flagPath) -> Context& {
     auto context = this;
     // Loop through all the flags that represent groups
@@ -270,6 +279,55 @@ inline auto Context::collectAllSetOptions(OptionMap& map,
 
             map[FlagPathWithAlias(pathSoFar, ptr->getFlag())] = ptr;
 
+        }, opt);
+    }
+}
+
+inline auto Context::validate(const FlagPath& pathSoFar, std::vector<std::string>& errorMsgs) -> void {
+    std::set<std::string> flags;
+    std::set<std::string> duplicateFlags;
+    for (const auto& flag : m_flags) {
+        if (flags.contains(flag.mainFlag)) {
+            duplicateFlags.emplace(flag.mainFlag);
+        } else {
+            flags.emplace(flag.mainFlag);
+        }
+
+        for (const auto& alias : flag.aliases) {
+            if (flags.contains(alias)) {
+                duplicateFlags.emplace(alias);
+            } else {
+                flags.emplace(alias);
+            }
+        }
+    }
+
+    for (const auto& flag : duplicateFlags) {
+        if (pathSoFar.flag.empty()) {
+            errorMsgs.emplace_back(std::format("Multiple flags found with the value of '{}'", flag));
+        } else {
+            errorMsgs.emplace_back(std::format(
+                "Multiple flags found with the value of '{}' within group '{}'",
+                flag, pathSoFar.getString()));
+        }
+    }
+
+    for (const auto& opt : m_options) {
+        std::visit([&]<typename T>(const T& optPtr) {
+            IOption *ptr = nullptr;
+            if constexpr (std::is_same_v<T, IOption*>) {
+                ptr = optPtr;
+            } else if constexpr (std::is_same_v<T, std::unique_ptr<IOption>>) {
+                ptr = optPtr.get();
+            }
+            if (ptr == nullptr) {
+                throw std::runtime_error("Unhandled type in collectAllSetOptions()");
+            }
+            if (const auto groupPtr = dynamic_cast<OptionGroup*>(ptr); groupPtr != nullptr) {
+                FlagPath newPath = pathSoFar;
+                newPath.extendPath(optPtr->getFlag().mainFlag);
+                groupPtr->getContext().validate(newPath, errorMsgs);
+            }
         }, opt);
     }
 }

@@ -51,7 +51,11 @@ namespace Argon {
     public:
         MultiOption();
 
-        explicit MultiOption(std::array<T, N>* out);
+        explicit MultiOption(const std::array<T, N>& defaultValue);
+
+        explicit MultiOption(std::array<T, N> *out);
+
+        MultiOption(const std::array<T, N>& defaultValue, const std::array<T, N> *out);
 
         auto getValue() const -> const std::array<T, N>&;
 
@@ -64,11 +68,15 @@ namespace Argon {
     class MultiOption<std::vector<T>> : public OptionBase, public OptionComponent<MultiOption<std::vector<T>>>,
                                         public IsMultiOption, public Converter<MultiOption<std::vector<T>>, T> {
         std::vector<T> m_values;
-        std::vector<T>* m_out;
+        std::vector<T>* m_out = nullptr;
     public:
         MultiOption() = default;
 
-        explicit MultiOption(std::vector<T>* out);
+        explicit MultiOption(const std::vector<T>& defaultValue);
+
+        explicit MultiOption(std::vector<T> *out);
+
+        MultiOption(const std::vector<T>& defaultValue, std::vector<T> *out);
 
         auto getValue() const -> const std::vector<T>&;
 
@@ -143,8 +151,18 @@ namespace Argon {
     template<typename T, size_t N>
     MultiOption<std::array<T, N>>::MultiOption() : MultiOptionStdArrayBase(N) {}
 
+    template<typename T, size_t N>
+    MultiOption<std::array<T, N>>::MultiOption(const std::array<T, N>& defaultValue)
+        : MultiOptionStdArrayBase(N), m_values(defaultValue) {}
+
     template <typename T, size_t N>
     MultiOption<std::array<T, N>>::MultiOption(std::array<T, N>* out) : MultiOptionStdArrayBase(N), m_out(out) {}
+
+    template<typename T, size_t N>
+    MultiOption<std::array<T, N>>::MultiOption(const std::array<T, N>& defaultValue, const std::array<T, N> *out)
+        : MultiOptionStdArrayBase(N), m_values(defaultValue), m_out(out) {
+        *m_out = m_values;
+    }
 
     template<typename T, size_t N>
     auto MultiOption<std::array<T, N>>::getValue() const -> const std::array<T, N>& {
@@ -180,9 +198,18 @@ namespace Argon {
 
     template<typename T>
     MultiOption(std::vector<T>) -> MultiOption<std::vector<T>>;
-    
+
+    template<typename T>
+    MultiOption<std::vector<T>>::MultiOption(const std::vector<T>& defaultValue) : m_values(defaultValue) {}
+
     template <typename T>
     MultiOption<std::vector<T>>::MultiOption(std::vector<T>* out) : m_out(out) {}
+
+    template<typename T>
+    MultiOption<std::vector<T>>::MultiOption(const std::vector<T>& defaultValue, std::vector<T> *out)
+        : m_values(defaultValue), m_out(out) {
+        *m_out = m_values;
+    }
 
     template<typename T>
     auto MultiOption<std::vector<T>>::getValue() const -> const std::vector<T>& {

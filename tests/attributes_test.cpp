@@ -51,3 +51,25 @@ TEST_CASE() {
         parser.printErrors(PrintMode::Flat);
     }
 }
+
+TEST_CASE("Duplicate flags") {
+
+    auto parser = Option<int>()["-x"]["--cannonical"]
+                | (
+                    OptionGroup()["--group"]["-g"]
+                    + Option<float>()["-x"]
+                    + Option<float>()["-x"]
+                    + (
+                        OptionGroup()["-g2"]
+                        + Option<std::string>()["-y"]
+                        + Option<bool>()["-y"]
+                    )
+                )
+                | Option<int>()["-x"]
+                | Option<int>()["-y"]["--group"]
+                | Option<int>()["-g2"]["--group2"];
+    parser.parse("-c asdf  -g [-x asdf]");
+    if (parser.hasErrors()) {
+        parser.printErrors(PrintMode::Tree);
+    }
+}

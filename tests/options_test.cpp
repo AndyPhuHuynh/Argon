@@ -6,7 +6,7 @@
 
 using namespace Argon;
 
-TEST_CASE("Basic option", "[options]") {
+TEST_CASE("Basic option test 1", "[options]") {
     unsigned int width = 2;
     float height = 2;
     double depth = 2;
@@ -27,6 +27,11 @@ TEST_CASE("Basic option", "[options]") {
             const char *argv[] = {"argon.exe", "--width", "100", "--height", "50.1", "--depth", "69.123456", "-t", "152"};
             int argc = std::size(argv);
             parser.parse(argc, argv);
+        }
+
+        SECTION("Equal sign") {
+            const std::string input = "--width=100 --height=50.1 --depth=69.123456 -t=152";
+            parser.parse(input);
         }
 
         CHECK(!parser.hasErrors());
@@ -53,17 +58,39 @@ TEST_CASE("Basic option test 2", "[options]") {
     int age;
     std::string major;
 
-    auto parser = Option(&name)["--name"]
-                | Option(&age)["--age"]
-                | Option(&major)["--major"];
+    auto parser = Option(std::string("Sally"), &name)["--name"]
+                | Option(25, &age)["--age"]
+                | Option(std::string("Music"), &major)["--major"];
 
-    const std::string input = "--name John --age 20 --major CS";
-    parser.parse(input);
+    SECTION("Input provided") {
+        SECTION("std::string") {
+            const std::string input = "--name John --age 20 --major CS";
+            parser.parse(input);
+        }
 
-    CHECK(!parser.hasErrors());
-    CHECK(name == "John");
-    CHECK(age == 20);
-    CHECK(major == "CS");
+        SECTION("C-Style argv") {
+            const char *argv[] = {"argon.exe", "--name", "John", "--age", "20", "--major", "CS"};
+            int argc = std::size(argv);
+            parser.parse(argc, argv);
+        }
+
+        SECTION("Equal sign") {
+            const std::string input = "--name = John --age = 20 --major = CS";
+            parser.parse(input);
+        }
+
+        CHECK(!parser.hasErrors());
+        CHECK(name  == "John");
+        CHECK(age   == 20);
+        CHECK(major == "CS");
+    }
+
+    SECTION("No input provided") {
+        CHECK(!parser.hasErrors());
+        CHECK(name  == "Sally");
+        CHECK(age   == 25);
+        CHECK(major == "Music");
+    }
 }
 
 TEST_CASE("Option all built-in numeric types", "[options]") {

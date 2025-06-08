@@ -212,8 +212,14 @@ inline auto Parser::parseOptionBundle(Context& context) -> std::unique_ptr<Optio
 }
 
 inline auto Parser::parseSingleOption(const Context& context, const Token& flag) -> std::unique_ptr<OptionAst> {
-    // Get value
+    // Get optional equal sign
     Token value = m_scanner.peekToken();
+    if (value.kind == TokenKind::EQUALS) {
+        getNextToken();
+        value = m_scanner.peekToken();
+    }
+
+    // Get value
     if (value.kind != TokenKind::IDENTIFIER) {
         m_syntaxErrors.addErrorMessage(
             std::format("Expected flag value, got '{}' at position {}", value.image, value.position), value.position);

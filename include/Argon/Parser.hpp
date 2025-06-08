@@ -84,6 +84,8 @@ namespace Argon {
 
         auto getNextValidFlag(const Context& context, bool printErrors = true) -> std::optional<Token>;
 
+        auto skipToNextValidFlag(const Context& context) -> void;
+
         auto getNextToken() -> Token;
 
         auto skipScope() -> void;
@@ -223,10 +225,7 @@ inline auto Parser::parseSingleOption(const Context& context, const Token& flag)
     if (value.kind != TokenKind::IDENTIFIER) {
         m_syntaxErrors.addErrorMessage(
             std::format("Expected flag value, got '{}' at position {}", value.image, value.position), value.position);
-        getNextValidFlag(context, false);
-        if (m_scanner.peekToken().kind != TokenKind::END) {
-            m_scanner.rewind(1);
-        }
+        skipToNextValidFlag(context);
         return nullptr;
     }
 
@@ -302,6 +301,7 @@ inline auto Parser::parseOptionGroup(Context& context, const Token& flag) -> std
     if (lbrack.kind != TokenKind::LBRACK) {
         m_syntaxErrors.addErrorMessage(
             std::format("Expected '[', got '{}' at position {}", lbrack.image, lbrack.position), lbrack.position);
+        skipToNextValidFlag(context);
         return nullptr;
     }
     getNextToken();
@@ -354,6 +354,7 @@ inline auto Parser::getNextValidFlag(const Context& context, const bool printErr
         Token token = m_scanner.peekToken();
         if (token.kind == TokenKind::LBRACK) {
             skipScope();
+            continue;
         } else if (m_mismatchedRBRACK) {
             getNextToken();
             continue;
@@ -365,6 +366,13 @@ inline auto Parser::getNextValidFlag(const Context& context, const bool printErr
             return token;
         }
         getNextToken();
+    }
+}
+
+inline auto Parser::skipToNextValidFlag(const Context& context) -> void {
+    getNextValidFlag(context, false);
+    if (m_scanner.peekToken().kind != TokenKind::END) {
+        m_scanner.rewind(1);
     }
 }
 
@@ -399,8 +407,10 @@ inline auto Parser::constraints() -> Constraints& {
 }
 
 inline auto Parser::reset() -> void {
+    m_contextValidationErrors.clear();
     m_syntaxErrors.clear();
     m_analysisErrors.clear();
+    m_constraintErrors.clear();
     m_brackets.clear();
 }
 

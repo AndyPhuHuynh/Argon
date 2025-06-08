@@ -53,7 +53,6 @@ TEST_CASE() {
 }
 
 TEST_CASE("Duplicate flags") {
-
     auto parser = Option<int>()["-x"]["--cannonical"]
                 | (
                     OptionGroup()["--group"]["-g"]
@@ -72,4 +71,19 @@ TEST_CASE("Duplicate flags") {
     if (parser.hasErrors()) {
         parser.printErrors(PrintMode::Tree);
     }
+}
+
+TEST_CASE() {
+    auto parser = Option<int>()["-x"]
+                | Option<int>()["-y"]
+                | (
+                    OptionGroup()["-g"]["--group"]
+                );
+
+    parser.parse("-x 10 -g [] = -y 20");
+    if (parser.hasErrors()) {
+        parser.printErrors(PrintMode::Tree);
+    }
+
+    std::cout << "Y: " << parser.getValue<int>("-y") << "\n";
 }

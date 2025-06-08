@@ -587,3 +587,14 @@ TEST_CASE("Booleans options", "[options]") {
         CHECK(y             == 20);
     }
 }
+
+TEST_CASE("Repeated flags", "[options]") {
+    int x, y, z;
+    auto parser = Option(&x)["-x"] | Option(&y)["-y"] | Option(&z)["-z"];
+    parser.parse("-x 10 -x 20 -x 30 -y 10 -y 20 -z 10");
+
+    CHECK(!parser.hasErrors());
+    CHECK(x == 30);
+    CHECK(y == 20);
+    CHECK(z == 10);
+}

@@ -10,23 +10,6 @@ namespace Argon {
     class MultiOption;
 
     class IsMultiOption {};
-
-    // MultiOption with C-Style array
-
-    template<typename T>
-    class MultiOption<T[]> : public OptionBase, public OptionComponent<MultiOption<T[]>>,
-                             public IsMultiOption, public Converter<MultiOption<T[]>, T> {
-        T (*m_out)[];
-        size_t m_size = 0;
-        size_t m_nextIndex = 0;
-        bool m_maxCapacityError = false;
-    public:
-        MultiOption() = default;
-
-        explicit MultiOption(T (*out)[]);
-
-        auto setValue(const std::string& flag, const std::string& value) -> void override;
-    };
     
     // MultiOption with std::array
 
@@ -87,11 +70,6 @@ namespace Argon {
 // Deduction guides
 
 namespace Argon {
-    // Deduction guides for C-Style array
-
-    template <typename T, std::size_t N>
-    MultiOption(T (*)[]) -> MultiOption<T[]>;
-    
     // Deduction guides for std::array
     
     template <typename T, std::size_t N>
@@ -106,34 +84,6 @@ namespace Argon {
 // Template Implementations
 
 namespace Argon {
-    // MultiOption with C-Style array
-    
-    template <typename T>
-    MultiOption<T[]>::MultiOption(T (*out)[]) : m_out(out) {
-        m_size = sizeof(*m_out) / sizeof((*m_out)[0]);
-    }
-
-    template <typename T>
-    void MultiOption<T[]>::setValue(const std::string& flag, const std::string& value) {
-        if (m_maxCapacityError) {
-            this->m_error.clear();
-            return;
-        }
-        
-        if (m_nextIndex >= m_size) {
-            this->m_error = std::format("Flag '{}' only supports a maximum of {} values", flag, m_size);
-            m_maxCapacityError = true;
-            return;
-        }
-        
-        this->convert(flag, value, (*m_out)[m_nextIndex]);
-        if (this->hasConversionError()) {
-            this->m_error = this->getConversionError();
-        } else {
-            m_nextIndex++;
-        }
-    }
-
     // MultiOptionStdArrayBase
 
     inline MultiOptionStdArrayBase::MultiOptionStdArrayBase(const size_t maxSize) : m_maxSize(maxSize) {}

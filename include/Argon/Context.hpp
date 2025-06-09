@@ -19,7 +19,6 @@ namespace Argon {
 
     class Context {
         std::vector<OptionPtr> m_options;
-        std::vector<Flag> m_flags;
         std::string m_name;
         Context *m_parent = nullptr;
     public:
@@ -55,7 +54,11 @@ namespace Argon {
 
         auto validate(std::vector<std::string>& errorMsgs) -> void;
 
+        auto applyPrefixes(std::string_view shortPrefix, std::string_view longPrefix) -> void;
+
     private:
+        [[nodiscard]] auto collectAllFlags() const -> std::vector<const Flag*>;
+
         auto resolveFlagGroup(const FlagPath& flagPath) -> Context&;
 
         auto collectAllSetOptions(OptionMap& map, const std::vector<Flag>& pathSoFar) -> void;
@@ -114,7 +117,6 @@ inline Context::Context(const Context& other) {
             optionGroup->getContext().m_parent = this;
         }
     }
-    m_flags = other.m_flags;
     m_name = other.m_name;
     m_parent = other.m_parent;
 }
@@ -138,14 +140,12 @@ inline auto Context::operator=(const Context& other) -> Context& {
             optionGroup->getContext().m_parent = this;
         }
     }
-    m_flags = other.m_flags;
     m_name = other.m_name;
     m_parent = other.m_parent;
     return *this;
 }
 
 inline auto Context::addOption(IOption& option) -> void {
-    m_flags.emplace_back(option.getFlag());
     m_options.emplace_back(&option);
     if (const auto optionGroup = dynamic_cast<OptionGroup*>(&option)) {
         optionGroup->getContext().m_parent = this;
@@ -153,7 +153,6 @@ inline auto Context::addOption(IOption& option) -> void {
 }
 
 inline auto Context::addOption(IOption&& option) -> void {
-    m_flags.emplace_back(option.getFlag());
     const auto& newOpt = m_options.emplace_back(option.clone());
     if (const auto optionGroup = dynamic_cast<OptionGroup*>(getRawPointer(newOpt))) {
         optionGroup->getContext().m_parent = this;
@@ -227,8 +226,9 @@ inline auto Context::getPath() const -> std::string {
 }
 
 inline auto Context::containsLocalFlag(const std::string_view flag) const -> bool {
-    return std::ranges::any_of(m_flags, [&flag](const Flag& flagInList) {
-        return flagInList.containsFlag(flag);
+    const auto allFlags = collectAllFlags();
+    return std::ranges::any_of(allFlags, [&flag](const Flag* flagInList) {
+        return flagInList->containsFlag(flag);
     });
 }
 
@@ -240,6 +240,26 @@ inline auto Context::collectAllSetOptions() -> OptionMap {
 
 inline auto Context::validate(std::vector<std::string>& errorMsgs) -> void {
     validate(FlagPath(), errorMsgs);
+}
+
+inline auto Context::applyPrefixes(const std::string_view shortPrefix,  // NOLINT (const)
+                                   const std::string_view longPrefix) -> void {
+    for (const auto& opt : m_options) {
+        IOption *ptr = getRawPointer(opt);
+        ptr->applyPrefixes(shortPrefix, longPrefix);
+        if (const auto groupPtr = dynamic_cast<OptionGroup*>(ptr); groupPtr != nullptr) {
+            groupPtr->getContext().applyPrefixes(shortPrefix, longPrefix);
+        }
+    }
+}
+
+inline auto Context::collectAllFlags() const -> std::vector<const Flag*> {
+    std::vector<const Flag*> result;
+    for (const auto& opt : m_options) {
+        const IOption *ptr = getRawPointer(opt);
+        result.emplace_back(&ptr->getFlag());
+    }
+    return result;
 }
 
 inline auto Context::resolveFlagGroup(const FlagPath& flagPath) -> Context& {
@@ -255,45 +275,35 @@ inline auto Context::resolveFlagGroup(const FlagPath& flagPath) -> Context& {
     return *context;
 }
 
-inline auto Context::collectAllSetOptions(OptionMap& map,
+inline auto Context::collectAllSetOptions(OptionMap& map, //NOLINT (recursion)
                                           const std::vector<Flag>& pathSoFar) -> void {
     for (const auto& opt : m_options) {
-        std::visit([&]<typename T>(const T& optPtr) {
-            IOption *ptr = nullptr;
-            if constexpr (std::is_same_v<T, IOption*>) {
-                ptr = optPtr;
-            } else if constexpr (std::is_same_v<T, std::unique_ptr<IOption>>) {
-                ptr = optPtr.get();
-            }
-            if (ptr == nullptr) {
-                throw std::runtime_error("Unhandled type in collectAllSetOptions()");
-            }
-            if (const auto groupPtr = dynamic_cast<OptionGroup*>(ptr); groupPtr != nullptr) {
-                auto newVec = pathSoFar;
-                newVec.emplace_back(optPtr->getFlag());
-                groupPtr->getContext().collectAllSetOptions(map, newVec);
-                return;
-            }
+        IOption *ptr = getRawPointer(opt);
+        if (const auto groupPtr = dynamic_cast<OptionGroup*>(ptr); groupPtr != nullptr) {
+            auto newVec = pathSoFar;
+            newVec.emplace_back(ptr->getFlag());
+            groupPtr->getContext().collectAllSetOptions(map, newVec);
+            continue;
+        }
 
-            if (!ptr->isSet()) return;
+        if (!ptr->isSet()) continue;
 
-            map[FlagPathWithAlias(pathSoFar, ptr->getFlag())] = ptr;
-
-        }, opt);
+        map[FlagPathWithAlias(pathSoFar, ptr->getFlag())] = ptr;
     }
 }
 
 inline auto Context::validate(const FlagPath& pathSoFar, std::vector<std::string>& errorMsgs) -> void {
+    const auto allFlags = collectAllFlags();
     std::set<std::string> flags;
     std::set<std::string> duplicateFlags;
-    for (const auto& flag : m_flags) {
-        if (flags.contains(flag.mainFlag)) {
-            duplicateFlags.emplace(flag.mainFlag);
+    for (const auto& flag : allFlags) {
+        if (flags.contains(flag->mainFlag)) {
+            duplicateFlags.emplace(flag->mainFlag);
         } else {
-            flags.emplace(flag.mainFlag);
+            flags.emplace(flag->mainFlag);
         }
 
-        for (const auto& alias : flag.aliases) {
+        for (const auto& alias : flag->aliases) {
             if (flags.contains(alias)) {
                 duplicateFlags.emplace(alias);
             } else {

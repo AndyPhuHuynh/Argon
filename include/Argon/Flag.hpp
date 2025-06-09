@@ -19,6 +19,8 @@ struct Flag {
 
     [[nodiscard]] auto containsFlag(std::string_view flag) const -> bool;
 
+    inline auto applyPrefixes(std::string_view shortPrefix, std::string_view longPrefix);
+
     auto operator<=>(const Flag&) const = default;
 };
 
@@ -119,6 +121,17 @@ inline auto operator==(const FlagPath& flagPath, const FlagPathWithAlias& flagPa
     }
     return flagPathWithAlias.flag.containsFlag(flagPath.flag);
 }
+
+inline auto addPrefixToString(std::string& flag,
+    const std::string_view shortPrefix, const std::string_view longPrefix) -> void {
+    if (flag.empty()) throw std::invalid_argument("Flag has to be at least one character long");
+
+    if (flag.starts_with(shortPrefix) || flag.starts_with(longPrefix)) return;
+
+    flag.length() == 1 ?
+        flag.insert(0, shortPrefix) :
+        flag.insert(0, longPrefix);
+}
 } // End namespace Argon
 
 //---------------------------------------------------Implementations----------------------------------------------------
@@ -128,6 +141,13 @@ inline Flag::Flag(const std::string_view flag) : mainFlag(flag) {}
 
 inline auto Flag::containsFlag(const std::string_view flag) const -> bool {
     return mainFlag == flag || std::ranges::contains(aliases, flag);
+}
+
+inline auto Flag::applyPrefixes(const std::string_view shortPrefix, const std::string_view longPrefix) {
+    addPrefixToString(mainFlag, shortPrefix, longPrefix);
+    for (auto& alias : aliases) {
+        addPrefixToString(alias, shortPrefix, longPrefix);
+    }
 }
 
 inline FlagPathWithAlias::FlagPathWithAlias(std::vector<Flag> path, Flag flag) : groupPath(std::move(path)), flag(std::move(flag)) {}

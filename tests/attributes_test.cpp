@@ -53,7 +53,7 @@ TEST_CASE() {
 }
 
 TEST_CASE("Duplicate flags") {
-    auto parser = Option<int>()["-x"]["--cannonical"]
+    auto parser = Option<int>()["-x"]["--canonical"]
                 | (
                     OptionGroup()["--group"]["-g"]
                     + Option<float>()["-x"]
@@ -68,9 +68,9 @@ TEST_CASE("Duplicate flags") {
                 | Option<int>()["-y"]["--group"]
                 | Option<int>()["-g2"]["--group2"];
     parser.parse("-c asdf  -g [-x asdf]");
-    if (parser.hasErrors()) {
-        parser.printErrors(PrintMode::Tree);
-    }
+    // if (parser.hasErrors()) {
+    //     parser.printErrors(PrintMode::Tree);
+    // }
 }
 
 TEST_CASE() {
@@ -81,9 +81,22 @@ TEST_CASE() {
                 );
 
     parser.parse("-x 10 -g [] = -y 20");
-    if (parser.hasErrors()) {
-        parser.printErrors(PrintMode::Tree);
-    }
+    // if (parser.hasErrors()) {
+    //     parser.printErrors(PrintMode::Tree);
+    // }
+    //
+    // std::cout << "Y: " << parser.getValue<int>("-y") << "\n";
+}
 
-    std::cout << "Y: " << parser.getValue<int>("-y") << "\n";
+TEST_CASE("Add default dashes") {
+    int x, y;
+    auto parser = Option(&x)["main"]["m"]
+                | Option(&y)["--main2"]["-m2"];
+
+    parser.parse("--main 1 -m 2 --main2 3 -m2 4");
+
+    CHECK(!parser.hasErrors());
+    parser.printErrors(PrintMode::Flat);
+    CHECK(x == 2);
+    CHECK(y == 4);
 }

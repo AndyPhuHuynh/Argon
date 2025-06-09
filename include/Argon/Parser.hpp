@@ -27,6 +27,9 @@ namespace Argon {
         bool m_mismatchedRBRACK = false;
 
         Constraints m_constraints;
+
+        std::string m_shortPrefix = "-";
+        std::string m_longPrefix  = "--";
     public:
         Parser() = default;
 
@@ -91,6 +94,8 @@ namespace Argon {
         auto skipScope() -> void;
 
         auto validateConstraints() -> void;
+
+        auto applyPrefixes() -> void;
     };
 
     template<typename Left, typename Right> requires DerivesFrom<Left, IOption> && DerivesFrom<Right, IOption>
@@ -168,6 +173,8 @@ inline auto Parser::parse(const int argc, const char **argv) {
 }
 
 inline auto Parser::parse(const std::string& str) -> bool {
+    m_context.applyPrefixes(m_shortPrefix, m_longPrefix);
+
     m_context.validate(m_contextValidationErrors);
     if (!m_contextValidationErrors.empty()) {
         return false;
@@ -473,6 +480,10 @@ inline auto Parser::skipScope() -> void {
 
 inline auto Parser::validateConstraints() -> void {
     m_constraints.validate(m_context, m_constraintErrors);
+}
+
+inline auto Parser::applyPrefixes() -> void {
+
 }
 
 template<typename Left, typename Right> requires

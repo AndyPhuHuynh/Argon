@@ -32,6 +32,8 @@ namespace Argon {
         IOption& operator=(IOption&&) noexcept;
         virtual ~IOption() = default;
 
+        auto applyPrefixes(std::string_view shortPrefix, std::string_view longPrefix) -> void;
+
         [[nodiscard]] auto getFlag() const -> const Flag&;
 
         [[nodiscard]] auto getError() const -> const std::string&;
@@ -53,8 +55,8 @@ namespace Argon {
         OptionComponent() = default;
     public:
         [[nodiscard]] std::unique_ptr<IOption> clone() const override;
-        auto operator[](const std::string& tag) & -> Derived&;
-        auto operator[](const std::string& tag) && -> Derived&&;
+        auto operator[](std::string_view tag) & -> Derived&;
+        auto operator[](std::string_view tag) && -> Derived&&;
     };
 
     class OptionBase {
@@ -250,23 +252,23 @@ auto OptionComponent<Derived>::clone() const -> std::unique_ptr<IOption> {
 }
 
 template <typename Derived>
-auto OptionComponent<Derived>::operator[](const std::string& tag) & -> Derived& {
+auto OptionComponent<Derived>::operator[](const std::string_view tag) & -> Derived& {
     if (!m_mainFlagSet) {
         m_mainFlagSet = true;
         m_flag.mainFlag = tag;
     } else {
-        m_flag.aliases.push_back(tag);
+        m_flag.aliases.emplace_back(tag);
     }
     return static_cast<Derived&>(*this);
 }
 
 template<typename Derived>
-auto OptionComponent<Derived>::operator[](const std::string& tag) && -> Derived&& {
+auto OptionComponent<Derived>::operator[](const std::string_view tag) && -> Derived&& {
     if (!m_mainFlagSet) {
         m_mainFlagSet = true;
         m_flag.mainFlag = tag;
     } else {
-        m_flag.aliases.push_back(tag);
+        m_flag.aliases.emplace_back(tag);
     }
     return static_cast<Derived&&>(*this);
 }
@@ -431,6 +433,10 @@ inline auto IOption::operator=(IOption&& other) noexcept -> IOption& {
         m_isSet         = other.m_isSet;
     }
     return *this;
+}
+
+inline auto IOption::applyPrefixes(const std::string_view shortPrefix, const std::string_view longPrefix) -> void {
+    m_flag.applyPrefixes(shortPrefix, longPrefix);
 }
 
 inline auto IOption::getFlag() const -> const Flag& {

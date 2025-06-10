@@ -142,7 +142,10 @@ namespace Argon {
         auto addOption(T&& option) -> void;
 
         auto getOption(const std::string& flag) -> IOption*;
+
         auto getContext() -> Context&;
+
+        [[nodiscard]] auto getContext() const -> const Context&;
     };
 }
 
@@ -529,6 +532,9 @@ inline auto OptionGroup::getContext() -> Context& { //NOLINT (function is not co
     return *m_context;
 }
 
+inline auto OptionGroup::getContext() const -> const Context & {
+    return *m_context;
+}
 } // End namespace Argon
 
 #endif // ARGON_OPTION_INCLUDE

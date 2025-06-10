@@ -63,6 +63,8 @@ namespace Argon {
 
         auto resolveFlagGroup(const FlagPath& flagPath) -> Context&;
 
+        auto getHelpMessage(std::stringstream& ss, size_t leadingSpaces) const -> void;
+
         auto collectAllSetOptions(OptionMap& map, const std::vector<Flag>& pathSoFar) -> void;
 
         auto validate(const FlagPath& pathSoFar, std::vector<std::string>& errorMsgs) -> void;
@@ -237,56 +239,40 @@ inline auto Context::containsLocalFlag(const std::string_view flag) const -> boo
 
 inline auto Context::getHelpMessage() const -> std::string {
     std::stringstream ss;
+    ss << "Usage: [options]\n\n" << "Options:\n" << std::string(80, '-') << "\n";
+    getHelpMessage(ss, 0);
+    return ss.str();
+}
+
+inline auto Context::getHelpMessage(std::stringstream& ss, const size_t leadingSpaces) const -> void { //NOLINT (recursion)
+    std::set<const OptionGroup*> groups;
 
     for (const auto& opt : m_options) {
         const auto ptr = getRawPointer(opt);
-
-        ss << std::format("Flag: '{}', Msg: '{}'\n", ptr->getFlag().getString(), ptr->getDescription());
+        if (const auto group = dynamic_cast<OptionGroup*>(ptr); group != nullptr) {
+            groups.insert(group);
+            continue;
+        }
+        std::string flagStr = ptr->getFlag().getString() + ':';
+        ss << std::string(leadingSpaces, ' ') << std::left << std::setw(20) << flagStr << ptr->getDescription() << "\n";
     }
-    return ss.str();
+
+    for (const auto& group : groups) {
+        std::string flagStr = group->getFlag().getString() + ':';
+        ss << std::string(leadingSpaces, ' ') << std::left << std::setw(20) << flagStr << group->getDescription() << "\n";
+    }
+
+    for (auto& group : groups) {
+        ss << "\n" << std::string(leadingSpaces + 4, ' ') << std::format("[{}]\n", group->getFlag().getString());
+        ss << std::string(leadingSpaces + 4, ' ') << std::string(80 - leadingSpaces - 4, '-') << "\n";
+        group->getContext().getHelpMessage(ss, leadingSpaces + 4);
+    }
 }
 
 inline auto Context::collectAllSetOptions() -> OptionMap {
     std::unordered_map<FlagPathWithAlias, IOption *> result;
     collectAllSetOptions(result, std::vector<Flag>());
     return result;
-}
-
-inline auto Context::validate(std::vector<std::string>& errorMsgs) -> void {
-    validate(FlagPath(), errorMsgs);
-}
-
-inline auto Context::applyPrefixes(const std::string_view shortPrefix,  // NOLINT (const)
-                                   const std::string_view longPrefix) -> void {
-    for (const auto& opt : m_options) {
-        IOption *ptr = getRawPointer(opt);
-        ptr->applyPrefixes(shortPrefix, longPrefix);
-        if (const auto groupPtr = dynamic_cast<OptionGroup*>(ptr); groupPtr != nullptr) {
-            groupPtr->getContext().applyPrefixes(shortPrefix, longPrefix);
-        }
-    }
-}
-
-inline auto Context::collectAllFlags() const -> std::vector<const Flag*> {
-    std::vector<const Flag*> result;
-    for (const auto& opt : m_options) {
-        const IOption *ptr = getRawPointer(opt);
-        result.emplace_back(&ptr->getFlag());
-    }
-    return result;
-}
-
-inline auto Context::resolveFlagGroup(const FlagPath& flagPath) -> Context& {
-    auto context = this;
-    // Loop through all the flags that represent groups
-    for (const auto& groupFlag : flagPath.groupPath) {
-        const auto optGroup = context->getOptionDynamic<OptionGroup>(groupFlag);
-        if (optGroup == nullptr) {
-            throw InvalidFlagPathException(flagPath);
-        }
-        context = &optGroup->getContext();
-    }
-    return *context;
 }
 
 inline auto Context::collectAllSetOptions(OptionMap& map, //NOLINT (recursion)
@@ -304,6 +290,10 @@ inline auto Context::collectAllSetOptions(OptionMap& map, //NOLINT (recursion)
 
         map[FlagPathWithAlias(pathSoFar, ptr->getFlag())] = ptr;
     }
+}
+
+inline auto Context::validate(std::vector<std::string>& errorMsgs) -> void {
+    validate(FlagPath(), errorMsgs);
 }
 
 inline auto Context::validate(const FlagPath& pathSoFar, std::vector<std::string>& errorMsgs) -> void { //NOLINT (recursion)
@@ -346,6 +336,38 @@ inline auto Context::validate(const FlagPath& pathSoFar, std::vector<std::string
     }
 }
 
+inline auto Context::applyPrefixes(const std::string_view shortPrefix,  // NOLINT (const)
+                                   const std::string_view longPrefix) -> void {
+    for (const auto& opt : m_options) {
+        IOption *ptr = getRawPointer(opt);
+        ptr->applyPrefixes(shortPrefix, longPrefix);
+        if (const auto groupPtr = dynamic_cast<OptionGroup*>(ptr); groupPtr != nullptr) {
+            groupPtr->getContext().applyPrefixes(shortPrefix, longPrefix);
+        }
+    }
+}
+
+inline auto Context::collectAllFlags() const -> std::vector<const Flag*> {
+    std::vector<const Flag*> result;
+    for (const auto& opt : m_options) {
+        const IOption *ptr = getRawPointer(opt);
+        result.emplace_back(&ptr->getFlag());
+    }
+    return result;
+}
+
+inline auto Context::resolveFlagGroup(const FlagPath& flagPath) -> Context& {
+    auto context = this;
+    // Loop through all the flags that represent groups
+    for (const auto& groupFlag : flagPath.groupPath) {
+        const auto optGroup = context->getOptionDynamic<OptionGroup>(groupFlag);
+        if (optGroup == nullptr) {
+            throw InvalidFlagPathException(flagPath);
+        }
+        context = &optGroup->getContext();
+    }
+    return *context;
+}
 } // End namespace Argon
 
 #endif // ARGON_CONTEXT_INCLUDE

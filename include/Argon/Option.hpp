@@ -23,6 +23,8 @@ namespace Argon {
     protected:
         Flag m_flag;
         std::string m_error;
+        std::string m_description;
+
         bool m_isSet = false;
         IOption() = default;
     public:
@@ -40,6 +42,8 @@ namespace Argon {
 
         [[nodiscard]] auto hasError() const -> bool;
 
+        [[nodiscard]] auto getDescription() const -> const std::string&;
+
         auto clearError() -> void;
 
         [[nodiscard]] auto isSet() const -> bool;
@@ -55,8 +59,12 @@ namespace Argon {
         OptionComponent() = default;
     public:
         [[nodiscard]] std::unique_ptr<IOption> clone() const override;
+
         auto operator[](std::string_view tag) & -> Derived&;
         auto operator[](std::string_view tag) && -> Derived&&;
+
+        auto description(std::string_view desc) & -> Derived&;
+        auto description(std::string_view desc) && -> Derived&&;
     };
 
     class OptionBase {
@@ -273,6 +281,18 @@ auto OptionComponent<Derived>::operator[](const std::string_view tag) && -> Deri
     return static_cast<Derived&&>(*this);
 }
 
+template<typename Derived>
+auto OptionComponent<Derived>::description(const std::string_view desc) & -> Derived& {
+    m_description = desc;
+    return static_cast<Derived&>(*this);
+}
+
+template<typename Derived>
+auto OptionComponent<Derived>::description(const std::string_view desc) && -> Derived&& {
+    m_description = desc;
+    return static_cast<Derived&&>(*this);
+}
+
 template <typename Derived, typename T>
 auto Converter<Derived, T>::generateErrorMsg(const std::string& flag, const std::string& invalidArg) -> void {
     // Generate custom error message if provided
@@ -407,6 +427,7 @@ inline IOption::IOption(const IOption& other) {
     m_flag          = other.m_flag;
     m_error         = other.m_error;
     m_isSet         = other.m_isSet;
+    m_description   = other.m_description;
 }
 
 inline auto IOption::operator=(const IOption& other) -> IOption& {
@@ -414,6 +435,7 @@ inline auto IOption::operator=(const IOption& other) -> IOption& {
         m_flag          = other.m_flag;
         m_error         = other.m_error;
         m_isSet         = other.m_isSet;
+        m_description   = other.m_description;
     }
     return *this;
 }
@@ -423,6 +445,7 @@ inline IOption::IOption(IOption&& other) noexcept {
         m_flag          = std::move(other.m_flag);
         m_error         = std::move(other.m_error);
         m_isSet         = other.m_isSet;
+        m_description   = std::move(other.m_description);
     }
 }
 
@@ -431,6 +454,7 @@ inline auto IOption::operator=(IOption&& other) noexcept -> IOption& {
         m_flag          = std::move(other.m_flag);
         m_error         = std::move(other.m_error);
         m_isSet         = other.m_isSet;
+        m_description   = std::move(other.m_description);
     }
     return *this;
 }
@@ -449,6 +473,10 @@ inline auto IOption::getError() const -> const std::string& {
 
 inline auto IOption::hasError() const -> bool {
     return !m_error.empty();
+}
+
+inline auto IOption::getDescription() const -> const std::string& {
+    return m_description;
 }
 
 inline auto IOption::clearError() -> void {

@@ -47,9 +47,9 @@ TEST_CASE() {
     // const std::string input = "-x 10 -y 20 -g [-a 40 -b 50]";
     // parser.parse(input);
 
-    if (parser.hasErrors()) {
-        parser.printErrors(PrintMode::Flat);
-    }
+    // if (parser.hasErrors()) {
+    //     parser.printErrors(PrintMode::Flat);
+    // }
 }
 
 TEST_CASE("Duplicate flags") {
@@ -99,4 +99,12 @@ TEST_CASE("Add default dashes") {
     parser.printErrors(PrintMode::Flat);
     CHECK(x == 2);
     CHECK(y == 4);
+}
+
+TEST_CASE("Help message") {
+    const auto parser = Option<int>()["--xcoord"]["x"].description("X coordinate")
+                      | Option<int>()["--ycoord"]["y"].description("Y coordinate")
+                      | Option<int>()["--zcoord"]["z"].description("Z coordinate");
+    const auto msg = parser.getHelpMessage();
+    std::cout << msg;
 }

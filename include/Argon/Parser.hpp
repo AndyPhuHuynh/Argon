@@ -45,7 +45,9 @@ namespace Argon {
 
         auto removeErrorGroup(int startPos) -> void;
 
-        [[nodiscard]] bool hasErrors() const;
+        [[nodiscard]] auto hasErrors() const -> bool;
+
+        [[nodiscard]] auto getHelpMessage() const -> std::string;
 
         auto printErrors(PrintMode analysisPrintMode, TextMode analysisTextMode = TextMode::Ascii) const -> void;
 
@@ -69,6 +71,8 @@ namespace Argon {
         auto getMultiValue(const FlagPath& flagPath) -> const Container&;
 
         auto constraints() -> Constraints&;
+
+        auto setDefaultPrefixes(std::string_view shortPrefix, std::string_view longPrefix);
 
     private:
         auto reset() -> void;
@@ -94,8 +98,6 @@ namespace Argon {
         auto skipScope() -> void;
 
         auto validateConstraints() -> void;
-
-        auto applyPrefixes() -> void;
     };
 
     template<typename Left, typename Right> requires DerivesFrom<Left, IOption> && DerivesFrom<Right, IOption>
@@ -109,7 +111,6 @@ template<typename T> requires DerivesFrom<T, IOption>
 Parser::Parser(T&& option) {
     addOption(std::forward<T>(option));
 }
-
 
 template<typename T> requires DerivesFrom<T, IOption>
 auto Parser::addOption(T&& option) -> void {
@@ -131,6 +132,10 @@ inline auto Parser::removeErrorGroup(const int startPos) -> void {
 inline auto Parser::hasErrors() const -> bool {
     return !m_contextValidationErrors.empty() || m_syntaxErrors.hasErrors() ||
             m_analysisErrors.hasErrors() || !m_constraintErrors.empty();
+}
+
+inline auto Parser::getHelpMessage() const -> std::string {
+    return m_context.getHelpMessage();
 }
 
 inline auto Parser::printErrors(const PrintMode analysisPrintMode,
@@ -370,13 +375,16 @@ inline auto Parser::getNextValidFlag(const Context& context, const bool printErr
         if (token.kind == TokenKind::LBRACK) {
             skipScope();
             continue;
-        } else if (m_mismatchedRBRACK) {
+        }
+        if (m_mismatchedRBRACK) {
             getNextToken();
             continue;
-        } else if (token.kind == TokenKind::RBRACK || token.kind == TokenKind::END) {
+        }
+        if (token.kind == TokenKind::RBRACK || token.kind == TokenKind::END) {
             // Escape this scope, leave RBRACK scanning to the function above
             return std::nullopt;
-        } else if (token.kind == TokenKind::IDENTIFIER && context.containsLocalFlag(token.image)) {
+        }
+        if (token.kind == TokenKind::IDENTIFIER && context.containsLocalFlag(token.image)) {
             getNextToken();
             return token;
         }
@@ -419,6 +427,11 @@ auto Parser::getMultiValue(const FlagPath& flagPath) -> const Container& {
 
 inline auto Parser::constraints() -> Constraints& {
     return m_constraints;
+}
+
+inline auto Parser::setDefaultPrefixes(const std::string_view shortPrefix, const std::string_view longPrefix) {
+    m_shortPrefix = shortPrefix;
+    m_longPrefix = longPrefix;
 }
 
 inline auto Parser::reset() -> void {
@@ -480,10 +493,6 @@ inline auto Parser::skipScope() -> void {
 
 inline auto Parser::validateConstraints() -> void {
     m_constraints.validate(m_context, m_constraintErrors);
-}
-
-inline auto Parser::applyPrefixes() -> void {
-
 }
 
 template<typename Left, typename Right> requires

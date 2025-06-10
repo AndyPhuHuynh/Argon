@@ -44,6 +44,8 @@ namespace Argon {
 
         [[nodiscard]] auto containsLocalFlag(std::string_view flag) const -> bool;
 
+        [[nodiscard]] auto getHelpMessage() const -> std::string;
+
         template<typename ValueType>
         auto getValue(const FlagPath& flagPath) -> const ValueType&;
 
@@ -94,6 +96,7 @@ inline auto containsFlag(const OptionMap& map, const FlagPath& flag) -> const Fl
 //---------------------------------------------------Implementations----------------------------------------------------
 
 #include <algorithm>
+#include <iomanip>
 #include <set>
 
 #include "Option.hpp" // NOLINT (misc-unused-include)
@@ -232,6 +235,17 @@ inline auto Context::containsLocalFlag(const std::string_view flag) const -> boo
     });
 }
 
+inline auto Context::getHelpMessage() const -> std::string {
+    std::stringstream ss;
+
+    for (const auto& opt : m_options) {
+        const auto ptr = getRawPointer(opt);
+
+        ss << std::format("Flag: '{}', Msg: '{}'\n", ptr->getFlag().getString(), ptr->getDescription());
+    }
+    return ss.str();
+}
+
 inline auto Context::collectAllSetOptions() -> OptionMap {
     std::unordered_map<FlagPathWithAlias, IOption *> result;
     collectAllSetOptions(result, std::vector<Flag>());
@@ -292,7 +306,7 @@ inline auto Context::collectAllSetOptions(OptionMap& map, //NOLINT (recursion)
     }
 }
 
-inline auto Context::validate(const FlagPath& pathSoFar, std::vector<std::string>& errorMsgs) -> void {
+inline auto Context::validate(const FlagPath& pathSoFar, std::vector<std::string>& errorMsgs) -> void { //NOLINT (recursion)
     const auto allFlags = collectAllFlags();
     std::set<std::string> flags;
     std::set<std::string> duplicateFlags;
@@ -323,22 +337,12 @@ inline auto Context::validate(const FlagPath& pathSoFar, std::vector<std::string
     }
 
     for (const auto& opt : m_options) {
-        std::visit([&]<typename T>(const T& optPtr) {
-            IOption *ptr = nullptr;
-            if constexpr (std::is_same_v<T, IOption*>) {
-                ptr = optPtr;
-            } else if constexpr (std::is_same_v<T, std::unique_ptr<IOption>>) {
-                ptr = optPtr.get();
-            }
-            if (ptr == nullptr) {
-                throw std::runtime_error("Unhandled type in collectAllSetOptions()");
-            }
-            if (const auto groupPtr = dynamic_cast<OptionGroup*>(ptr); groupPtr != nullptr) {
-                FlagPath newPath = pathSoFar;
-                newPath.extendPath(optPtr->getFlag().mainFlag);
-                groupPtr->getContext().validate(newPath, errorMsgs);
-            }
-        }, opt);
+        IOption *ptr = getRawPointer(opt);
+        if (const auto groupPtr = dynamic_cast<OptionGroup*>(ptr); groupPtr != nullptr) {
+            FlagPath newPath = pathSoFar;
+            newPath.extendPath(ptr->getFlag().mainFlag);
+            groupPtr->getContext().validate(newPath, errorMsgs);
+        }
     }
 }
 

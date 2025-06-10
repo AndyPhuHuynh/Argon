@@ -19,7 +19,9 @@ struct Flag {
 
     [[nodiscard]] auto containsFlag(std::string_view flag) const -> bool;
 
-    inline auto applyPrefixes(std::string_view shortPrefix, std::string_view longPrefix);
+    [[nodiscard]] auto getString() const -> std::string;
+
+    auto applyPrefixes(std::string_view shortPrefix, std::string_view longPrefix);
 
     auto operator<=>(const Flag&) const = default;
 };
@@ -141,6 +143,15 @@ inline Flag::Flag(const std::string_view flag) : mainFlag(flag) {}
 
 inline auto Flag::containsFlag(const std::string_view flag) const -> bool {
     return mainFlag == flag || std::ranges::contains(aliases, flag);
+}
+
+inline auto Flag::getString() const -> std::string {
+    std::stringstream ss(mainFlag);
+    ss << mainFlag;
+    for (auto& alias : aliases) {
+        ss << ", " << alias;
+    }
+    return ss.str();
 }
 
 inline auto Flag::applyPrefixes(const std::string_view shortPrefix, const std::string_view longPrefix) {

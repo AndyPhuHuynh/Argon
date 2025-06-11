@@ -51,7 +51,7 @@ namespace Argon {
 
         auto printErrors(PrintMode analysisPrintMode, TextMode analysisTextMode = TextMode::Ascii) const -> void;
 
-        auto parse(int argc, const char **argv);
+        auto parse(int argc, const char **argv) -> bool;
 
         auto parse(const std::string& str) -> bool;
 
@@ -168,13 +168,13 @@ inline auto Parser::printErrors(const PrintMode analysisPrintMode,
     }
 }
 
-inline auto Parser::parse(const int argc, const char **argv) {
+inline auto Parser::parse(const int argc, const char **argv) -> bool {
     std::string input;
     for (int i = 1; i < argc; i++) {
         input += argv[i];
         input += " ";
     }
-    parse(input);
+    return parse(input);
 }
 
 inline auto Parser::parse(const std::string& str) -> bool {

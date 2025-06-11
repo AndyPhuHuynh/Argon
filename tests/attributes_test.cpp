@@ -110,7 +110,7 @@ TEST_CASE("Help message") {
 }
 
 TEST_CASE("Help message 2") {
-    auto parser = Option<int>()["--xcoord"]["-x"]("<int>", "x coordinate of the location")
+    auto parser = Option<int>()["--xcoord"]["-x"]("<int>", "x coordinate of the location. This is a really long description to test how overflow works :D. Wow this is a very amazing feature.")
                 | Option<int>()["--ycoord"]["-y"]("<int>", "y coordinate of the location")
                 | Option<int>()["--zcoord"]["-z"]("<int>", "z coordinate of the location")
                 | (

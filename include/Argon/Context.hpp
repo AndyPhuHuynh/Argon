@@ -44,7 +44,7 @@ namespace Argon {
 
         [[nodiscard]] auto containsLocalFlag(std::string_view flag) const -> bool;
 
-        [[nodiscard]] auto getHelpMessage() const -> std::string;
+        [[nodiscard]] auto getHelpMessage(size_t maxLineWidth = 80) const -> std::string;
 
         template<typename ValueType>
         auto getValue(const FlagPath& flagPath) -> const ValueType&;
@@ -63,7 +63,9 @@ namespace Argon {
 
         auto resolveFlagGroup(const FlagPath& flagPath) -> Context&;
 
-        auto getHelpMessage(std::stringstream& ss, size_t leadingSpaces) const -> void;
+        auto getHelpMessage(std::stringstream& ss, size_t leadingSpaces, size_t maxLineWidth) const -> void;
+
+        static auto getHelpMessage(std::stringstream& ss, size_t leadingSpaces, size_t maxLineWidth, const IOption *option) -> void;
 
         auto collectAllSetOptions(OptionMap& map, const std::vector<Flag>& pathSoFar) -> void;
 
@@ -237,63 +239,109 @@ inline auto Context::containsLocalFlag(const std::string_view flag) const -> boo
     });
 }
 
-inline auto Context::getHelpMessage() const -> std::string {
+inline auto Context::getHelpMessage(const size_t maxLineWidth) const -> std::string {
     std::stringstream ss;
-    ss << "Usage: [options]\n\n" << "Options:\n" << std::string(80, '-') << "\n";
-    getHelpMessage(ss, 0);
+    ss << "Usage: [options]\n\n" << "Options:\n" << std::string(maxLineWidth, '-') << "\n";
+    getHelpMessage(ss, 0, maxLineWidth);
     return ss.str();
 }
 
-inline auto Context::getHelpMessage(std::stringstream& ss, const size_t leadingSpaces) const -> void { //NOLINT (recursion)
-    std::vector<std::pair<std::string, const IOption*>> nonGroups;
-    std::vector<std::tuple<std::string, const OptionGroup*>> groups;
-    int alignLen = 20;
+inline auto Context::getHelpMessage(std::stringstream& ss, const size_t leadingSpaces, const size_t maxLineWidth) const -> void { //NOLINT (recursion)
+    std::vector<const OptionGroup*> groups;
 
     for (const auto& opt : m_options) {
         const auto ptr = getRawPointer(opt);
-        std::string *flagStr;
-        if (const auto group = dynamic_cast<OptionGroup*>(ptr); group != nullptr) {
-            groups.emplace_back(ptr->getFlag().getString(), group);
-            flagStr = &std::get<0>(groups.back());
-        } else {
-            nonGroups.emplace_back(ptr->getFlag().getString(), ptr);
-            flagStr = &nonGroups.back().first;
+        if (const auto groupPtr = dynamic_cast<OptionGroup*>(ptr); groupPtr != nullptr) {
+            groups.push_back(groupPtr);
+            continue;
         }
-        if (const auto& typeHint = ptr->getInputHint(); !typeHint.empty()) {
-            *flagStr += ' ';
-            *flagStr += typeHint;
-        }
-        *flagStr += ':';
-
-        // Find the biggest flagLength and align it to the next multiple of 4
-        if (const int len = static_cast<int>(flagStr->length()); len > alignLen) {
-            alignLen = len + (4 - len % 4);
-        }
-    }
-    alignLen += 4;
-
-    // Print all non-group help messages
-    std::string leading(leadingSpaces, ' ');
-    for (const auto& [flagStr, ptr] : nonGroups) {
-        ss << leading << std::left << std::setw(alignLen) << flagStr << ptr->getDescription() << "\n";
+        getHelpMessage(ss, leadingSpaces, maxLineWidth, ptr);
     }
 
     // Print top level group help messages
-    for (const auto& [flagStr, ptr]: groups) {
-        ss << leading << std::left << std::setw(alignLen) << flagStr << ptr->getDescription() << "\n";
+    for (const auto& group: groups) {
+        getHelpMessage(ss, leadingSpaces, maxLineWidth, group);
     }
 
     // Print nested group messages
-    leading = std::string(leadingSpaces + 4, ' ');
-    for (auto& [flagStr, ptr] : groups) {
+    const auto leading = std::string(leadingSpaces + 4, ' ');
+    for (const auto& group : groups) {
         ss << "\n" << leading;
-        if (const auto& inputHint = ptr->getInputHint(); !inputHint.empty()) {
+        if (const auto& inputHint = group->getInputHint(); !inputHint.empty()) {
             ss << inputHint;
         } else {
-            ss << std::format("[{}]", ptr->getFlag().getString());
+            ss << std::format("[{}]", group->getFlag().getString());
         }
-        ss << "\n" << leading << std::string(80 - leadingSpaces - 4, '-') << "\n";
-        ptr->getContext().getHelpMessage(ss, leadingSpaces + 4);
+        ss << "\n" << leading << std::string(maxLineWidth - leadingSpaces - 4, '-') << "\n";
+        group->getContext().getHelpMessage(ss, leadingSpaces + 4, maxLineWidth);
+    }
+}
+
+inline auto Context::getHelpMessage(std::stringstream& ss, const size_t leadingSpaces,
+                                    const size_t maxLineWidth, const IOption *option) -> void {
+    // Print flag
+    ss << std::string(leadingSpaces, ' ');
+    constexpr size_t maxFlagWidth = 32;
+    std::string flag = option->getFlag().getString();
+    if (const auto& typeHint = option->getInputHint(); !typeHint.empty()) {
+        flag += ' ';
+        flag += typeHint;
+    }
+    flag += ':';
+    ss << std::left << std::setw(maxFlagWidth) << flag;
+
+    // Print description with line wrapping
+    const std::string& description = option->getDescription();
+    std::vector<std::string_view> sections;
+
+    const size_t maxDescLength = maxLineWidth - maxFlagWidth;
+    size_t sectionStart = 0;
+    while (sectionStart < description.length()) {
+        // Trim whitespaces
+        while (description[sectionStart] == ' ') {
+            sectionStart++;
+        }
+        if (sectionStart >= description.length() - 1) {
+            break;
+        }
+        // Extract section
+        size_t prevSpaceIndex = sectionStart;
+        for (size_t i = 0; i < maxDescLength; i++) {
+            if (sectionStart + i >= description.length()) {
+                prevSpaceIndex = sectionStart + i;
+                break;
+            }
+            if (description[sectionStart + i] == ' ') {
+                prevSpaceIndex = sectionStart + i;
+            }
+        }
+        sections.emplace_back(&description[sectionStart], prevSpaceIndex - sectionStart);
+        sectionStart = prevSpaceIndex;
+    }
+
+    // for (size_t i = 0; i < description.size(); i++) {
+    //     if (description[i] == ' ') {
+    //         prevSpaceIndex = i;
+    //     }
+    //     if (i != 0 && (endOfLastSection + i) % maxDescLength == 0) {
+    //         sections.emplace_back(&description[endOfLastSection], prevSpaceIndex - endOfLastSection);
+    //         endOfLastSection = prevSpaceIndex;
+    //     }
+    // }
+    // if (endOfLastSection < description.length() - 1) {
+    //     sections.emplace_back(&description[endOfLastSection], description.length() - endOfLastSection);
+    // }
+
+    if (flag.length() > maxFlagWidth) {
+        ss << "\n" << std::string(leadingSpaces + maxFlagWidth, ' ') << sections[0];
+    } else {
+        ss << sections[0];
+    }
+    ss << "\n";
+
+    for (size_t i = 1; i < sections.size(); i++) {
+        if (sections[i].empty()) continue;
+        ss << std::string(leadingSpaces + maxFlagWidth, ' ') << sections[i] << "\n";
     }
 }
 

@@ -23,6 +23,7 @@ namespace Argon {
     protected:
         Flag m_flag;
         std::string m_error;
+        std::string m_typeHint;
         std::string m_description;
 
         bool m_isSet = false;
@@ -41,6 +42,8 @@ namespace Argon {
         [[nodiscard]] auto getError() const -> const std::string&;
 
         [[nodiscard]] auto hasError() const -> bool;
+
+        [[nodiscard]] auto getTypeHint() const -> const std::string&;
 
         [[nodiscard]] auto getDescription() const -> const std::string&;
 
@@ -65,6 +68,9 @@ namespace Argon {
 
         auto description(std::string_view desc) & -> Derived&;
         auto description(std::string_view desc) && -> Derived&&;
+
+        auto operator()(std::string_view desc) & -> Derived&;
+        auto operator()(std::string_view desc) && -> Derived&&;
     };
 
     class OptionBase {
@@ -296,6 +302,16 @@ auto OptionComponent<Derived>::description(const std::string_view desc) && -> De
     return static_cast<Derived&&>(*this);
 }
 
+template<typename Derived>
+auto OptionComponent<Derived>::operator()(const std::string_view desc) & -> Derived& {
+    return static_cast<Derived&>(description(desc));
+}
+
+template<typename Derived>
+auto OptionComponent<Derived>::operator()(const std::string_view desc) && -> Derived&& {
+    return static_cast<Derived&&>(description(desc));
+}
+
 template <typename Derived, typename T>
 auto Converter<Derived, T>::generateErrorMsg(const std::string& flag, const std::string& invalidArg) -> void {
     // Generate custom error message if provided
@@ -476,6 +492,10 @@ inline auto IOption::getError() const -> const std::string& {
 
 inline auto IOption::hasError() const -> bool {
     return !m_error.empty();
+}
+
+inline auto IOption::getTypeHint() const -> const std::string& {
+    return m_typeHint;
 }
 
 inline auto IOption::getDescription() const -> const std::string& {

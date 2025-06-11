@@ -245,26 +245,40 @@ inline auto Context::getHelpMessage() const -> std::string {
 }
 
 inline auto Context::getHelpMessage(std::stringstream& ss, const size_t leadingSpaces) const -> void { //NOLINT (recursion)
-    std::set<const OptionGroup*> groups;
+    std::vector<std::pair<std::string, std::string>> nonGroups;
+    std::vector<std::tuple<std::string, std::string, const OptionGroup*>> groups;
+    int alignLen = 20;
 
     for (const auto& opt : m_options) {
         const auto ptr = getRawPointer(opt);
+        std::string *flagStr;
         if (const auto group = dynamic_cast<OptionGroup*>(ptr); group != nullptr) {
-            groups.insert(group);
-            continue;
+            groups.emplace_back(ptr->getFlag().getString(), ptr->getDescription(), group);
+            flagStr = &std::get<0>(groups.back());
+        } else {
+            nonGroups.emplace_back(ptr->getFlag().getString(), ptr->getDescription());
+            flagStr = &nonGroups.back().first;
         }
-        std::string flagStr = ptr->getFlag().getString() + ':';
-        ss << std::string(leadingSpaces, ' ') << std::left << std::setw(20) << flagStr << ptr->getDescription() << "\n";
+        // Find the biggest flagLength and align it to the next multiple of 4
+        *flagStr += ':';
+        if (const int len = static_cast<int>(flagStr->length()); len > alignLen) {
+            alignLen = len + (4 - len % 4);
+        }
     }
 
-    for (const auto& group : groups) {
-        std::string flagStr = group->getFlag().getString() + ':';
-        ss << std::string(leadingSpaces, ' ') << std::left << std::setw(20) << flagStr << group->getDescription() << "\n";
+    std::string leading(leadingSpaces, ' ');
+    for (const auto& [flagStr, description] : nonGroups) {
+        ss << leading << std::left << std::setw(alignLen) << flagStr << description << "\n";
     }
 
-    for (auto& group : groups) {
-        ss << "\n" << std::string(leadingSpaces + 4, ' ') << std::format("[{}]\n", group->getFlag().getString());
-        ss << std::string(leadingSpaces + 4, ' ') << std::string(80 - leadingSpaces - 4, '-') << "\n";
+    for (const auto& [flagStr, description, _]: groups) {
+        ss << leading << std::left << std::setw(alignLen) << flagStr << description << "\n";
+    }
+
+    leading = std::string(leadingSpaces + 4, ' ');
+    for (auto& [flagStr, _, group] : groups) {
+        ss << "\n" << leading << std::format("[{}]\n", flagStr);
+        ss << leading << std::string(80 - leadingSpaces - 4, '-') << "\n";
         group->getContext().getHelpMessage(ss, leadingSpaces + 4);
     }
 }

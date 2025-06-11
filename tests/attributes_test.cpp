@@ -110,20 +110,20 @@ TEST_CASE("Help message") {
 }
 
 TEST_CASE("Help message 2") {
-    auto parser = Option<int>()["--xcoord"]["-x"].description("x coordinate of the location")
-                | Option<int>()["--ycoord"]["-y"].description("y coordinate of the location")
-                | Option<int>()["--zcoord"]["-z"].description("z coordinate of the location")
+    auto parser = Option<int>()["--xcoord"]["-x"]("x coordinate of the location")
+                | Option<int>()["--ycoord"]["-y"]("y coordinate of the location")
+                | Option<int>()["--zcoord"]["-z"]("z coordinate of the location")
                 | (
-                    OptionGroup()["--student"].description("Specify information about the main character")
-                    + Option<int>()["--name"].description("The name of the student")
-                    + Option<int>()["--age"].description("The age of the student")
+                    OptionGroup()["--student"]("Specify information about the main character")
+                    + Option<int>()["--name"]("The name of the student")
+                    + Option<int>()["--age"]("The age of the student")
                     + (
-                        OptionGroup()["--classes"].description("The classes the student takes")
-                        + Option<int>()["--major"]["--maj"].description("The main class the student is taking")
-                        + Option<int>()["--minor"]["--min"].description("The side class the student is taking")
+                        OptionGroup()["--classes"]("The classes the student takes")
+                        + Option<int>()["--major"]["--maj"]("The main class the student is taking")
+                        + Option<int>()["--minor"]["--min"]("The side class the student is taking")
                     )
                 )
-                | Option<int>()["--region"].description("The region the game takes place in");
+                | Option<int>()["--region"]("The region the game takes place in");
     const auto msg = parser.getHelpMessage();
     std::cout << msg << "\n\n\n";
     std::string x = R"START([Options]

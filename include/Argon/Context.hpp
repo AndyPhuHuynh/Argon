@@ -245,41 +245,55 @@ inline auto Context::getHelpMessage() const -> std::string {
 }
 
 inline auto Context::getHelpMessage(std::stringstream& ss, const size_t leadingSpaces) const -> void { //NOLINT (recursion)
-    std::vector<std::pair<std::string, std::string>> nonGroups;
-    std::vector<std::tuple<std::string, std::string, const OptionGroup*>> groups;
+    std::vector<std::pair<std::string, const IOption*>> nonGroups;
+    std::vector<std::tuple<std::string, const OptionGroup*>> groups;
     int alignLen = 20;
 
     for (const auto& opt : m_options) {
         const auto ptr = getRawPointer(opt);
         std::string *flagStr;
         if (const auto group = dynamic_cast<OptionGroup*>(ptr); group != nullptr) {
-            groups.emplace_back(ptr->getFlag().getString(), ptr->getDescription(), group);
+            groups.emplace_back(ptr->getFlag().getString(), group);
             flagStr = &std::get<0>(groups.back());
         } else {
-            nonGroups.emplace_back(ptr->getFlag().getString(), ptr->getDescription());
+            nonGroups.emplace_back(ptr->getFlag().getString(), ptr);
             flagStr = &nonGroups.back().first;
         }
-        // Find the biggest flagLength and align it to the next multiple of 4
+        if (const auto& typeHint = ptr->getInputHint(); !typeHint.empty()) {
+            *flagStr += ' ';
+            *flagStr += typeHint;
+        }
         *flagStr += ':';
+
+        // Find the biggest flagLength and align it to the next multiple of 4
         if (const int len = static_cast<int>(flagStr->length()); len > alignLen) {
             alignLen = len + (4 - len % 4);
         }
     }
+    alignLen += 4;
 
+    // Print all non-group help messages
     std::string leading(leadingSpaces, ' ');
-    for (const auto& [flagStr, description] : nonGroups) {
-        ss << leading << std::left << std::setw(alignLen) << flagStr << description << "\n";
+    for (const auto& [flagStr, ptr] : nonGroups) {
+        ss << leading << std::left << std::setw(alignLen) << flagStr << ptr->getDescription() << "\n";
     }
 
-    for (const auto& [flagStr, description, _]: groups) {
-        ss << leading << std::left << std::setw(alignLen) << flagStr << description << "\n";
+    // Print top level group help messages
+    for (const auto& [flagStr, ptr]: groups) {
+        ss << leading << std::left << std::setw(alignLen) << flagStr << ptr->getDescription() << "\n";
     }
 
+    // Print nested group messages
     leading = std::string(leadingSpaces + 4, ' ');
-    for (auto& [flagStr, _, group] : groups) {
-        ss << "\n" << leading << std::format("[{}]\n", flagStr);
-        ss << leading << std::string(80 - leadingSpaces - 4, '-') << "\n";
-        group->getContext().getHelpMessage(ss, leadingSpaces + 4);
+    for (auto& [flagStr, ptr] : groups) {
+        ss << "\n" << leading;
+        if (const auto& inputHint = ptr->getInputHint(); !inputHint.empty()) {
+            ss << inputHint;
+        } else {
+            ss << std::format("[{}]", ptr->getFlag().getString());
+        }
+        ss << "\n" << leading << std::string(80 - leadingSpaces - 4, '-') << "\n";
+        ptr->getContext().getHelpMessage(ss, leadingSpaces + 4);
     }
 }
 

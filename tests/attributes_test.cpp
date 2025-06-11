@@ -110,20 +110,31 @@ TEST_CASE("Help message") {
 }
 
 TEST_CASE("Help message 2") {
-    auto parser = Option<int>()["--xcoord"]["-x"]("x coordinate of the location")
-                | Option<int>()["--ycoord"]["-y"]("y coordinate of the location")
-                | Option<int>()["--zcoord"]["-z"]("z coordinate of the location")
+    auto parser = Option<int>()["--xcoord"]["-x"]("<int>", "x coordinate of the location")
+                | Option<int>()["--ycoord"]["-y"]("<int>", "y coordinate of the location")
+                | Option<int>()["--zcoord"]["-z"]("<int>", "z coordinate of the location")
                 | (
-                    OptionGroup()["--student"]("Specify information about the main character")
+                    OptionGroup()["--student"]("[Student Info]", "Specify information about the main character")
                     + Option<int>()["--name"]("The name of the student")
                     + Option<int>()["--age"]("The age of the student")
                     + (
-                        OptionGroup()["--classes"]("The classes the student takes")
+                        OptionGroup()["--classes"]("[Class Information]", "The classes the student takes")
                         + Option<int>()["--major"]["--maj"]("The main class the student is taking")
                         + Option<int>()["--minor"]["--min"]("The side class the student is taking")
                     )
                 )
-                | Option<int>()["--region"]("The region the game takes place in");
+                | Option<int>()["--region"]("The region the game takes place in")
+                | (
+                    OptionGroup()["--student2"]("[Student Info 2]", "Specify information about the second character")
+                    + Option<int>()["--name"]("The name of the student")
+                    + Option<int>()["--age"]("The age of the student")
+                    + (
+                        OptionGroup()["--classes"]("[Class Information]", "The classes the student takes")
+                        + Option<int>()["--major"]["--maj"]("The main class the student is taking")
+                        + Option<int>()["--minor"]["--min"]("The side class the student is taking")
+                    )
+                );
+
     const auto msg = parser.getHelpMessage();
     std::cout << msg << "\n\n\n";
     std::string x = R"START([Options]

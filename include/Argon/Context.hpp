@@ -319,19 +319,6 @@ inline auto Context::getHelpMessage(std::stringstream& ss, const size_t leadingS
         sectionStart = prevSpaceIndex;
     }
 
-    // for (size_t i = 0; i < description.size(); i++) {
-    //     if (description[i] == ' ') {
-    //         prevSpaceIndex = i;
-    //     }
-    //     if (i != 0 && (endOfLastSection + i) % maxDescLength == 0) {
-    //         sections.emplace_back(&description[endOfLastSection], prevSpaceIndex - endOfLastSection);
-    //         endOfLastSection = prevSpaceIndex;
-    //     }
-    // }
-    // if (endOfLastSection < description.length() - 1) {
-    //     sections.emplace_back(&description[endOfLastSection], description.length() - endOfLastSection);
-    // }
-
     if (flag.length() > maxFlagWidth) {
         ss << "\n" << std::string(leadingSpaces + maxFlagWidth, ' ') << sections[0];
     } else {

@@ -3,8 +3,10 @@
 
 #include <memory>
 #include <string>
+#include <typeindex>
+#include <typeinfo>
+#include <unordered_map>
 
-#include "Ast.hpp"
 #include "Attributes.hpp"
 #include "Context.hpp"
 #include "Error.hpp"
@@ -14,6 +16,15 @@
 #include "Traits.hpp"
 
 namespace Argon {
+    class StatementAst;
+    class OptionAst;
+    class MultiOptionAst;
+    class OptionGroupAst;
+    class OptionBaseAst;
+
+    using DefaultConversionFn = std::function<bool(std::string_view, void*)>;
+    using DefaultConversions  = std::unordered_map<std::type_index, DefaultConversionFn>;
+
     class Parser {
         Context m_context;
         Scanner m_scanner;
@@ -26,6 +37,7 @@ namespace Argon {
         std::vector<Token> m_brackets;
         bool m_mismatchedRBRACK = false;
 
+        DefaultConversions m_defaultConversions;
         Constraints m_constraints;
 
         std::string m_shortPrefix = "-";
@@ -74,6 +86,11 @@ namespace Argon {
 
         auto setDefaultPrefixes(std::string_view shortPrefix, std::string_view longPrefix);
 
+        template <typename T>
+        auto registerConversionFn(std::function<bool(std::string_view, T*)>conversionFn) -> void;
+
+        [[nodiscard]] auto getDefaultConversions() const -> const DefaultConversions&;
+
     private:
         auto reset() -> void;
 
@@ -105,6 +122,8 @@ namespace Argon {
 }
 
 // --------------------------------------------- Implementations -------------------------------------------------------
+
+#include "Ast.hpp"
 
 namespace Argon {
 template<typename T> requires DerivesFrom<T, IOption>
@@ -188,7 +207,7 @@ inline auto Parser::parse(const std::string& str) -> bool {
     reset();
     m_scanner = Scanner(str);
     StatementAst ast = parseStatement();
-    ast.analyze(m_analysisErrors, m_context);
+    ast.analyze(*this, m_context);
     validateConstraints();
     return !hasErrors();
 }
@@ -425,6 +444,14 @@ auto Parser::getMultiValue(const FlagPath& flagPath) -> const Container& {
     return m_context.getMultiValue<Container>(flagPath);
 }
 
+template<typename T>
+auto Parser::registerConversionFn(std::function<bool(std::string_view, T *)> conversionFn) -> void {
+    auto wrapper = [conversionFn](std::string_view arg, void *out) -> bool {
+        return conversionFn(arg, static_cast<T*>(out));
+    };
+    m_defaultConversions[std::type_index(typeid(T))] = wrapper;
+}
+
 inline auto Parser::constraints() -> Constraints& {
     return m_constraints;
 }
@@ -432,6 +459,10 @@ inline auto Parser::constraints() -> Constraints& {
 inline auto Parser::setDefaultPrefixes(const std::string_view shortPrefix, const std::string_view longPrefix) {
     m_shortPrefix = shortPrefix;
     m_longPrefix = longPrefix;
+}
+
+inline auto Parser::getDefaultConversions() const -> const DefaultConversions& {
+    return m_defaultConversions;
 }
 
 inline auto Parser::reset() -> void {

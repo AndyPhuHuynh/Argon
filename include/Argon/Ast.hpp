@@ -6,10 +6,10 @@
 #include <vector>
 
 #include "Scanner.hpp"
-#include "Error.hpp"
 
 namespace Argon {
     class Context;
+    class Parser;
 
     struct Value {
         std::string value;
@@ -18,7 +18,7 @@ namespace Argon {
 
     class Ast {
     public:
-        virtual void analyze(ErrorGroup& errorGroup, Context& context) = 0;
+        virtual void analyze(Parser& parser, Context& context) = 0;
     protected:
         virtual ~Ast() = default;
     };
@@ -39,7 +39,7 @@ namespace Argon {
         OptionAst(const Token& flagToken, const Token& valueToken);
         ~OptionAst() override = default;
 
-        void analyze(ErrorGroup& errorGroup, Context& context) override;
+        void analyze(Parser& parser, Context& context) override;
     };
 
     class MultiOptionAst : public OptionBaseAst {
@@ -50,7 +50,7 @@ namespace Argon {
         ~MultiOptionAst() override = default;
 
         void addValue(const Token& value);
-        void analyze(ErrorGroup& errorGroup, Context& context) override;
+        void analyze(Parser& parser, Context& context) override;
     };
 
     class OptionGroupAst : public OptionBaseAst {
@@ -68,7 +68,7 @@ namespace Argon {
         ~OptionGroupAst() override = default;
 
         void addOption(std::unique_ptr<OptionBaseAst> option);
-        void analyze(ErrorGroup& errorGroup, Context& context) override;
+        void analyze(Parser& parser, Context& context) override;
     private:
         std::vector<std::unique_ptr<OptionBaseAst>> m_options;
     };
@@ -87,7 +87,7 @@ namespace Argon {
         ~StatementAst() override = default;
 
         void addOption(std::unique_ptr<OptionBaseAst> option);
-        void analyze(ErrorGroup& errorGroup, Context& context) override;
+        void analyze(Parser& parser, Context& context) override;
     private:
         std::vector<std::unique_ptr<OptionBaseAst>> m_options;
     };
@@ -99,6 +99,7 @@ namespace Argon {
 
 #include "Context.hpp"
 #include "Option.hpp"
+#include "Parser.hpp" // NOLINT (unused include)
 #include "MultiOption.hpp"
 
 inline Argon::OptionBaseAst::OptionBaseAst(const Token& flagToken) {
@@ -112,22 +113,22 @@ inline Argon::OptionAst::OptionAst(const Token& flagToken, const Token& valueTok
     value = { .value = valueToken.image, .pos = valueToken.position };
 }
 
-inline void Argon::OptionAst::analyze(ErrorGroup& errorGroup, Context& context) {
+inline void Argon::OptionAst::analyze(Parser& parser, Context& context) {
     IOption *iOption = context.getOption(flag.value);
     if (!iOption) {
-        errorGroup.addErrorMessage(std::format("Unknown option: '{}'", flag.value), flag.pos);
+        parser.addError(std::format("Unknown option: '{}'", flag.value), flag.pos);
         return;
     }
 
     auto *optionBase = dynamic_cast<OptionBase*>(iOption);
     if (!optionBase || !dynamic_cast<IsSingleOption*>(iOption)) {
-        errorGroup.addErrorMessage(std::format("Flag '{}' is not an option", flag.value), flag.pos);
+        parser.addError(std::format("Flag '{}' is not an option", flag.value), flag.pos);
         return;
     }
 
-    optionBase->setValue(flag.value, value.value);
+    optionBase->setValue(parser.getDefaultConversions(), flag.value, value.value);
     if (iOption->hasError()) {
-        errorGroup.addErrorMessage(iOption->getError(), value.pos);
+        parser.addError(iOption->getError(), value.pos);
     }
 }
 
@@ -141,23 +142,23 @@ inline void Argon::MultiOptionAst::addValue(const Token& value) {
     m_values.emplace_back(value.image, value.position);
 }
 
-inline void Argon::MultiOptionAst::analyze(ErrorGroup& errorGroup, Context &context) {
+inline void Argon::MultiOptionAst::analyze(Parser& parser, Context &context) {
     IOption *iOption = context.getOption(flag.value);
     if (!iOption) {
-        errorGroup.addErrorMessage(std::format("Unknown multi-option: '{}'", flag.value), flag.pos);
+        parser.addError(std::format("Unknown multi-option: '{}'", flag.value), flag.pos);
         return;
     }
 
     auto *optionBase = dynamic_cast<OptionBase*>(iOption);
     if (!optionBase || !dynamic_cast<IsMultiOption*>(iOption)) {
-        errorGroup.addErrorMessage(std::format("Flag '{}' is not a multi-option", flag.value), flag.pos);
+        parser.addError(std::format("Flag '{}' is not a multi-option", flag.value), flag.pos);
         return;
     }
 
     for (const auto&[value, pos] : m_values) {
-        optionBase->setValue(flag.value, value);
+        optionBase->setValue(parser.getDefaultConversions(), flag.value, value);
         if (iOption->hasError()) {
-            errorGroup.addErrorMessage(iOption->getError(), pos);
+            parser.addError(iOption->getError(), pos);
         }
     }
 }
@@ -174,23 +175,23 @@ inline void Argon::OptionGroupAst::addOption(std::unique_ptr<OptionBaseAst> opti
     m_options.push_back(std::move(option));
 }
 
-inline void Argon::OptionGroupAst::analyze(ErrorGroup& errorGroup, Context& context) {
+inline void Argon::OptionGroupAst::analyze(Parser& parser, Context& context) {
     IOption *iOption = context.getOption(flag.value);
     if (!iOption) {
-        errorGroup.removeErrorGroup(flag.pos);
-        errorGroup.addErrorMessage(std::format("Unknown option group: '{}'", flag.value), flag.pos);
+        parser.removeErrorGroup(flag.pos);
+        parser.addError(std::format("Unknown option group: '{}'", flag.value), flag.pos);
         return;
     }
 
-    auto optionGroup = dynamic_cast<OptionGroup*>(iOption);
+    const auto optionGroup = dynamic_cast<OptionGroup*>(iOption);
     if (!optionGroup) {
-        errorGroup.removeErrorGroup(flag.pos);
-        errorGroup.addErrorMessage(std::format("Flag '{}' is not an option group", flag.value), flag.pos);
+        parser.removeErrorGroup(flag.pos);
+        parser.addError(std::format("Flag '{}' is not an option group", flag.value), flag.pos);
         return;
     }
 
     for (const auto& option : m_options) {
-        option->analyze(errorGroup, optionGroup->getContext());
+        option->analyze(parser, optionGroup->getContext());
     }
 }
 
@@ -203,9 +204,9 @@ inline void Argon::StatementAst::addOption(std::unique_ptr<OptionBaseAst> option
     m_options.push_back(std::move(option));
 }
 
-inline void Argon::StatementAst::analyze(ErrorGroup& errorGroup, Context& context) {
+inline void Argon::StatementAst::analyze(Parser& parser, Context& context) {
     for (const auto& option : m_options) {
-        option->analyze(errorGroup, context);
+        option->analyze(parser, context);
     }
 }
 

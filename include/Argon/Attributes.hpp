@@ -10,7 +10,9 @@
 #include "Flag.hpp"
 
 namespace Argon {
+    class IOption;
     class Context;
+    using OptionMap = std::unordered_map<FlagPathWithAlias, IOption*>;
 
     class Constraints {
     public:

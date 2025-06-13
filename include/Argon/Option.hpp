@@ -8,6 +8,7 @@
 #include <memory>
 #include <sstream>
 #include <string>
+#include <typeindex>
 #include <vector>
 
 #include "Flag.hpp"
@@ -18,6 +19,9 @@ namespace Argon {
     template <typename T> class Option;
     class OptionGroup;
     class Context;
+
+    using DefaultConversionFn = std::function<bool(std::string_view, void*)>;
+    using DefaultConversions  = std::unordered_map<std::type_index, DefaultConversionFn>;
 
     class IOption {
     protected:
@@ -82,7 +86,7 @@ namespace Argon {
         OptionBase() = default;
         virtual ~OptionBase() = default;
 
-        virtual void setValue(const std::string& flag, const std::string& value) = 0;
+        virtual void setValue(const DefaultConversions& conversions, const std::string& flag, const std::string& value) = 0;
     };
 
     template <typename T>
@@ -99,7 +103,7 @@ namespace Argon {
         auto generateErrorMsg(const std::string& flag, const std::string& invalidArg) -> void;
 
     public:
-        auto convert(const std::string& flag, const std::string& value, T& outValue) -> void;
+        auto convert(const DefaultConversions& conversions, const std::string& flag, const std::string& value, T& outValue) -> void;
 
         [[nodiscard]] auto hasConversionError() const -> bool;
 
@@ -132,7 +136,7 @@ namespace Argon {
 
         auto getValue() const -> const T&;
     private:
-        auto setValue(const std::string& flag, const std::string& value) -> void override;
+        auto setValue(const DefaultConversions& conversions, const std::string& flag, const std::string& value) -> void override;
     };
 
     class OptionGroup : public OptionComponent<OptionGroup> {
@@ -365,13 +369,19 @@ auto Converter<Derived, T>::generateErrorMsg(const std::string& flag, const std:
 }
 
 template <typename Derived, typename T>
-auto Converter<Derived, T>::convert(const std::string& flag, const std::string& value, T& outValue) -> void {
+auto Converter<Derived, T>::convert(const DefaultConversions& conversions,
+                                    const std::string& flag, const std::string& value, T& outValue) -> void {
     m_conversionError.clear();
     bool success;
-    // Use custom conversion function if supplied
+    // Use custom conversion function for this specific option if supplied
     if (this->m_conversion_fn != nullptr) {
         success = this->m_conversion_fn(value, outValue);
     }
+    // Search for conversion list for conversion for this type if specified
+    else if (conversions.contains(std::type_index(typeid(T)))) {
+        success = conversions.at(std::type_index(typeid(T)))(value, static_cast<void*>(&outValue));
+    }
+    // Fallback to generic parsing
     // Parse as a character
     else if constexpr (is_numeric_char_type<T>) {
         success = parseNumericChar<T>(value, outValue);
@@ -456,9 +466,9 @@ auto Option<T>::getValue() const -> const T& {
 }
 
 template <typename T>
-auto Option<T>::setValue(const std::string& flag, const std::string& value) -> void {
+auto Option<T>::setValue(const DefaultConversions& conversions, const std::string& flag, const std::string& value) -> void {
     T temp;
-    this->convert(flag, value, temp);
+    this->convert(conversions, flag, value, temp);
     if (this->hasConversionError()) {
         this->m_error = this->getConversionError();
         return;

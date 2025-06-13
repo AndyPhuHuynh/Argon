@@ -1,6 +1,7 @@
 #ifndef ARGON_FLAG_INCLUDE
 #define ARGON_FLAG_INCLUDE
 
+#include <algorithm>
 #include <numeric>
 #include <stdexcept>
 #include <string>

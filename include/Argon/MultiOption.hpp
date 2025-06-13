@@ -42,7 +42,7 @@ namespace Argon {
 
         auto getValue() const -> const std::array<T, N>&;
 
-        auto setValue(const std::string& flag, const std::string& value) -> void override;
+        auto setValue(const DefaultConversions& conversions, const std::string& flag, const std::string& value) -> void override;
     };
 
     // MultiOption with std::vector
@@ -63,7 +63,7 @@ namespace Argon {
 
         auto getValue() const -> const std::vector<T>&;
 
-        auto setValue(const std::string& flag, const std::string& value) -> void override;
+        auto setValue(const DefaultConversions& conversions, const std::string& flag, const std::string& value) -> void override;
     };
 }
 
@@ -120,7 +120,7 @@ namespace Argon {
     }
 
     template <typename T, size_t N>
-    void MultiOption<std::array<T, N>>::setValue(const std::string& flag, const std::string& value) {
+    void MultiOption<std::array<T, N>>::setValue(const DefaultConversions& conversions, const std::string& flag, const std::string& value) {
         if (m_maxCapacityError) {
             this->m_error.clear();
             return;
@@ -132,7 +132,7 @@ namespace Argon {
             return;
         }
 
-        this->convert(flag, value, m_values[m_nextIndex]);
+        this->convert(conversions, flag, value, m_values[m_nextIndex]);
         if (this->hasConversionError()) {
             this->m_error = this->getConversionError();
             return;
@@ -167,9 +167,9 @@ namespace Argon {
     }
 
     template <typename T>
-    void MultiOption<std::vector<T>>::setValue(const std::string& flag, const std::string& value) {
+    void MultiOption<std::vector<T>>::setValue(const DefaultConversions& conversions, const std::string& flag, const std::string& value) {
         T temp;
-        this->convert(flag, value, temp);
+        this->convert(conversions, flag, value, temp);
         if (this->hasConversionError()) {
             this->m_error = this->getConversionError();
             return;

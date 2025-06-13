@@ -598,3 +598,36 @@ TEST_CASE("Repeated flags", "[options]") {
     CHECK(y == 20);
     CHECK(z == 10);
 }
+
+TEST_CASE("Default conversion table", "[options]") {
+    int i;
+    float f;
+    double d;
+    Student s;
+
+    auto parser = Option(&i)["--int"]
+                | Option(&f)["--float"]
+                | Option(&d)["--double"]
+                | Option(&s)["--student"];
+
+    parser.registerConversionFn<int>([](std::string_view, int *out) {
+        *out = 1; return true;
+    });
+    parser.registerConversionFn<float>([](std::string_view, float *out) {
+        *out = 2.0; return true;
+    });
+    parser.registerConversionFn<double>([](std::string_view, double *out) {
+        *out = 3.0; return true;
+    });
+    parser.registerConversionFn<Student>([](std::string_view, Student *out) {
+        *out = { .name = "Joshua", .age = 20 }; return true;
+    });
+    parser.parse("--int hi --float hello --double world --student :D");
+
+    CHECK(!parser.hasErrors());
+    CHECK(i == 1);
+    CHECK(f == Catch::Approx(2.0).epsilon(1e-6));
+    CHECK(d == Catch::Approx(3.0).epsilon(1e-6));
+    CHECK(s.name == "Joshua");
+    CHECK(s.age == 20);
+}

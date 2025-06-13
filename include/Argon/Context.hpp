@@ -44,7 +44,7 @@ namespace Argon {
 
         [[nodiscard]] auto containsLocalFlag(std::string_view flag) const -> bool;
 
-        [[nodiscard]] auto getHelpMessage(size_t maxLineWidth = 80) const -> std::string;
+        [[nodiscard]] auto getHelpMessage(size_t maxLineWidth = 120) const -> std::string;
 
         template<typename ValueType>
         auto getValue(const FlagPath& flagPath) -> const ValueType&;
@@ -297,26 +297,33 @@ inline auto Context::getHelpMessage(std::stringstream& ss, const size_t leadingS
     const size_t maxDescLength = maxLineWidth - maxFlagWidth;
     size_t sectionStart = 0;
     while (sectionStart < description.length()) {
-        // Trim whitespaces
-        while (description[sectionStart] == ' ') {
-            sectionStart++;
+        // Skip any leading whitespace
+        while (sectionStart < description.length() && description[sectionStart] == ' ') {
+            ++sectionStart;
         }
-        if (sectionStart >= description.length() - 1) {
+
+        if (sectionStart >= description.length()) {
             break;
         }
-        // Extract section
-        size_t prevSpaceIndex = sectionStart;
-        for (size_t i = 0; i < maxDescLength; i++) {
-            if (sectionStart + i >= description.length()) {
-                prevSpaceIndex = sectionStart + i;
-                break;
-            }
-            if (description[sectionStart + i] == ' ') {
-                prevSpaceIndex = sectionStart + i;
-            }
+
+        // Determine the maximum end index
+        const size_t end = sectionStart + maxDescLength;
+        if (end >= description.length()) {
+            // Add the final section
+            sections.emplace_back(&description[sectionStart], description.length() - sectionStart);
+            break;
         }
-        sections.emplace_back(&description[sectionStart], prevSpaceIndex - sectionStart);
-        sectionStart = prevSpaceIndex;
+
+        // Find the last space within the range
+        size_t breakPoint = description.rfind(' ', end);
+        if (breakPoint == std::string::npos || breakPoint <= sectionStart) {
+            // No space found, or the space is before sectionStart – hard break
+            breakPoint = end;
+        }
+
+        size_t length = breakPoint - sectionStart;
+        sections.emplace_back(&description[sectionStart], length);
+        sectionStart = breakPoint;
     }
 
     if (flag.length() > maxFlagWidth) {

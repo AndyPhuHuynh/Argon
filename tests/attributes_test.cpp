@@ -111,7 +111,7 @@ TEST_CASE("Help message") {
 
 TEST_CASE("Help message 2") {
     auto parser = Option<int>()["--xcoord"]["-x"]("<int>", "x coordinate of the location. This is a really long description to test how overflow works :D. Wow this is a very amazing feature.")
-                | Option<int>()["--ycoord"]["-y"]("<int>", "y coordinate of the location")
+                | Option<int>()["--ycoord"]["-y"]("<int>", "y coordinate of the location ycoordinateofthelocation ycoordinateofthelocationycoordinateofthelocation")
                 | Option<int>()["--zcoord"]["-z"]("<int>", "z coordinate of the location")
                 | (
                     OptionGroup()["--student"]("[Student Info]", "Specify information about the main character")
@@ -133,8 +133,8 @@ TEST_CASE("Help message 2") {
                         + Option<int>()["--major"]["--maj"]("The main class the student is taking")
                         + Option<int>()["--minor"]["--min"]("The side class the student is taking")
                     )
-                );
-
+                )
+                | MultiOption<std::vector<int>>()["--courseids"]("<ids...>", "Specify a list of course ids ");
     const auto msg = parser.getHelpMessage();
     std::cout << msg << "\n\n\n";
     std::string x = R"START([Options]

@@ -120,13 +120,13 @@ inline void Argon::OptionAst::analyze(Parser& parser, Context& context) {
         return;
     }
 
-    auto *optionBase = dynamic_cast<OptionBase*>(iOption);
-    if (!optionBase || !dynamic_cast<IsSingleOption*>(iOption)) {
+    auto *setValue = dynamic_cast<ISetValue*>(iOption);
+    if (!setValue || !dynamic_cast<IsSingleOption*>(iOption)) {
         parser.addError(std::format("Flag '{}' is not an option", flag.value), flag.pos);
         return;
     }
 
-    optionBase->setValue(parser.getDefaultConversions(), flag.value, value.value);
+    setValue->setValue(parser.getDefaultConversions(), flag.value, value.value);
     if (iOption->hasError()) {
         parser.addError(iOption->getError(), value.pos);
     }
@@ -149,14 +149,14 @@ inline void Argon::MultiOptionAst::analyze(Parser& parser, Context &context) {
         return;
     }
 
-    auto *optionBase = dynamic_cast<OptionBase*>(iOption);
-    if (!optionBase || !dynamic_cast<IsMultiOption*>(iOption)) {
+    auto *setValue = dynamic_cast<ISetValue*>(iOption);
+    if (!setValue || !dynamic_cast<IsMultiOption*>(iOption)) {
         parser.addError(std::format("Flag '{}' is not a multi-option", flag.value), flag.pos);
         return;
     }
 
     for (const auto&[value, pos] : m_values) {
-        optionBase->setValue(parser.getDefaultConversions(), flag.value, value);
+        setValue->setValue(parser.getDefaultConversions(), flag.value, value);
         if (iOption->hasError()) {
             parser.addError(iOption->getError(), pos);
         }

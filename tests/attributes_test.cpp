@@ -110,51 +110,32 @@ TEST_CASE("Help message") {
 }
 
 TEST_CASE("Help message 2") {
-    auto parser = Option<int>()["--xcoord"]["-x"]("<int>", "x coordinate of the location. This is a really long description to test how overflow works :D. Wow this is a very amazing feature.")
-                | Option<int>()["--ycoord"]["-y"]("<int>", "y coordinate of the location ycoordinateofthelocation ycoordinateofthelocationycoordinateofthelocation")
-                | Option<int>()["--zcoord"]["-z"]("<int>", "z coordinate of the location")
-                | (
-                    OptionGroup()["--student"]("[Student Info]", "Specify information about the main character")
-                    + Option<int>()["--name"]("The name of the student")
-                    + Option<int>()["--age"]("The age of the student")
-                    + (
-                        OptionGroup()["--classes"]("[Class Information]", "The classes the student takes")
-                        + Option<int>()["--major"]["--maj"]("The main class the student is taking")
-                        + Option<int>()["--minor"]["--min"]("The side class the student is taking")
-                    )
-                )
-                | Option<int>()["--region"]("The region the game takes place in")
-                | (
-                    OptionGroup()["--student2"]("[Student Info 2]", "Specify information about the second character")
-                    + Option<int>()["--name"]("The name of the student")
-                    + Option<int>()["--age"]("The age of the student")
-                    + (
-                        OptionGroup()["--classes"]("[Class Information]", "The classes the student takes")
-                        + Option<int>()["--major"]["--maj"]("The main class the student is taking")
-                        + Option<int>()["--minor"]["--min"]("The side class the student is taking")
-                    )
-                )
-                | MultiOption<std::vector<int>>()["--courseids"]("<ids...>", "Specify a list of course ids ");
+    const auto parser =
+        Option<int>()["--xcoord"]["-x"]("<int>", "x coordinate of the location. This is a really long description to test how overflow works :D. Wow this is a very amazing feature.")
+        | Option<int>()["--ycoord"]["-y"]("<int>", "y coordinate of the location ycoordinateofthelocation ycoordinateofthelocationycoordinateofthelocation")
+        | Option<int>()["--zcoord"]["-z"]("<int>", "z coordinate of the location")
+        | (
+            OptionGroup()["--student"]("[Student Info]", "Specify information about the main character")
+            + Option<int>()["--name"]("The name of the student")
+            + Option<int>()["--age"]("The age of the student")
+            + (
+                OptionGroup()["--classes"]("[Class Information]", "The classes the student takes")
+                + Option<int>()["--major"]["--maj"]("The main class the student is taking")
+                + Option<int>()["--minor"]["--min"]("The side class the student is taking")
+            )
+        )
+        | Option<int>()["--region"]("The region the game takes place in")
+        | (
+            OptionGroup()["--student2"]("[Student Info 2]", "Specify information about the second character")
+            + Option<int>()["--name"]("The name of the student")
+            + Option<int>()["--age"]("The age of the student")
+            + (
+                OptionGroup()["--classes"]("[Class Information]", "The classes the student takes")
+                + Option<int>()["--major"]["--maj"]("The main class the student is taking")
+                + Option<int>()["--minor"]["--min"]("The side class the student is taking")
+            )
+        )
+        | MultiOption<std::vector<int>>()["--courseids"]("<ids...>", "Specify a list of course ids ");
     const auto msg = parser.getHelpMessage();
     std::cout << msg << "\n\n\n";
-    std::string x = R"START([Options]
---------------------------------------------------------------------------
---xcoord, -x, --xc:             x coordinate of the location (mutually exclusive with --region)
---ycoord, -y:                   y coordinate of the location (mutually exclusive with --region)
---zcoordinates, -z:             z coordinate of the location (mutually exclusive with --region)
---region-of-games, -r:          The region the game takes place in (mutually exclusive with:
-                                --xcoord, --ycoord, --zcoord)
---student [Student Info]:       Specify information about the main character
-
-    [Student Info]
-    -----------------------------------------------------------------------
-    --name:                     The name of the student
-    --age:                      The age of the student
-    --classes [Class Info]:     The classes the student takes
-
-        [Class Info]
-        --------------------------------------------------------------------
-        --major, --maj:         The main class the student is taking
-        --minor, --min:         The side class the student is taking)START";
-    // std::cout << x << "\n";
 }

@@ -98,7 +98,7 @@ static void GroupTest1() {
 static void SyntaxError1() {
     using namespace Argon;
     int test = 0;
-    Parser parser = static_cast<Parser>(Option(&test)["--test"]);
+    auto parser = static_cast<Parser>(Option(&test)["--test"]);
 
     const std::string input = "[[[[[[[[[ --test ] 2";
     parser.parse(input);

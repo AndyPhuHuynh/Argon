@@ -81,10 +81,10 @@ namespace Argon {
         auto operator()(std::string_view inputHint, std::string_view desc) && -> Derived&&;
     };
 
-    class OptionBase {
+    class ISetValue {
     public:
-        OptionBase() = default;
-        virtual ~OptionBase() = default;
+        ISetValue() = default;
+        virtual ~ISetValue() = default;
 
         virtual void setValue(const DefaultConversions& conversions, const std::string& flag, const std::string& value) = 0;
     };
@@ -118,13 +118,28 @@ namespace Argon {
         auto withErrorMsgFn(const GenerateErrorMsgFn& generate_error_msg_fn) && -> Derived&&;
     };
 
+    template <typename Derived, typename T>
+    class SetValueImpl : public ISetValue, public Converter<Derived, T> {
+        T m_value = T();
+        T *m_out = nullptr;
+    public:
+        SetValueImpl() = default;
+
+        explicit SetValueImpl(T defaultValue);
+
+        explicit SetValueImpl(T *out);
+
+        SetValueImpl(T defaultValue, T *out);
+
+        auto getValue() const -> const T&;
+    protected:
+        auto setValue(const DefaultConversions& conversions, const std::string& flag, const std::string& value) -> void override;
+    };
+
     class IsSingleOption {};
 
     template <typename T>
-    class Option : public OptionBase, public OptionComponent<Option<T>>,
-                   public IsSingleOption, public Converter<Option<T>, T> {
-        T m_value = T();
-        T *m_out = nullptr;
+    class Option : public SetValueImpl<Option<T>, T>, public OptionComponent<Option<T>>, public IsSingleOption {
     public:
         Option() = default;
 
@@ -133,9 +148,7 @@ namespace Argon {
         explicit Option(T *out);
 
         Option(T defaultValue, T *out);
-
-        auto getValue() const -> const T&;
-    private:
+    protected:
         auto setValue(const DefaultConversions& conversions, const std::string& flag, const std::string& value) -> void override;
     };
 
@@ -449,34 +462,48 @@ auto Converter<Derived, T>::withErrorMsgFn(const GenerateErrorMsgFn& generate_er
     return static_cast<Derived&&>(*this);
 }
 
-template<typename T>
-Option<T>::Option(T defaultValue) : m_value(defaultValue) {}
+template<typename Derived, typename T>
+SetValueImpl<Derived, T>::SetValueImpl(T defaultValue) : m_value(defaultValue) {}
 
-template <typename T>
-Option<T>::Option(T* out) : OptionBase(), m_out(out) {}
+template<typename Derived, typename T>
+SetValueImpl<Derived, T>::SetValueImpl(T* out) : ISetValue(), m_out(out) {}
 
-template<typename T>
-Option<T>::Option(T defaultValue, T *out) : m_value(defaultValue), m_out(out) {
+template<typename Derived, typename T>
+SetValueImpl<Derived, T>::SetValueImpl(T defaultValue, T *out) : m_value(defaultValue), m_out(out) {
     *m_out = defaultValue;
 }
 
-template<typename T>
-auto Option<T>::getValue() const -> const T& {
+template<typename Derived, typename T>
+auto SetValueImpl<Derived, T>::getValue() const -> const T& {
     return m_value;
 }
 
-template <typename T>
-auto Option<T>::setValue(const DefaultConversions& conversions, const std::string& flag, const std::string& value) -> void {
+template<typename Derived, typename T>
+auto SetValueImpl<Derived, T>::setValue(const DefaultConversions& conversions, const std::string& flag, const std::string& value) -> void {
     T temp;
     this->convert(conversions, flag, value, temp);
     if (this->hasConversionError()) {
-        this->m_error = this->getConversionError();
         return;
     }
     m_value = temp;
     if (m_out != nullptr) {
         *m_out = temp;
     }
+}
+
+template<typename T>
+Option<T>::Option(T defaultValue) : SetValueImpl<Option, T>(defaultValue) {}
+
+template<typename T>
+Option<T>::Option(T *out) : SetValueImpl<Option, T>(out) {}
+
+template<typename T>
+Option<T>::Option(T defaultValue, T *out) : SetValueImpl<Option, T>(defaultValue, out) {}
+
+template<typename T>
+void Option<T>::setValue(const DefaultConversions& conversions, const std::string& flag, const std::string& value) {
+    SetValueImpl<Option, T>::setValue(conversions, flag, value);
+    this->m_error = this->getConversionError();
     this->m_isSet = true;
 }
 

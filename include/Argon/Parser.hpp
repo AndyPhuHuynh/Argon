@@ -6,6 +6,7 @@
 #include <typeindex>
 #include <typeinfo>
 #include <unordered_map>
+#include <variant>
 
 #include "Attributes.hpp"
 #include "Context.hpp"
@@ -21,6 +22,7 @@ namespace Argon {
     class MultiOptionAst;
     class OptionGroupAst;
     class OptionBaseAst;
+    class PositionalAst;
 
     using DefaultConversionFn = std::function<bool(std::string_view, void*)>;
     using DefaultConversions  = std::unordered_map<std::type_index, DefaultConversionFn>;
@@ -96,7 +98,8 @@ namespace Argon {
 
         auto parseStatement() -> StatementAst;
 
-        auto parseOptionBundle(Context& context) -> std::unique_ptr<OptionBaseAst>;
+        auto parseOptionBundle(Context& context) ->
+            std::variant<std::monostate, std::unique_ptr<OptionBaseAst>, std::unique_ptr<PositionalAst>>;
 
         auto parseSingleOption(Context& context, const Token& flag) -> std::unique_ptr<OptionAst>;
 
@@ -106,7 +109,8 @@ namespace Argon {
 
         auto parseOptionGroup(Context& context, const Token& flag) -> std::unique_ptr<OptionGroupAst>;
 
-        auto getNextValidFlag(const Context& context, bool printErrors = true) -> std::optional<Token>;
+        auto getNextValidFlag(const Context& context, bool printErrors = true) -> ::std::variant<std::monostate,
+            Token, std::unique_ptr<::Argon::PositionalAst>>;
 
         auto skipToNextValidFlag(const Context& context) -> void;
 
@@ -220,28 +224,39 @@ inline auto Parser::parseStatement() -> StatementAst {
             getNextToken();
             continue;
         }
-        statement.addOption(parseOptionBundle(m_context));
+        auto parsed = parseOptionBundle(m_context);
+        std::visit([&statement]<typename T>(T& opt) {
+            if constexpr (std::is_same_v<T, std::monostate>) {}
+            else {statement.addOption(std::move(opt));}
+        }, parsed);
     }
     return statement;
 }
 
-inline auto Parser::parseOptionBundle(Context& context) -> std::unique_ptr<OptionBaseAst> { // NOLINT(misc-no-recursion)
-    const auto opt = getNextValidFlag(context);
-    if (!opt.has_value()) { return nullptr; }
-    const auto& flagToken = opt.value();
+inline auto Parser::parseOptionBundle(Context& context) -> // NOLINT(misc-no-recursion)
+    std::variant<std::monostate, std::unique_ptr<OptionBaseAst>, std::unique_ptr<PositionalAst>> {
+    auto var = getNextValidFlag(context);
+    if (std::holds_alternative<std::monostate>(var)) { return std::monostate{}; }
+    if (std::holds_alternative<Token>(var)) {
+        const auto& flagToken = std::get<Token>(var);
 
-    IOption *iOption = context.getOption(flagToken.image);
-    if (dynamic_cast<IsSingleOption *>(iOption)) {
-        return parseSingleOption(context, flagToken);
-    }
-    if (dynamic_cast<IsMultiOption *>(iOption)) {
-        return parseMultiOption(context, flagToken);
-    }
-    if (dynamic_cast<OptionGroup *>(iOption)) {
-        return parseOptionGroup(context, flagToken);
-    }
+        IOption *iOption = context.getOption(flagToken.image);
+        if (dynamic_cast<IsSingleOption *>(iOption)) {
+            return parseSingleOption(context, flagToken);
+        }
+        if (dynamic_cast<IsMultiOption *>(iOption)) {
+            return parseMultiOption(context, flagToken);
+        }
+        if (dynamic_cast<OptionGroup *>(iOption)) {
+            return parseOptionGroup(context, flagToken);
+        }
 
-    return nullptr;
+        return std::monostate{};
+    }
+    if (std::holds_alternative<std::unique_ptr<PositionalAst>>(var)) {
+        return std::move(std::get<std::unique_ptr<PositionalAst>>(var));
+    }
+    return std::monostate{};
 }
 
 inline auto Parser::parseSingleOption(Context& context, const Token& flag) -> std::unique_ptr<OptionAst> {
@@ -330,8 +345,11 @@ inline auto Parser::parseGroupContents(OptionGroupAst& optionGroupAst, Context& 
                 std::format("No matching ']' found for group '{}'", optionGroupAst.flag.value), nextToken.position);
             return;
         }
-
-        optionGroupAst.addOption(parseOptionBundle(nextContext));
+        auto parsed = parseOptionBundle(nextContext);
+        std::visit([&optionGroupAst]<typename T>(T& opt) {
+            if constexpr (std::is_same_v<T, std::monostate>) {}
+            else {optionGroupAst.addOption(std::move(opt));}
+        }, parsed);
     }
 }
 
@@ -354,12 +372,21 @@ inline auto Parser::parseOptionGroup(Context& context, const Token& flag) -> std
     return optionGroupAst;
 }
 
-inline auto Parser::getNextValidFlag(const Context& context, const bool printErrors) -> std::optional<Token> {
+inline auto Parser::getNextValidFlag(const Context& context, const bool printErrors) ->
+    std::variant<std::monostate, Token, std::unique_ptr<PositionalAst>> {
     Token flag = m_scanner.peekToken();
 
-    const bool isIdentifier = flag.kind == TokenKind::IDENTIFIER;
-    const bool inContext = context.containsLocalFlag(flag.image);
+    const bool isIdentifier     = flag.kind == TokenKind::IDENTIFIER;
+    const bool hasFlagPrefix    = flag.image.starts_with(m_shortPrefix) || flag.image.starts_with(m_longPrefix);
+    const bool inContext        = context.containsLocalFlag(flag.image);
 
+    // Is a positional arg
+    if (isIdentifier && !hasFlagPrefix) {
+        getNextToken();
+        return std::make_unique<PositionalAst>(flag);
+    }
+
+    // Is a valid flag in the context
     if (isIdentifier && inContext) {
         getNextToken();
         return flag;
@@ -401,7 +428,7 @@ inline auto Parser::getNextValidFlag(const Context& context, const bool printErr
         }
         if (token.kind == TokenKind::RBRACK || token.kind == TokenKind::END) {
             // Escape this scope, leave RBRACK scanning to the function above
-            return std::nullopt;
+            return std::monostate{};
         }
         if (token.kind == TokenKind::IDENTIFIER && context.containsLocalFlag(token.image)) {
             getNextToken();

@@ -88,7 +88,6 @@ namespace Argon {
         return "unsigned long long";
     }
 
-
     template<>
     inline std::string type_name<float>() {
         return "floating point number";

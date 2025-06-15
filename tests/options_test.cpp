@@ -631,3 +631,13 @@ TEST_CASE("Default conversion table", "[options]") {
     CHECK(s.name == "Joshua");
     CHECK(s.age == 20);
 }
+
+TEST_CASE("Positional args test 1", "[options][positional]") {
+    auto parser = Option<int>()["--x"]
+                | Option<float>()["--f"];
+
+    const std::string input = "hello world --x 10 positional arg";
+    parser.parse(input);
+
+    CHECK(!parser.hasErrors());
+}

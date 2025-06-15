@@ -53,6 +53,16 @@ namespace Argon {
         void analyze(Parser& parser, Context& context) override;
     };
 
+    class PositionalAst : public Ast {
+    public:
+        Value value;
+
+        explicit PositionalAst(const Token& flagToken);
+        ~PositionalAst() override = default;
+
+        void analyze(Parser& parser, Context& context) override;
+    };
+
     class OptionGroupAst : public OptionBaseAst {
     public:
         int endPos = -1;
@@ -68,14 +78,15 @@ namespace Argon {
         ~OptionGroupAst() override = default;
 
         void addOption(std::unique_ptr<OptionBaseAst> option);
+        void addOption(std::unique_ptr<PositionalAst> option);
         void analyze(Parser& parser, Context& context) override;
     private:
         std::vector<std::unique_ptr<OptionBaseAst>> m_options;
+        std::vector<std::unique_ptr<PositionalAst>> m_positionals;
     };
 
     class StatementAst : public Ast {
     public:
-
         StatementAst() = default;
 
         StatementAst(const StatementAst&) = delete;
@@ -87,9 +98,11 @@ namespace Argon {
         ~StatementAst() override = default;
 
         void addOption(std::unique_ptr<OptionBaseAst> option);
+        void addOption(std::unique_ptr<PositionalAst> option);
         void analyze(Parser& parser, Context& context) override;
     private:
         std::vector<std::unique_ptr<OptionBaseAst>> m_options;
+        std::vector<std::unique_ptr<PositionalAst>> m_positionals;
     };
 }
 
@@ -163,6 +176,14 @@ inline void Argon::MultiOptionAst::analyze(Parser& parser, Context &context) {
     }
 }
 
+inline Argon::PositionalAst::PositionalAst(const Token& flagToken) {
+    value = { .value = flagToken.image, .pos = flagToken.position };
+}
+
+inline void Argon::PositionalAst::analyze([[maybe_unused]] Parser& parser, [[maybe_unused]] Context& context) {
+    std::cout << "Todo later: analyze positional ast\n";
+}
+
 // OptionGroupAst
 
 inline Argon::OptionGroupAst::OptionGroupAst(const Token& flagToken)
@@ -173,6 +194,13 @@ inline void Argon::OptionGroupAst::addOption(std::unique_ptr<OptionBaseAst> opti
         return;
     }
     m_options.push_back(std::move(option));
+}
+
+inline void Argon::OptionGroupAst::addOption(std::unique_ptr<PositionalAst> option) {
+    if (option == nullptr) {
+        return;
+    }
+    m_positionals.push_back(std::move(option));
 }
 
 inline void Argon::OptionGroupAst::analyze(Parser& parser, Context& context) {
@@ -202,6 +230,13 @@ inline void Argon::StatementAst::addOption(std::unique_ptr<OptionBaseAst> option
         return;
     }
     m_options.push_back(std::move(option));
+}
+
+inline void Argon::StatementAst::addOption(std::unique_ptr<PositionalAst> option) {
+    if (option == nullptr) {
+        return;
+    }
+    m_positionals.push_back(std::move(option));
 }
 
 inline void Argon::StatementAst::analyze(Parser& parser, Context& context) {

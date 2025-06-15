@@ -15,18 +15,26 @@
 
 namespace Argon {
     class IOption;
-    using OptionPtr = std::variant<IOption*, std::unique_ptr<IOption>>;
-    using OptionMap = std::unordered_map<FlagPathWithAlias, IOption*>;
+    class IsPositional;
+
+    using OptionPtr     = std::variant<IOption*, std::unique_ptr<IOption>>;
+    using PositionalPtr = std::variant<IsPositional*, std::unique_ptr<IsPositional>>;
+    using OptionMap     = std::unordered_map<FlagPathWithAlias, IOption*>;
 
     class Context {
         std::vector<OptionPtr> m_options;
+        std::vector<PositionalPtr> m_positionals;
         std::string m_name;
         Context *m_parent = nullptr;
     public:
         Context() = default;
         explicit Context(std::string name);
+
         Context(const Context&);
         auto operator=(const Context&) -> Context&;
+
+        Context(Context&&) noexcept = default;
+        auto operator=(Context&&) noexcept -> Context& = default;
 
         template <typename T> requires DerivesFrom<T, IOption>
         auto addOption(T&& option) -> void;
@@ -59,6 +67,12 @@ namespace Argon {
         auto applyPrefixes(std::string_view shortPrefix, std::string_view longPrefix) -> void;
 
     private:
+        template <typename T> requires DerivesFrom<T, IsPositional>
+        auto addPositionalOption(T&& option) -> void;
+
+        template <typename T> requires DerivesFrom<T, IOption>
+        auto addNonPositionalOption(T&& option) -> void;
+
         [[nodiscard]] auto collectAllFlags() const -> std::vector<const Flag*>;
 
         auto resolveFlagGroup(const FlagPath& flagPath) -> Context&;
@@ -154,6 +168,27 @@ inline auto Context::operator=(const Context& other) -> Context& {
 
 template<typename T> requires DerivesFrom<T, IOption>
 auto Context::addOption(T&& option) -> void {
+    if constexpr (DerivesFrom<T, IsPositional>) {
+        addPositionalOption(std::forward<T>(option));
+    } else {
+        addNonPositionalOption(std::forward<T>(option));
+    }
+}
+
+template<typename T> requires DerivesFrom<T, IsPositional>
+auto Context::addPositionalOption(T&&option) -> void {
+    // Non-owned option
+    if (std::is_lvalue_reference_v<T>) {
+        m_positionals.emplace_back(&option);
+    }
+    // Owned option
+    else {
+        m_positionals.emplace_back(option.clone());
+    }
+}
+
+template<typename T> requires DerivesFrom<T, IOption>
+auto Context::addNonPositionalOption(T&& option) -> void {
     IOption *optPtr;
     // Non-owned option
     if (std::is_lvalue_reference_v<T>) {

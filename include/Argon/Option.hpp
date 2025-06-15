@@ -195,6 +195,18 @@ namespace Argon {
 
         [[nodiscard]] auto getContext() const -> const Context&;
     };
+
+    class IsPositional {
+    public:
+        IsPositional() = default;
+        virtual ~IsPositional() = 0;
+    };
+
+    template <typename T>
+    class Positional : public SetValueImpl<Positional<T>, T>,
+                       public OptionComponent<Positional<T>>, public IsPositional {
+        auto setValue(const DefaultConversions& conversions, const std::string& flag, const std::string& value) -> void override;
+    };
 }
 
 //------------------------------------------------------Includes--------------------------------------------------------
@@ -633,6 +645,13 @@ auto OptionGroup::operator+(T&& other) && -> OptionGroup&& {
 template<typename T> requires DerivesFrom<T, IOption>
 auto OptionGroup::addOption(T&& option) -> void {
     m_context->addOption(std::forward<T>(option));
+}
+
+template<typename T>
+void Positional<T>::setValue(const DefaultConversions& conversions, const std::string& flag, const std::string& value) {
+    SetValueImpl<Positional, T>::setValue(conversions, flag, value);
+    this->m_error = this->getConversionError();
+    this->m_isSet = true;
 }
 
 inline auto OptionGroup::getOption(const std::string& flag) -> IOption* { //NOLINT (function is not const)

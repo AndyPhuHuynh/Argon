@@ -23,9 +23,34 @@ namespace Argon {
     using DefaultConversionFn = std::function<bool(std::string_view, void*)>;
     using DefaultConversions  = std::unordered_map<std::type_index, DefaultConversionFn>;
 
-    class IOption {
+    class IFlag {
     protected:
         Flag m_flag;
+        bool m_mainFlagSet = false;
+    public:
+        IFlag() = default;
+        ~IFlag() = default;
+
+        IFlag(const IFlag&) = default;
+        IFlag& operator=(const IFlag&) = default;
+
+        IFlag(IFlag&&) = default;
+        IFlag& operator=(IFlag&&) = default;
+
+        [[nodiscard]] auto getFlag() const -> const Flag&;
+
+        auto applyPrefixes(std::string_view shortPrefix, std::string_view longPrefix) -> void;
+    };
+
+    template <typename Derived>
+    class HasFlag : public IFlag{
+    public:
+        auto operator[](std::string_view tag) & -> Derived&;
+        auto operator[](std::string_view tag) && -> Derived&&;
+    };
+
+    class IOption {
+    protected:
         std::string m_error;
         std::string m_inputHint;
         std::string m_description;
@@ -38,10 +63,6 @@ namespace Argon {
         IOption(IOption&&) noexcept;
         IOption& operator=(IOption&&) noexcept;
         virtual ~IOption() = default;
-
-        auto applyPrefixes(std::string_view shortPrefix, std::string_view longPrefix) -> void;
-
-        [[nodiscard]] auto getFlag() const -> const Flag&;
 
         [[nodiscard]] auto getError() const -> const std::string&;
 
@@ -61,14 +82,10 @@ namespace Argon {
     template <typename Derived>
     class OptionComponent : public IOption {
         friend Derived;
-        bool m_mainFlagSet = false;
 
         OptionComponent() = default;
     public:
         [[nodiscard]] std::unique_ptr<IOption> clone() const override;
-
-        auto operator[](std::string_view tag) & -> Derived&;
-        auto operator[](std::string_view tag) && -> Derived&&;
 
         auto description(std::string_view desc) & -> Derived&;
         auto description(std::string_view desc) && -> Derived&&;
@@ -139,7 +156,8 @@ namespace Argon {
     class IsSingleOption {};
 
     template <typename T>
-    class Option : public SetValueImpl<Option<T>, T>, public OptionComponent<Option<T>>, public IsSingleOption {
+    class Option : public HasFlag<Option<T>>, public SetValueImpl<Option<T>, T>,
+                   public OptionComponent<Option<T>>, public IsSingleOption {
     public:
         Option() = default;
 
@@ -152,12 +170,15 @@ namespace Argon {
         auto setValue(const DefaultConversions& conversions, const std::string& flag, const std::string& value) -> void override;
     };
 
-    class OptionGroup : public OptionComponent<OptionGroup> {
+    class OptionGroup : public HasFlag<OptionGroup>, public OptionComponent<OptionGroup>{
         std::unique_ptr<Context> m_context;
     public:
         OptionGroup();
         OptionGroup(const OptionGroup&);
         auto operator=(const OptionGroup&) -> OptionGroup&;
+
+        OptionGroup(OptionGroup&&) = default;
+        auto operator=(OptionGroup&&) -> OptionGroup& = default;
 
         template <typename T> requires DerivesFrom<T, IOption>
         auto operator+(T&& other) & -> OptionGroup&;
@@ -284,13 +305,16 @@ auto parseFloatingPoint(const std::string& arg, T& out) -> bool {
 //---------------------------------------------------Implementations----------------------------------------------------
 
 namespace Argon {
-template <typename Derived>
-auto OptionComponent<Derived>::clone() const -> std::unique_ptr<IOption> {
-    return std::make_unique<Derived>(static_cast<const Derived&>(*this));
+inline auto IFlag::getFlag() const -> const Flag& {
+    return m_flag;
+}
+
+inline auto IFlag::applyPrefixes(const std::string_view shortPrefix, const std::string_view longPrefix) -> void {
+    m_flag.applyPrefixes(shortPrefix, longPrefix);
 }
 
 template <typename Derived>
-auto OptionComponent<Derived>::operator[](const std::string_view tag) & -> Derived& {
+auto HasFlag<Derived>::operator[](const std::string_view tag) & -> Derived& {
     if (!m_mainFlagSet) {
         m_mainFlagSet = true;
         m_flag.mainFlag = tag;
@@ -301,7 +325,10 @@ auto OptionComponent<Derived>::operator[](const std::string_view tag) & -> Deriv
 }
 
 template<typename Derived>
-auto OptionComponent<Derived>::operator[](const std::string_view tag) && -> Derived&& {
+auto HasFlag<Derived>::operator[](const std::string_view tag) && -> Derived&& {
+    if (tag.empty()) {
+        throw std::invalid_argument("Flag has to be at least one character long opt");
+    }
     if (!m_mainFlagSet) {
         m_mainFlagSet = true;
         m_flag.mainFlag = tag;
@@ -309,6 +336,11 @@ auto OptionComponent<Derived>::operator[](const std::string_view tag) && -> Deri
         m_flag.aliases.emplace_back(tag);
     }
     return static_cast<Derived&&>(*this);
+}
+
+template <typename Derived>
+auto OptionComponent<Derived>::clone() const -> std::unique_ptr<IOption> {
+    return std::make_unique<Derived>(static_cast<const Derived&>(*this));
 }
 
 template<typename Derived>
@@ -508,7 +540,6 @@ void Option<T>::setValue(const DefaultConversions& conversions, const std::strin
 }
 
 inline IOption::IOption(const IOption& other) {
-    m_flag          = other.m_flag;
     m_error         = other.m_error;
     m_isSet         = other.m_isSet;
     m_inputHint      = other.m_inputHint;
@@ -517,7 +548,6 @@ inline IOption::IOption(const IOption& other) {
 
 inline auto IOption::operator=(const IOption& other) -> IOption& {
     if (this != &other) {
-        m_flag          = other.m_flag;
         m_error         = other.m_error;
         m_isSet         = other.m_isSet;
         m_inputHint      = other.m_inputHint;
@@ -528,7 +558,6 @@ inline auto IOption::operator=(const IOption& other) -> IOption& {
 
 inline IOption::IOption(IOption&& other) noexcept {
     if (this != &other) {
-        m_flag          = std::move(other.m_flag);
         m_error         = std::move(other.m_error);
         m_isSet         = other.m_isSet;
         m_inputHint      = std::move(other.m_inputHint);
@@ -538,21 +567,12 @@ inline IOption::IOption(IOption&& other) noexcept {
 
 inline auto IOption::operator=(IOption&& other) noexcept -> IOption& {
     if (this != &other) {
-        m_flag          = std::move(other.m_flag);
         m_error         = std::move(other.m_error);
         m_isSet         = other.m_isSet;
         m_inputHint      = std::move(other.m_inputHint);
         m_description   = std::move(other.m_description);
     }
     return *this;
-}
-
-inline auto IOption::applyPrefixes(const std::string_view shortPrefix, const std::string_view longPrefix) -> void {
-    m_flag.applyPrefixes(shortPrefix, longPrefix);
-}
-
-inline auto IOption::getFlag() const -> const Flag& {
-    return m_flag;
 }
 
 inline auto IOption::getError() const -> const std::string& {
@@ -583,7 +603,8 @@ inline OptionGroup::OptionGroup() {
     m_context = std::make_unique<Context>();
 }
 
-inline OptionGroup::OptionGroup(const OptionGroup &other) : OptionComponent(other) {
+inline OptionGroup::OptionGroup(const OptionGroup &other)
+    : HasFlag(other), OptionComponent(other) {
     m_context = std::make_unique<Context>(*other.m_context);
 }
 
@@ -591,7 +612,8 @@ inline auto OptionGroup::operator=(const OptionGroup& other) -> OptionGroup& {
     if (this == &other) {
         return *this;
     }
-
+    HasFlag::operator=(other);
+    OptionComponent::operator=(other);
     m_context = std::make_unique<Context>(*other.m_context);
     return *this;
 }

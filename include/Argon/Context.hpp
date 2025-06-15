@@ -6,6 +6,7 @@
 #include <ranges>
 #include <string>
 #include <string_view>
+#include <type_traits>
 #include <variant>
 #include <vector>
 
@@ -26,10 +27,9 @@ namespace Argon {
         explicit Context(std::string name);
         Context(const Context&);
         auto operator=(const Context&) -> Context&;
-        
-        auto addOption(IOption& option) -> void;
 
-        auto addOption(IOption&& option) -> void;
+        template <typename T> requires DerivesFrom<T, IOption>
+        auto addOption(T&& option) -> void;
 
         auto getOption(std::string_view flag) -> IOption*;
 
@@ -152,25 +152,31 @@ inline auto Context::operator=(const Context& other) -> Context& {
     return *this;
 }
 
-inline auto Context::addOption(IOption& option) -> void {
-    m_options.emplace_back(&option);
-    if (const auto optionGroup = dynamic_cast<OptionGroup*>(&option)) {
-        optionGroup->getContext().m_parent = this;
+template<typename T> requires DerivesFrom<T, IOption>
+auto Context::addOption(T&& option) -> void {
+    IOption *optPtr;
+    // Non-owned option
+    if (std::is_lvalue_reference_v<T>) {
+        m_options.emplace_back(&option);
+        optPtr = &option;
     }
-}
+    // Owned option
+    else {
+        optPtr = getRawPointer(m_options.emplace_back(option.clone()));
+    }
 
-inline auto Context::addOption(IOption&& option) -> void {
-    const auto& newOpt = m_options.emplace_back(option.clone());
-    if (const auto optionGroup = dynamic_cast<OptionGroup*>(getRawPointer(newOpt))) {
+    if (const auto optionGroup = dynamic_cast<OptionGroup*>(optPtr); optionGroup != nullptr) {
         optionGroup->getContext().m_parent = this;
     }
 }
 
 inline auto Context::getOption(const std::string_view flag) -> IOption * {
     const auto it = std::ranges::find_if(m_options, [&flag](const OptionPtr& option) {
-        return std::visit([&flag]<typename T>(const T& opt) -> bool {
-            return opt->getFlag().containsFlag(flag);
-        }, option);
+        const auto optPtr = getRawPointer(option);
+        if (!dynamic_cast<const IFlag*>(optPtr)) {
+            throw std::invalid_argument("Unsupported option type");
+        }
+        return dynamic_cast<const IFlag*>(optPtr)->getFlag().containsFlag(flag);
     });
 
     return it == m_options.end() ? nullptr : getRawPointer(*it);
@@ -250,12 +256,17 @@ inline auto Context::getHelpMessage(std::stringstream& ss, const size_t leadingS
     std::vector<const OptionGroup*> groups;
 
     for (const auto& opt : m_options) {
-        const auto ptr = getRawPointer(opt);
-        if (const auto groupPtr = dynamic_cast<OptionGroup*>(ptr); groupPtr != nullptr) {
+        const auto optPtr = getRawPointer(opt);
+
+        if (!dynamic_cast<const IFlag*>(optPtr)) {
+            throw std::invalid_argument("Unsupported option type");
+        }
+
+        if (const auto groupPtr = dynamic_cast<OptionGroup*>(optPtr); groupPtr != nullptr) {
             groups.push_back(groupPtr);
             continue;
         }
-        getHelpMessage(ss, leadingSpaces, maxLineWidth, ptr);
+        getHelpMessage(ss, leadingSpaces, maxLineWidth, optPtr);
     }
 
     // Print top level group help messages
@@ -279,10 +290,13 @@ inline auto Context::getHelpMessage(std::stringstream& ss, const size_t leadingS
 
 inline auto Context::getHelpMessage(std::stringstream& ss, const size_t leadingSpaces,
                                     const size_t maxLineWidth, const IOption *option) -> void {
+    if (!dynamic_cast<const IFlag*>(option)) {
+        throw std::invalid_argument("Unsupported option type");
+    }
     // Print flag
     ss << std::string(leadingSpaces, ' ');
     constexpr size_t maxFlagWidth = 32;
-    std::string flag = option->getFlag().getString();
+    std::string flag = dynamic_cast<const IFlag*>(option)->getFlag().getString();
     if (const auto& typeHint = option->getInputHint(); !typeHint.empty()) {
         flag += ' ';
         flag += typeHint;
@@ -348,17 +362,23 @@ inline auto Context::collectAllSetOptions() -> OptionMap {
 inline auto Context::collectAllSetOptions(OptionMap& map, //NOLINT (recursion)
                                           const std::vector<Flag>& pathSoFar) -> void {
     for (const auto& opt : m_options) {
-        IOption *ptr = getRawPointer(opt);
-        if (const auto groupPtr = dynamic_cast<OptionGroup*>(ptr); groupPtr != nullptr) {
+        IOption *optPtr = getRawPointer(opt);
+
+        auto *flagPtr = dynamic_cast<IFlag*>(optPtr);
+        if (!flagPtr) {
+            throw std::invalid_argument("Unsupported option type");
+        }
+
+        if (const auto groupPtr = dynamic_cast<OptionGroup*>(optPtr); groupPtr != nullptr) {
             auto newVec = pathSoFar;
-            newVec.emplace_back(ptr->getFlag());
+            newVec.emplace_back(flagPtr->getFlag());
             groupPtr->getContext().collectAllSetOptions(map, newVec);
             continue;
         }
 
-        if (!ptr->isSet()) continue;
+        if (!optPtr->isSet()) continue;
 
-        map[FlagPathWithAlias(pathSoFar, ptr->getFlag())] = ptr;
+        map[FlagPathWithAlias(pathSoFar, flagPtr->getFlag())] = optPtr;
     }
 }
 
@@ -398,9 +418,14 @@ inline auto Context::validate(const FlagPath& pathSoFar, std::vector<std::string
 
     for (const auto& opt : m_options) {
         IOption *ptr = getRawPointer(opt);
+
+        if (!dynamic_cast<const IFlag*>(ptr)) {
+            throw std::invalid_argument("Unsupported option type");
+        }
+
         if (const auto groupPtr = dynamic_cast<OptionGroup*>(ptr); groupPtr != nullptr) {
             FlagPath newPath = pathSoFar;
-            newPath.extendPath(ptr->getFlag().mainFlag);
+            newPath.extendPath(groupPtr->getFlag().mainFlag);
             groupPtr->getContext().validate(newPath, errorMsgs);
         }
     }
@@ -410,7 +435,10 @@ inline auto Context::applyPrefixes(const std::string_view shortPrefix,  // NOLIN
                                    const std::string_view longPrefix) -> void {
     for (const auto& opt : m_options) {
         IOption *ptr = getRawPointer(opt);
-        ptr->applyPrefixes(shortPrefix, longPrefix);
+        if (!dynamic_cast<const IFlag*>(ptr)) {
+            throw std::invalid_argument("Unsupported option type");
+        }
+        dynamic_cast<IFlag*>(ptr)->applyPrefixes(shortPrefix, longPrefix);
         if (const auto groupPtr = dynamic_cast<OptionGroup*>(ptr); groupPtr != nullptr) {
             groupPtr->getContext().applyPrefixes(shortPrefix, longPrefix);
         }
@@ -421,7 +449,10 @@ inline auto Context::collectAllFlags() const -> std::vector<const Flag*> {
     std::vector<const Flag*> result;
     for (const auto& opt : m_options) {
         const IOption *ptr = getRawPointer(opt);
-        result.emplace_back(&ptr->getFlag());
+        if (!dynamic_cast<const IFlag*>(ptr)) {
+            throw std::invalid_argument("Unsupported option type");
+        }
+        result.emplace_back(&dynamic_cast<const IFlag*>(ptr)->getFlag());
     }
     return result;
 }

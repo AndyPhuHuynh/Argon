@@ -26,7 +26,8 @@ namespace Argon {
     };
 
     template<typename T, size_t N>
-    class MultiOption<std::array<T, N>> : public ISetValue, public OptionComponent<MultiOption<std::array<T, N>>>,
+    class MultiOption<std::array<T, N>> : public HasFlag<MultiOption<std::array<T, N>>>, public ISetValue,
+                                          public OptionComponent<MultiOption<std::array<T, N>>>,
                                           public MultiOptionStdArrayBase, public Converter<MultiOption<std::array<T, N>>, T>{
         std::array<T, N> m_values;
         std::array<T, N>* m_out = nullptr;
@@ -48,7 +49,8 @@ namespace Argon {
     // MultiOption with std::vector
 
     template<typename T>
-    class MultiOption<std::vector<T>> : public ISetValue, public OptionComponent<MultiOption<std::vector<T>>>,
+    class MultiOption<std::vector<T>> : public HasFlag<MultiOption<std::vector<T>>>, public ISetValue,
+                                        public OptionComponent<MultiOption<std::vector<T>>>,
                                         public IsMultiOption, public Converter<MultiOption<std::vector<T>>, T> {
         std::vector<T> m_values;
         std::vector<T>* m_out = nullptr;

@@ -127,7 +127,9 @@ inline auto operator==(const FlagPath& flagPath, const FlagPathWithAlias& flagPa
 
 inline auto addPrefixToString(std::string& flag,
     const std::string_view shortPrefix, const std::string_view longPrefix) -> void {
-    if (flag.empty()) throw std::invalid_argument("Flag has to be at least one character long");
+    if (flag.empty()) {
+        throw std::invalid_argument("Flag has to be at least one character long");
+    }
 
     if (flag.starts_with(shortPrefix) || flag.starts_with(longPrefix)) return;
 

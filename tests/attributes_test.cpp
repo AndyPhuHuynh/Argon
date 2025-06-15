@@ -16,7 +16,7 @@ TEST_CASE("Attributes test 1", "[attributes]") {
     c.mutuallyExclusive(FlagPath("world"), {FlagPath("world"), FlagPath("add3")});
 }
 
-TEST_CASE() {
+TEST_CASE("Attributes test 2", "[attributes]") {
     auto parser = Option<int>()["-x"]["--x2"]
                 | Option<int>()["-y"]
                 | Option<int>()["-z"]

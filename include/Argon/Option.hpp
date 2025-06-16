@@ -117,7 +117,7 @@ namespace Argon {
         GenerateErrorMsgFn m_generate_error_msg_fn = nullptr;
         std::string m_conversionError;
 
-        auto generateErrorMsg(const std::string& flag, const std::string& invalidArg) -> void;
+        auto generateErrorMsg(const std::string& optionName, const std::string& invalidArg) -> void;
 
     public:
         auto convert(const DefaultConversions& conversions, const std::string& flag, const std::string& value, T& outValue) -> void;
@@ -199,13 +199,25 @@ namespace Argon {
     class IsPositional {
     public:
         IsPositional() = default;
-        virtual ~IsPositional() = 0;
+        virtual ~IsPositional() = default;
+
+        [[nodiscard]] virtual auto cloneAsPositional() const -> std::unique_ptr<IsPositional> = 0;
     };
 
     template <typename T>
     class Positional : public SetValueImpl<Positional<T>, T>,
                        public OptionComponent<Positional<T>>, public IsPositional {
         auto setValue(const DefaultConversions& conversions, const std::string& flag, const std::string& value) -> void override;
+    public:
+        Positional() = default;
+
+        explicit Positional(T defaultValue);
+
+        explicit Positional(T *out);
+
+        Positional(T defaultValue, T *out);
+
+        [[nodiscard]] auto cloneAsPositional() const -> std::unique_ptr<IsPositional> override;
     };
 }
 
@@ -402,17 +414,22 @@ auto OptionComponent<Derived>::operator()(const std::string_view inputHint, cons
 }
 
 template <typename Derived, typename T>
-auto Converter<Derived, T>::generateErrorMsg(const std::string& flag, const std::string& invalidArg) -> void {
+auto Converter<Derived, T>::generateErrorMsg(const std::string& optionName, const std::string& invalidArg) -> void {
     // Generate custom error message if provided
     if (this->m_generate_error_msg_fn != nullptr) {
-        this->m_conversionError = this->m_generate_error_msg_fn(flag, invalidArg);
+        this->m_conversionError = this->m_generate_error_msg_fn(optionName, invalidArg);
         return;
     }
 
     // Else generate default message
     std::stringstream ss;
-    ss << "Invalid value for flag \'" << flag << "\': "
-        << "expected " << type_name<T>();
+
+    if (optionName.empty()) {
+        ss << "Invalid value: ";
+    } else {
+        ss << std::format("Invalid value for '{}': ", optionName);
+    }
+    ss << "expected " << type_name<T>();
 
     if constexpr (is_non_bool_integral<T>) {
         ss << " in the range of [" << format_with_commas(static_cast<int64_t>(std::numeric_limits<T>::min())) <<
@@ -652,6 +669,20 @@ void Positional<T>::setValue(const DefaultConversions& conversions, const std::s
     SetValueImpl<Positional, T>::setValue(conversions, flag, value);
     this->m_error = this->getConversionError();
     this->m_isSet = true;
+}
+
+template<typename T>
+Positional<T>::Positional(T defaultValue) : SetValueImpl<Positional, T>(defaultValue) {}
+
+template<typename T>
+Positional<T>::Positional(T *out) : SetValueImpl<Positional, T>(out) {}
+
+template<typename T>
+Positional<T>::Positional(T defaultValue, T *out) : SetValueImpl<Positional, T>(defaultValue, out) {}
+
+template<typename T>
+auto Positional<T>::cloneAsPositional() const -> std::unique_ptr<IsPositional> {
+    return std::make_unique<Positional>(*this);
 }
 
 inline auto OptionGroup::getOption(const std::string& flag) -> IOption* { //NOLINT (function is not const)

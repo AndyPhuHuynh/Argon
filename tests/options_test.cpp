@@ -632,12 +632,37 @@ TEST_CASE("Default conversion table", "[options]") {
     CHECK(s.age == 20);
 }
 
-TEST_CASE("Positional args test 1", "[options][positional]") {
-    auto parser = Option<int>()["--x"]
-                | Option<float>()["--f"];
+TEST_CASE("Positional args basic test", "[options][positional]") {
+    int x; float f;
+    std::string greeting, world, pos, str;
+    int arg, n1, n2;
 
-    const std::string input = "hello world --x 10 positional arg";
+    auto parser = Option(&x)["--x"]
+                | Option(&f)["--f"]
+                | Positional(&greeting)("Greeting", "Description")
+                | Positional(&world)("World", "Description")
+                | Positional(&pos)("Pos", "Description")
+                | Positional(&arg)("NumberArg", "Description")
+                | (
+                    OptionGroup()["--group"]
+                    + Option(&str)["--string"]
+                    + Positional(&n1)
+                    + Positional(&n2)
+                );
+
+    const std::string input = "hello world --x 10 positional --f 3.0 --group [10 --string str 20] 300";
     parser.parse(input);
 
     CHECK(!parser.hasErrors());
+    CHECK(x == 10);
+    CHECK(f == Catch::Approx(3.0).epsilon(1e-6));
+
+    CHECK(greeting == "hello");
+    CHECK(world    == "world");
+    CHECK(pos      == "positional");
+    CHECK(arg      == 300);
+
+    CHECK(str == "str");
+    CHECK(n1  == 10);
+    CHECK(n2  == 20);
 }

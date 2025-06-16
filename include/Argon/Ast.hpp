@@ -53,14 +53,13 @@ namespace Argon {
         void analyze(Parser& parser, Context& context) override;
     };
 
-    class PositionalAst : public Ast {
+    class PositionalAst {
     public:
         Value value;
 
         explicit PositionalAst(const Token& flagToken);
-        ~PositionalAst() override = default;
 
-        void analyze(Parser& parser, Context& context) override;
+        void analyze(Parser& parser, const Context& context, size_t position);
     };
 
     class OptionGroupAst : public OptionBaseAst {
@@ -147,9 +146,7 @@ inline void Argon::OptionAst::analyze(Parser& parser, Context& context) {
 
 // MultiOptionAst
 
-inline Argon::MultiOptionAst::MultiOptionAst(const Token& flagToken) : OptionBaseAst(flagToken) {
-
-}
+inline Argon::MultiOptionAst::MultiOptionAst(const Token& flagToken) : OptionBaseAst(flagToken) {}
 
 inline void Argon::MultiOptionAst::addValue(const Token& value) {
     m_values.emplace_back(value.image, value.position);
@@ -176,12 +173,27 @@ inline void Argon::MultiOptionAst::analyze(Parser& parser, Context &context) {
     }
 }
 
+// PositionalAst
+
 inline Argon::PositionalAst::PositionalAst(const Token& flagToken) {
     value = { .value = flagToken.image, .pos = flagToken.position };
 }
 
-inline void Argon::PositionalAst::analyze([[maybe_unused]] Parser& parser, [[maybe_unused]] Context& context) {
-    std::cout << "Todo later: analyze positional ast\n";
+inline void Argon::PositionalAst::analyze(Parser& parser, const Context& context, const size_t position) {
+    IsPositional *opt = context.getPositional(position);
+    if (!opt) {
+        parser.addError(std::format("Unknown input: '{}'", value.value), value.pos);
+        return;
+    }
+
+    auto *setValue = dynamic_cast<ISetValue*>(opt);
+    const auto *iOption = dynamic_cast<IOption*>(opt);
+    if (!setValue || !iOption) std::unreachable();
+
+    setValue->setValue(parser.getDefaultConversions(), iOption->getInputHint(), value.value);
+    if (iOption->hasError()) {
+        parser.addError(iOption->getError(), value.pos);
+    }
 }
 
 // OptionGroupAst
@@ -218,8 +230,13 @@ inline void Argon::OptionGroupAst::analyze(Parser& parser, Context& context) {
         return;
     }
 
+    auto& nextContext = optionGroup->getContext();
     for (const auto& option : m_options) {
-        option->analyze(parser, optionGroup->getContext());
+        option->analyze(parser, nextContext);
+    }
+
+    for (size_t i = 0; i < m_positionals.size(); i++) {
+        m_positionals[i]->analyze(parser, nextContext, i);
     }
 }
 
@@ -242,6 +259,10 @@ inline void Argon::StatementAst::addOption(std::unique_ptr<PositionalAst> option
 inline void Argon::StatementAst::analyze(Parser& parser, Context& context) {
     for (const auto& option : m_options) {
         option->analyze(parser, context);
+    }
+
+    for (size_t i = 0; i < m_positionals.size(); i++) {
+        m_positionals[i]->analyze(parser, context, i);
     }
 }
 

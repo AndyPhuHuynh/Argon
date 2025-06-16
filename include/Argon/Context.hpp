@@ -17,8 +17,10 @@ namespace Argon {
     class IOption;
     class IsPositional;
 
-    using OptionPtr     = std::variant<IOption*, std::unique_ptr<IOption>>;
-    using PositionalPtr = std::variant<IsPositional*, std::unique_ptr<IsPositional>>;
+    template <typename T>
+    using PtrVariant    = std::variant<T*, std::unique_ptr<T>>;
+    using OptionPtr     = PtrVariant<IOption>;
+    using PositionalPtr = PtrVariant<IsPositional>;
     using OptionMap     = std::unordered_map<FlagPathWithAlias, IOption*>;
 
     class Context {
@@ -39,9 +41,11 @@ namespace Argon {
         template <typename T> requires DerivesFrom<T, IOption>
         auto addOption(T&& option) -> void;
 
-        auto getOption(std::string_view flag) -> IOption*;
+        auto getOption(std::string_view flag) -> IOption *;
 
-        auto getOption(const FlagPath& flagPath) -> IOption*;
+        auto getOption(const FlagPath& flagPath) -> IOption *;
+
+        [[nodiscard]] auto getPositional(size_t position) const -> IsPositional *;
 
         template <typename T>
         auto getOptionDynamic(const std::string& flag) -> T *;
@@ -90,17 +94,18 @@ namespace Argon {
 //---------------------------------------------------Free Functions-----------------------------------------------------
 
 namespace Argon {
-inline auto getRawPointer(const OptionPtr& optPtr) -> IOption * {
-    return std::visit([]<typename T>(const T& opt) -> IOption * {
-        if constexpr (std::is_same_v<T, IOption*>) {
+template <typename T>
+auto getRawPointer(const PtrVariant<T>& ptrVariant) -> T * {
+    return std::visit([]<typename ptrType>(const ptrType& opt) -> T * {
+        if constexpr (std::is_same_v<ptrType, T*>) {
             return opt;
-        } else if constexpr (std::is_same_v<T, std::unique_ptr<IOption>>) {
+        } else if constexpr (std::is_same_v<ptrType, std::unique_ptr<T>>) {
             return opt.get();
         } else {
-            static_assert(always_false<T>, "Unhandled type in getRawPointer");
+            static_assert(always_false<ptrType>, "Unhandled type in getRawPointer");
             return nullptr;
         }
-    }, optPtr);
+    }, ptrVariant);
 }
 
 inline auto containsFlag(const OptionMap& map, const FlagPath& flag) -> const FlagPathWithAlias * {
@@ -138,6 +143,15 @@ inline Context::Context(const Context& other) {
             optionGroup->getContext().m_parent = this;
         }
     }
+    for (const auto& option : other.m_positionals) {
+        std::visit([&]<typename T>(const T& opt) -> void {
+            if constexpr (std::is_same_v<T, IsPositional*>) {
+                m_positionals.emplace_back(opt);
+            } else {
+                m_positionals.emplace_back(opt->cloneAsPositional());
+            }
+        }, option);
+    }
     m_name = other.m_name;
     m_parent = other.m_parent;
 }
@@ -161,6 +175,15 @@ inline auto Context::operator=(const Context& other) -> Context& {
             optionGroup->getContext().m_parent = this;
         }
     }
+    for (const auto& option : other.m_positionals) {
+        std::visit([&]<typename T>(const T& opt) -> void {
+            if constexpr (std::is_same_v<T, IsPositional*>) {
+                m_positionals.emplace_back(opt);
+            } else {
+                m_positionals.emplace_back(opt->cloneAsPositional());
+            }
+        }, option);
+    }
     m_name = other.m_name;
     m_parent = other.m_parent;
     return *this;
@@ -183,7 +206,7 @@ auto Context::addPositionalOption(T&&option) -> void {
     }
     // Owned option
     else {
-        m_positionals.emplace_back(option.clone());
+        m_positionals.emplace_back(option.cloneAsPositional());
     }
 }
 
@@ -220,6 +243,11 @@ inline auto Context::getOption(const std::string_view flag) -> IOption * {
 inline auto Context::getOption(const FlagPath& flagPath) -> IOption * {
     auto& context = resolveFlagGroup(flagPath);
     return context.getOption(flagPath.flag);
+}
+
+inline auto Context::getPositional(const size_t position) const -> IsPositional * {
+    if (position >= m_positionals.size()) return nullptr;
+    return getRawPointer(m_positionals[position]);
 }
 
 template <typename T>

@@ -632,6 +632,26 @@ TEST_CASE("Default conversion table", "[options]") {
     CHECK(s.age == 20);
 }
 
+TEST_CASE("Setting multiple flags with initializer list", "[options]") {
+    int i; float f;
+    auto parser = Option(&i)[{"--integer", "--int", "-i"}]
+                | Option(&f)[{"--float",   "--flo", "-f"}];
+    SECTION("Flag 1") {
+        const std::string input = "--integer 1 --float 2";
+        parser.parse(input);
+    }
+    SECTION("Flag 2") {
+        const std::string input = "--int 1 --flo 2";
+        parser.parse(input);
+    }
+    SECTION("Flag 3") {
+        const std::string input = "-i 1 -f 2";
+        parser.parse(input);
+    }
+    CHECK(i == 1);
+    CHECK(f == Catch::Approx(2.0).epsilon(1e-6));
+}
+
 TEST_CASE("Positional args basic test", "[options][positional]") {
     int x; float f;
     std::string greeting, world, pos, str;

@@ -26,7 +26,6 @@ namespace Argon {
     class IFlag {
     protected:
         Flag m_flag;
-        bool m_mainFlagSet = false;
     public:
         IFlag() = default;
         ~IFlag() = default;
@@ -44,9 +43,14 @@ namespace Argon {
 
     template <typename Derived>
     class HasFlag : public IFlag{
+        auto applySetFlag(std::string_view flag) -> void;
+        auto applySetFlag(std::initializer_list<std::string_view> flags) -> void;
     public:
-        auto operator[](std::string_view tag) & -> Derived&;
-        auto operator[](std::string_view tag) && -> Derived&&;
+        auto operator[](std::string_view flag) & -> Derived&;
+        auto operator[](std::string_view flag) && -> Derived&&;
+
+        auto operator[](std::initializer_list<std::string_view> flags) & -> Derived&;
+        auto operator[](std::initializer_list<std::string_view> flags) && -> Derived&&;
     };
 
     class IOption {
@@ -337,28 +341,49 @@ inline auto IFlag::applyPrefixes(const std::string_view shortPrefix, const std::
     m_flag.applyPrefixes(shortPrefix, longPrefix);
 }
 
-template <typename Derived>
-auto HasFlag<Derived>::operator[](const std::string_view tag) & -> Derived& {
-    if (!m_mainFlagSet) {
-        m_mainFlagSet = true;
-        m_flag.mainFlag = tag;
-    } else {
-        m_flag.aliases.emplace_back(tag);
+template<typename Derived>
+auto HasFlag<Derived>::applySetFlag(std::string_view flag) -> void {
+    if (flag.empty()) {
+        throw std::invalid_argument("Flag has to be at least one character long");
     }
+    if (m_flag.mainFlag.empty()) {
+        m_flag.mainFlag = flag;
+    } else {
+        m_flag.aliases.emplace_back(flag);
+    }
+}
+
+template<typename Derived>
+auto HasFlag<Derived>::applySetFlag(const std::initializer_list<std::string_view> flags) -> void {
+    if (flags.size() <= 0) {
+        throw std::invalid_argument("Operator [] expects at least one flag");
+    }
+    for (const auto& flag : flags) {
+        applySetFlag(flag);
+    }
+}
+
+template <typename Derived>
+auto HasFlag<Derived>::operator[](const std::string_view flag) & -> Derived& {
+    applySetFlag(flag);
     return static_cast<Derived&>(*this);
 }
 
 template<typename Derived>
-auto HasFlag<Derived>::operator[](const std::string_view tag) && -> Derived&& {
-    if (tag.empty()) {
-        throw std::invalid_argument("Flag has to be at least one character long opt");
-    }
-    if (!m_mainFlagSet) {
-        m_mainFlagSet = true;
-        m_flag.mainFlag = tag;
-    } else {
-        m_flag.aliases.emplace_back(tag);
-    }
+auto HasFlag<Derived>::operator[](const std::string_view flag) && -> Derived&& {
+    applySetFlag(flag);
+    return static_cast<Derived&&>(*this);
+}
+
+template<typename Derived>
+auto HasFlag<Derived>::operator[](const std::initializer_list<std::string_view> flags) & -> Derived& {
+    applySetFlag(flags);
+    return static_cast<Derived&>(*this);
+}
+
+template<typename Derived>
+auto HasFlag<Derived>::operator[](const std::initializer_list<std::string_view> flags) && -> Derived&& {
+    applySetFlag(flags);
     return static_cast<Derived&&>(*this);
 }
 

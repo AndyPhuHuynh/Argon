@@ -27,7 +27,7 @@ namespace Argon {
         int pos = -1;
 
         ErrorMessage() = default;
-        ErrorMessage(std::string msg, int pos);
+        ErrorMessage(std::string_view msg, int pos);
         
         std::strong_ordering operator<=>(const ErrorMessage &other) const;
     };
@@ -41,11 +41,11 @@ namespace Argon {
         ErrorGroup *m_parent = nullptr;
     public:
         ErrorGroup() = default;
-        ErrorGroup(std::string groupName, int startPos, int endPos);
+        ErrorGroup(std::string_view groupName, int startPos, int endPos);
 
         void clear();
-        void addErrorMessage(const std::string& msg, int pos);
-        void addErrorGroup(const std::string& name, int startPos, int endPos);
+        void addErrorMessage(std::string_view msg, int pos);
+        void addErrorGroup(std::string_view name, int startPos, int endPos);
         void removeErrorGroup(int startPos);
 
         [[nodiscard]] const std::string& getGroupName() const;
@@ -55,7 +55,7 @@ namespace Argon {
         void printErrorsFlatMode() const;
         void printErrorsTreeMode(TextMode textMode) const;
     private:
-        ErrorGroup(std::string groupName, int startPos, int endPos, ErrorGroup* parent);
+        ErrorGroup(std::string_view groupName, int startPos, int endPos, ErrorGroup* parent);
 
         void setHasErrors();
         void addErrorGroup(ErrorGroup& groupToAdd);
@@ -73,14 +73,14 @@ static bool inRange(const int value, const int min, const int max) {
     return value >= min && value <= max;
 }
 
-inline Argon::ErrorMessage::ErrorMessage(std::string msg, const int pos) : msg(std::move(msg)), pos(pos) {}
+inline Argon::ErrorMessage::ErrorMessage(const std::string_view msg, const int pos) : msg(msg), pos(pos) {}
 
 inline std::strong_ordering Argon::ErrorMessage::operator<=>(const ErrorMessage& other) const {
     return pos <=> other.pos;
 }
 
-inline Argon::ErrorGroup::ErrorGroup(std::string groupName, const int startPos, const int endPos)
-: m_groupName(std::move(groupName)), m_startPos(startPos), m_endPos(endPos) {
+inline Argon::ErrorGroup::ErrorGroup(const std::string_view groupName, const int startPos, const int endPos)
+: m_groupName(groupName), m_startPos(startPos), m_endPos(endPos) {
 
 }
 
@@ -89,8 +89,8 @@ inline void Argon::ErrorGroup::clear() {
     m_hasErrors = false;
 }
 
-inline Argon::ErrorGroup::ErrorGroup(std::string groupName, const int startPos, const int endPos, ErrorGroup* parent)
-: m_groupName(std::move(groupName)), m_startPos(startPos), m_endPos(endPos), m_parent(parent) {
+inline Argon::ErrorGroup::ErrorGroup(const std::string_view groupName, const int startPos, const int endPos, ErrorGroup* parent)
+: m_groupName(groupName), m_startPos(startPos), m_endPos(endPos), m_parent(parent) {
 
 }
 
@@ -102,7 +102,7 @@ inline void Argon::ErrorGroup::setHasErrors() {
     }
 }
 
-inline void Argon::ErrorGroup::addErrorMessage(const std::string& msg, int pos) { //NOLINT (recursion)
+inline void Argon::ErrorGroup::addErrorMessage(std::string_view msg, int pos) { //NOLINT (recursion)
     if (m_errors.empty()) {
         m_errors.emplace_back(std::in_place_type<ErrorMessage>, msg, pos);
         setHasErrors();
@@ -157,8 +157,8 @@ inline void Argon::ErrorGroup::addErrorMessage(const std::string& msg, int pos) 
     }
 }
 
-inline void Argon::ErrorGroup::addErrorGroup(const std::string& name, const int startPos, const int endPos) {
-    ErrorGroup groupToAdd = ErrorGroup(name, startPos, endPos, this);
+inline void Argon::ErrorGroup::addErrorGroup(const std::string_view name, const int startPos, const int endPos) {
+    auto groupToAdd = ErrorGroup(name, startPos, endPos, this);
     addErrorGroup(groupToAdd);
 }
 

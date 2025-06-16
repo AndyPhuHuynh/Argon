@@ -53,9 +53,9 @@ namespace Argon {
         template<typename T> requires DerivesFrom<T, IOption>
         auto addOption(T&& option) -> void;
 
-        auto addError(const std::string& error, int pos) -> void;
+        auto addError(std::string_view error, int pos) -> void;
 
-        auto addErrorGroup(const std::string& groupName, int startPos, int endPos) -> void;
+        auto addErrorGroup(std::string_view groupName, int startPos, int endPos) -> void;
 
         auto removeErrorGroup(int startPos) -> void;
 
@@ -67,19 +67,19 @@ namespace Argon {
 
         auto parse(int argc, const char **argv) -> bool;
 
-        auto parse(const std::string& str) -> bool;
+        auto parse(std::string_view str) -> bool;
 
         template<typename T> requires DerivesFrom<T, IOption>
         auto operator|(T&& option) -> Parser&;
 
         template<typename ValueType>
-        auto getValue(const std::string& flag) -> const ValueType&;
+        auto getValue(std::string_view flag) -> const ValueType&;
 
         template<typename ValueType>
         auto getValue(const FlagPath& flagPath) -> const ValueType&;
 
         template<typename Container>
-        auto getMultiValue(const std::string& flag) -> const Container&;
+        auto getMultiValue(std::string_view flag) -> const Container&;
 
         template<typename Container>
         auto getMultiValue(const FlagPath& flagPath) -> const Container&;
@@ -140,11 +140,11 @@ auto Parser::addOption(T&& option) -> void {
     m_context.addOption(std::forward<T>(option));
 }
 
-inline auto Parser::addError(const std::string& error, const int pos) -> void {
+inline auto Parser::addError(const std::string_view error, const int pos) -> void {
     m_analysisErrors.addErrorMessage(error, pos);
 }
 
-inline auto Parser::addErrorGroup(const std::string& groupName, const int startPos, const int endPos) -> void {
+inline auto Parser::addErrorGroup(const std::string_view groupName, const int startPos, const int endPos) -> void {
     m_analysisErrors.addErrorGroup(groupName, startPos, endPos);
 }
 
@@ -200,7 +200,7 @@ inline auto Parser::parse(const int argc, const char **argv) -> bool {
     return parse(input);
 }
 
-inline auto Parser::parse(const std::string& str) -> bool {
+inline auto Parser::parse(const std::string_view str) -> bool {
     m_context.applyPrefixes(m_shortPrefix, m_longPrefix);
 
     m_context.validate(m_contextValidationErrors);
@@ -452,7 +452,7 @@ auto Parser::operator|(T&& option) -> Parser& {
 }
 
 template<typename ValueType>
-auto Parser::getValue(const std::string& flag) -> const ValueType& {
+auto Parser::getValue(const std::string_view flag) -> const ValueType& {
     return m_context.getValue<ValueType>(FlagPath(flag));
 }
 
@@ -462,7 +462,7 @@ auto Parser::getValue(const FlagPath& flagPath) -> const ValueType& {
 }
 
 template<typename Container>
-auto Parser::getMultiValue(const std::string& flag) -> const Container& {
+auto Parser::getMultiValue(const std::string_view flag) -> const Container& {
     return m_context.getMultiValue<Container>(FlagPath(flag));
 }
 

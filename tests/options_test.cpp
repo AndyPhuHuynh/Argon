@@ -196,7 +196,7 @@ auto operator<<(std::ostream &os, const Student &s) -> std::ostream & {
     return os << "Student(name:\"" << s.name << "\", age:" << s.age << ")";
 }
 
-auto studentFromString = [](const std::string& str, Student& out) -> bool {
+auto studentFromString = [](const std::string_view str, Student& out) -> bool {
     if (str == "1") {
         out = { .name = "Josh", .age = 1 }; return true;
     }
@@ -209,7 +209,7 @@ auto studentFromString = [](const std::string& str, Student& out) -> bool {
     return false;
 };
 
-auto studentError = [](const std::string& flag, const std::string& invalidArg) -> std::string {
+auto studentError = [](const std::string_view flag, const std::string_view invalidArg) -> std::string {
     return std::format("Invalid value for flag '{}': expected either '1' or '2', got '{}'", flag, invalidArg);
 };
 

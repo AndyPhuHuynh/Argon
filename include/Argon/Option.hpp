@@ -107,12 +107,12 @@ namespace Argon {
         ISetValue() = default;
         virtual ~ISetValue() = default;
 
-        virtual void setValue(const DefaultConversions& conversions, const std::string& flag, const std::string& value) = 0;
+        virtual void setValue(const DefaultConversions& conversions, std::string_view flag, std::string_view value) = 0;
     };
 
     template <typename T>
-    using ConversionFn = std::function<bool(const std::string&, T&)>;
-    using GenerateErrorMsgFn = std::function<std::string(const std::string&, const std::string&)>;
+    using ConversionFn = std::function<bool(std::string_view, T&)>;
+    using GenerateErrorMsgFn = std::function<std::string(std::string_view, std::string_view)>;
 
     template <typename Derived, typename T>
     class Converter {
@@ -121,10 +121,10 @@ namespace Argon {
         GenerateErrorMsgFn m_generate_error_msg_fn = nullptr;
         std::string m_conversionError;
 
-        auto generateErrorMsg(const std::string& optionName, const std::string& invalidArg) -> void;
+        auto generateErrorMsg(std::string_view optionName, std::string_view invalidArg) -> void;
 
     public:
-        auto convert(const DefaultConversions& conversions, const std::string& flag, const std::string& value, T& outValue) -> void;
+        auto convert(const DefaultConversions& conversions, std::string_view flag, std::string_view value, T& outValue) -> void;
 
         [[nodiscard]] auto hasConversionError() const -> bool;
 
@@ -154,7 +154,7 @@ namespace Argon {
 
         auto getValue() const -> const T&;
     protected:
-        auto setValue(const DefaultConversions& conversions, const std::string& flag, const std::string& value) -> void override;
+        auto setValue(const DefaultConversions& conversions, std::string_view flag, std::string_view value) -> void override;
     };
 
     class IsSingleOption {};
@@ -171,7 +171,7 @@ namespace Argon {
 
         Option(T defaultValue, T *out);
     protected:
-        auto setValue(const DefaultConversions& conversions, const std::string& flag, const std::string& value) -> void override;
+        auto setValue(const DefaultConversions& conversions, std::string_view flag, std::string_view value) -> void override;
     };
 
     class OptionGroup : public HasFlag<OptionGroup>, public OptionComponent<OptionGroup>{
@@ -193,7 +193,7 @@ namespace Argon {
         template <typename T> requires DerivesFrom<T, IOption>
         auto addOption(T&& option) -> void;
 
-        auto getOption(const std::string& flag) -> IOption*;
+        auto getOption(std::string_view flag) -> IOption*;
 
         auto getContext() -> Context&;
 
@@ -211,7 +211,7 @@ namespace Argon {
     template <typename T>
     class Positional : public SetValueImpl<Positional<T>, T>,
                        public OptionComponent<Positional<T>>, public IsPositional {
-        auto setValue(const DefaultConversions& conversions, const std::string& flag, const std::string& value) -> void override;
+        auto setValue(const DefaultConversions& conversions, std::string_view flag, std::string_view value) -> void override;
     public:
         Positional() = default;
 
@@ -258,7 +258,7 @@ inline auto getBaseFromPrefix(const std::string_view arg) -> Base {
 }
 
 template <typename T> requires std::is_integral_v<T>
-auto parseIntegralType(const std::string& arg, T& out) -> bool {
+auto parseIntegralType(const std::string_view arg, T& out) -> bool {
     if (arg.empty()) return false;
     const auto base = getBaseFromPrefix(arg);
     if (base == Base::Invalid) return false;
@@ -286,8 +286,8 @@ auto parseIntegralType(const std::string& arg, T& out) -> bool {
     return ec == std::errc() && ptr == end;
 }
 
-inline auto parseBool(const std::string& arg, bool& out) -> bool {
-    std::string boolStr = arg;
+inline auto parseBool(const std::string_view arg, bool& out) -> bool {
+    auto boolStr = std::string(arg);
     to_lower(boolStr);
     if (boolStr == "true") {
         out = true;
@@ -301,7 +301,7 @@ inline auto parseBool(const std::string& arg, bool& out) -> bool {
 }
 
 template <typename T> requires is_numeric_char_type<T>
-auto parseNumericChar(const std::string& arg, T& out) -> bool {
+auto parseNumericChar(const std::string_view arg, T& out) -> bool {
     if (arg.length() == 1) {
         out = static_cast<T>(arg[0]);
         return true;
@@ -310,7 +310,7 @@ auto parseNumericChar(const std::string& arg, T& out) -> bool {
 }
 
 template <typename T> requires std::is_floating_point_v<T>
-auto parseFloatingPoint(const std::string& arg, T& out) -> bool {
+auto parseFloatingPoint(const std::string_view arg, T& out) -> bool {
     if (arg.empty()) return false;
 
     const char *cstr = arg.data();
@@ -439,7 +439,7 @@ auto OptionComponent<Derived>::operator()(const std::string_view inputHint, cons
 }
 
 template <typename Derived, typename T>
-auto Converter<Derived, T>::generateErrorMsg(const std::string& optionName, const std::string& invalidArg) -> void {
+auto Converter<Derived, T>::generateErrorMsg(std::string_view optionName, std::string_view invalidArg) -> void {
     // Generate custom error message if provided
     if (this->m_generate_error_msg_fn != nullptr) {
         this->m_conversionError = this->m_generate_error_msg_fn(optionName, invalidArg);
@@ -469,7 +469,7 @@ auto Converter<Derived, T>::generateErrorMsg(const std::string& optionName, cons
 
 template <typename Derived, typename T>
 auto Converter<Derived, T>::convert(const DefaultConversions& conversions,
-                                    const std::string& flag, const std::string& value, T& outValue) -> void {
+                                    const std::string_view flag, std::string_view value, T& outValue) -> void {
     m_conversionError.clear();
     bool success;
     // Use custom conversion function for this specific option if supplied
@@ -499,7 +499,7 @@ auto Converter<Derived, T>::convert(const DefaultConversions& conversions,
     }
     // Use stream extraction if custom conversion not supplied and type is not integral
     else if constexpr (has_stream_extraction<T>::value) {
-        std::istringstream iss(value);
+        auto iss = std::istringstream(std::string(value));
         iss >> outValue;
         success = !iss.fail() && iss.eof();
     }
@@ -565,7 +565,7 @@ auto SetValueImpl<Derived, T>::getValue() const -> const T& {
 }
 
 template<typename Derived, typename T>
-auto SetValueImpl<Derived, T>::setValue(const DefaultConversions& conversions, const std::string& flag, const std::string& value) -> void {
+auto SetValueImpl<Derived, T>::setValue(const DefaultConversions& conversions, std::string_view flag, std::string_view value) -> void {
     T temp;
     this->convert(conversions, flag, value, temp);
     if (this->hasConversionError()) {
@@ -587,7 +587,7 @@ template<typename T>
 Option<T>::Option(T defaultValue, T *out) : SetValueImpl<Option, T>(defaultValue, out) {}
 
 template<typename T>
-void Option<T>::setValue(const DefaultConversions& conversions, const std::string& flag, const std::string& value) {
+void Option<T>::setValue(const DefaultConversions& conversions, std::string_view flag, std::string_view value) {
     SetValueImpl<Option, T>::setValue(conversions, flag, value);
     this->m_error = this->getConversionError();
     this->m_isSet = true;
@@ -690,7 +690,7 @@ auto OptionGroup::addOption(T&& option) -> void {
 }
 
 template<typename T>
-void Positional<T>::setValue(const DefaultConversions& conversions, const std::string& flag, const std::string& value) {
+void Positional<T>::setValue(const DefaultConversions& conversions, std::string_view flag, std::string_view value) {
     SetValueImpl<Positional, T>::setValue(conversions, flag, value);
     this->m_error = this->getConversionError();
     this->m_isSet = true;
@@ -710,7 +710,7 @@ auto Positional<T>::cloneAsPositional() const -> std::unique_ptr<IsPositional> {
     return std::make_unique<Positional>(*this);
 }
 
-inline auto OptionGroup::getOption(const std::string& flag) -> IOption* { //NOLINT (function is not const)
+inline auto OptionGroup::getOption(std::string_view flag) -> IOption* { //NOLINT (function is not const)
     return m_context->getOption(flag);
 }
 

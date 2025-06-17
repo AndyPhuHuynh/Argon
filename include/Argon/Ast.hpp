@@ -182,7 +182,7 @@ inline Argon::PositionalAst::PositionalAst(const Token& flagToken) {
 inline void Argon::PositionalAst::analyze(Parser& parser, const Context& context, const size_t position) {
     IsPositional *opt = context.getPositional(position);
     if (!opt) {
-        parser.addError(std::format("Unknown input: '{}'", value.value), value.pos);
+        parser.addError(std::format("Unexpected token: '{}'", value.value), value.pos);
         return;
     }
 

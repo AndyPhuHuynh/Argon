@@ -11,16 +11,6 @@ namespace Argon {
     class ErrorGroup;
 
     using ErrorVariant = std::variant<ErrorMessage, ErrorGroup>;
-
-    enum class PrintMode {
-        Flat,
-        Tree,
-    };
-
-    enum class TextMode {
-        Ascii,
-        Utf8,
-    };
     
     struct ErrorMessage {
         std::string msg;
@@ -52,14 +42,12 @@ namespace Argon {
         [[nodiscard]] const std::vector<ErrorVariant>& getErrors() const;
         [[nodiscard]] bool hasErrors() const;
         
-        void printErrorsFlatMode() const;
-        void printErrorsTreeMode(TextMode textMode) const;
+        void printErrors() const;
     private:
         ErrorGroup(std::string_view groupName, int startPos, int endPos, ErrorGroup* parent);
 
         void setHasErrors();
         void addErrorGroup(ErrorGroup& groupToAdd);
-        [[nodiscard]] size_t getIndexOfLastHasError() const;
     };
 }
 
@@ -95,7 +83,7 @@ inline Argon::ErrorGroup::ErrorGroup(const std::string_view groupName, const int
 }
 
 inline void Argon::ErrorGroup::setHasErrors() {
-    ErrorGroup *group = this;
+    auto group = this;
     while (group != nullptr) {
         group->m_hasErrors = true;
         group = group->m_parent;
@@ -267,63 +255,7 @@ inline bool Argon::ErrorGroup::hasErrors() const {
     return m_hasErrors;
 }
 
-inline void Argon::ErrorGroup::printErrorsFlatMode() const {
-    constexpr auto printRecursive = [](std::stringstream& stream, const ErrorGroup& group,
-                                       const std::string& parentGroups, const bool isRootGroup, bool isFirstPrint,
-                                       auto&& printRecursiveRef) -> void {
-        std::string currentGroupPath;
-        if (isRootGroup) {
-            currentGroupPath = group.getGroupName();
-        } else {
-            currentGroupPath = parentGroups.empty() ? group.getGroupName() : parentGroups + " > " + group.getGroupName();
-        }
-
-        std::vector<std::string> messages;
-
-        // Loop through all errors
-        for (const auto& error : group.getErrors()) {
-            std::visit([&]<typename T>(const T& e) {
-                // If it's an error message, add to messages
-                if constexpr (std::is_same_v<T, ErrorMessage>) {
-                    messages.emplace_back(e.msg);
-                }
-                // If it's a group recursively print
-                else if constexpr (std::is_same_v<T, ErrorGroup>) {
-                    // Print out messages in current group
-                    if (!messages.empty()) {
-                        if (!isFirstPrint) {
-                            stream << "\n";
-                        }
-                        stream << std::format("[{}]\n", currentGroupPath);
-                        for (const auto& msg : messages) {
-                            stream << std::format(" - {}\n", msg);
-                        }
-                        messages.clear();
-                        isFirstPrint = false;
-                    }
-                    // Recurse
-                    printRecursiveRef(stream, e, isRootGroup ? "" : currentGroupPath, false, isFirstPrint, printRecursiveRef);
-                }
-            }, error);
-        }
-        // Print remaining messages
-        if (!messages.empty()) {
-            if (!isFirstPrint) {
-                stream << "\n";
-            }
-            stream << std::format("[{}]\n", currentGroupPath);
-            for (const auto& msg : messages) {
-                stream << std::format(" - {}\n", msg);
-            }
-        }
-    };
-
-    std::stringstream ss;
-    printRecursive(ss, *this, "", true, true, printRecursive);
-    std::cout << ss.str();
-}
-
-inline void Argon::ErrorGroup::printErrorsTreeMode(const TextMode textMode) const {
+inline void Argon::ErrorGroup::printErrors() const {
     constexpr auto printRecursive = [](std::stringstream& stream, const ErrorGroup& group, const std::string& prefix,
                                        auto&& printRecursiveRef) -> void {
         const auto& errors = group.getErrors();
@@ -354,25 +286,6 @@ inline void Argon::ErrorGroup::printErrorsTreeMode(const TextMode textMode) cons
     std::stringstream ss;
     printRecursive(ss, *this, "", printRecursive);
     std::cout << ss.str();
-}
-
-inline size_t Argon::ErrorGroup::getIndexOfLastHasError() const {
-    size_t index = m_errors.size();
-    while (index-- > 0) {
-        ErrorVariant errorVariant = m_errors[index];
-        bool found = std::visit([]<typename T>(const T& e) -> bool {
-            if constexpr (std::is_same_v<T, ErrorMessage>) {
-                return true;
-            } else {
-                return e.m_hasErrors;
-            }
-        }, errorVariant);
-
-        if (found) {
-            return index;
-        }
-    }
-    return 0;
 }
 
 #endif // ARGON_ERROR_INCLUDE

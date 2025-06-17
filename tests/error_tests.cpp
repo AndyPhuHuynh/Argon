@@ -129,7 +129,7 @@ TEST_CASE("Errors test 1", "[errors]") {
                         + Positional<int>()("[PositionalInt]", "Description")
                     )
                 );
-    const std::string input = "--integer asdf charpos invalidpositional --g [--integer what --g2 [--nestedbool bool --nestedint int position ? huh] --bool dddd]  --bool true";
+    const std::string input = "--integer asdf charpos invalidpositional --g [--integer what --g2 [--nestedbool bool --nestedint int position ? huh] --bool dddd]  --bool 2";
     parser.parse(input);
-    parser.printErrors(PrintMode::Tree);
+    parser.printErrors();
 }

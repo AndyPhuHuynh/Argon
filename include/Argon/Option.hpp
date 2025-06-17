@@ -457,13 +457,14 @@ auto Converter<Derived, T>::generateErrorMsg(std::string_view optionName, std::s
     ss << "expected " << type_name<T>();
 
     if constexpr (is_non_bool_integral<T>) {
-        ss << " in the range of [" << format_with_commas(static_cast<int64_t>(std::numeric_limits<T>::min())) <<
-              " to " << format_with_commas(static_cast<int64_t>(std::numeric_limits<T>::max())) << "]";
+        ss << std::format(
+            " between {} and {}",
+            format_with_commas(static_cast<int64_t>(std::numeric_limits<T>::min())),
+            format_with_commas(static_cast<int64_t>(std::numeric_limits<T>::max())));
     } else if constexpr (std::is_same_v<T, bool>) {
-        ss << " true or false";
+        ss << " (true or false)";
     }
-
-    ss << ", got: " << invalidArg;
+    ss << std::format(", got: '{}'", invalidArg);
     this->m_conversionError = ss.str();
 }
 

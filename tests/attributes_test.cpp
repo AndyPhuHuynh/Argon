@@ -96,7 +96,7 @@ TEST_CASE("Add default dashes") {
     parser.parse("--main 1 -m 2 --main2 3 -m2 4");
 
     CHECK(!parser.hasErrors());
-    parser.printErrors(PrintMode::Flat);
+    parser.printErrors();
     CHECK(x == 2);
     CHECK(y == 4);
 }

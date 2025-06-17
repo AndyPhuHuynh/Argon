@@ -63,7 +63,7 @@ namespace Argon {
 
         [[nodiscard]] auto getHelpMessage() const -> std::string;
 
-        auto printErrors(PrintMode analysisPrintMode, TextMode analysisTextMode = TextMode::Ascii) const -> void;
+        auto printErrors() const -> void;
 
         auto parse(int argc, const char **argv) -> bool;
 
@@ -161,8 +161,7 @@ inline auto Parser::getHelpMessage() const -> std::string {
     return m_context.getHelpMessage();
 }
 
-inline auto Parser::printErrors(const PrintMode analysisPrintMode,
-                                const TextMode analysisTextMode) const -> void {
+inline auto Parser::printErrors() const -> void {
     if (!m_contextValidationErrors.empty()) {
         std::cout << "Parser is in an invalid state:\n";
         for (const auto& err : m_contextValidationErrors) {
@@ -171,17 +170,11 @@ inline auto Parser::printErrors(const PrintMode analysisPrintMode,
         return;
     }
     if (m_syntaxErrors.hasErrors()) {
-        m_syntaxErrors.printErrorsFlatMode();
+        m_syntaxErrors.printErrors();
         return;
     }
     if (m_analysisErrors.hasErrors()) {
-        switch (analysisPrintMode) {
-            case PrintMode::Flat:
-                m_analysisErrors.printErrorsFlatMode();
-                return;
-            case PrintMode::Tree:
-                m_analysisErrors.printErrorsTreeMode(analysisTextMode);
-        }
+        m_analysisErrors.printErrors();
         return;
     }
     if (!m_constraintErrors.empty()) {

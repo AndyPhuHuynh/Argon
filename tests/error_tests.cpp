@@ -1,6 +1,7 @@
 ﻿#include "Argon/Error.hpp"
 #include "Argon/Option.hpp"
 #include "Argon/Parser.hpp"
+#include "catch2/catch_test_macros.hpp"
 
 static void MessageTest1() {
     using namespace Argon;
@@ -110,4 +111,25 @@ void runErrorTests() {
     MessageTest1();
     GroupTest1();
     SyntaxError1();
+}
+
+TEST_CASE("Errors test 1", "[errors]") {
+    using namespace Argon;
+    auto parser = Option<int>()["--integer"]
+                | Option<bool>()["--bool"]
+                | Positional<char>()("CharPos", "Description")
+                | (
+                    OptionGroup()["--g"]
+                    + Option<int>()["--integer"]
+                    + Option<bool>()["--bool"]
+                    + (
+                        OptionGroup()["--g2"]
+                        + Option<int>()["--nestedint"]
+                        + Option<bool>()["--nestedbool"]
+                        + Positional<int>()("[PositionalInt]", "Description")
+                    )
+                );
+    const std::string input = "--integer asdf charpos invalidpositional --g [--integer what --g2 [--nestedbool bool --nestedint int position ? huh] --bool dddd]  --bool true";
+    parser.parse(input);
+    parser.printErrors(PrintMode::Tree);
 }

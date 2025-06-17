@@ -33,7 +33,7 @@ namespace Argon {
 
         std::vector<std::string> m_contextValidationErrors;
         ErrorGroup m_syntaxErrors = ErrorGroup("Syntax Errors", -1, -1);
-        ErrorGroup m_analysisErrors = ErrorGroup("Analysis Errors", -1, -1);
+        ErrorGroup m_analysisErrors = ErrorGroup("", -1, -1);
         std::vector<std::string> m_constraintErrors;
 
         std::vector<Token> m_brackets;

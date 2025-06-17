@@ -325,40 +325,22 @@ inline void Argon::ErrorGroup::printErrorsFlatMode() const {
 
 inline void Argon::ErrorGroup::printErrorsTreeMode(const TextMode textMode) const {
     constexpr auto printRecursive = [](std::stringstream& stream, const ErrorGroup& group, const std::string& prefix,
-                                       const bool isFirstPrint, const bool useUnicode, auto&& printRecursiveRef) -> void {
-        if (isFirstPrint) {
-            stream << std::format("[{}]\n", group.getGroupName());
-        }
+                                       auto&& printRecursiveRef) -> void {
         const auto& errors = group.getErrors();
-        const size_t lastErrorIndex = group.getIndexOfLastHasError();
         for (size_t i = 0; i < errors.size(); ++i) {
             auto& error = errors[i];
             std::visit([&]<typename T>(const T& e) {
                 if constexpr (std::is_same_v<T, ErrorMessage>) {
-                    if (i == lastErrorIndex) {
-                        useUnicode ? stream << std::format("{}└── {}\n", prefix, e.msg) :
-                                     stream << std::format("{}'-- {}\n", prefix, e.msg);
-                    } else {
-                        useUnicode ? stream << std::format("{}├── {}\n", prefix, e.msg) :
-                                     stream << std::format("{}|-- {}\n", prefix, e.msg);
-                    }
+                    stream << std::format("{}{}\n", prefix, e.msg);
                 } else if constexpr (std::is_same_v<T, ErrorGroup>) {
                     if (!e.m_hasErrors) {
                         return;
                     }
-
-                    if (i == lastErrorIndex) {
-                        useUnicode ? stream << std::format("{}└── [{}]\n", prefix, e.getGroupName()) :
-                                     stream << std::format("{}'-- [{}]\n", prefix, e.getGroupName());
-                        printRecursiveRef(stream, e, prefix + "    ", false, useUnicode, printRecursiveRef);
-                    } else {
-                        if (useUnicode) {
-                            stream << std::format("{}├── [{}]\n", prefix, e.getGroupName());
-                            printRecursiveRef(stream, e, prefix + "│   ", false, useUnicode, printRecursiveRef);
-                        } else {
-                            stream << std::format("{}|-- [{}]\n", prefix, e.getGroupName());
-                            printRecursiveRef(stream, e, prefix + "|   ", false, useUnicode, printRecursiveRef);
-                        }
+                    stream << "\n";
+                    stream << std::format("{}In group '{}':\n", prefix, e.getGroupName());
+                    printRecursiveRef(stream, e, prefix + "    ", printRecursiveRef);
+                    if (i < errors.size() - 1) {
+                        stream << "\n";
                     }
                 }
             }, error);
@@ -370,7 +352,7 @@ inline void Argon::ErrorGroup::printErrorsTreeMode(const TextMode textMode) cons
     }
 
     std::stringstream ss;
-    printRecursive(ss, *this, "", true, textMode == TextMode::Utf8, printRecursive);
+    printRecursive(ss, *this, "", printRecursive);
     std::cout << ss.str();
 }
 

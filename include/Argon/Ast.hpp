@@ -218,12 +218,14 @@ inline void Argon::OptionGroupAst::addOption(std::unique_ptr<PositionalAst> opti
 inline void Argon::OptionGroupAst::analyze(Parser& parser, Context& context) {
     IOption *iOption = context.getOption(flag.value);
     if (!iOption) {
+        parser.removeErrorGroup(flag.pos);
         parser.addError(std::format("Unknown option group: '{}'", flag.value), flag.pos);
         return;
     }
 
     const auto optionGroup = dynamic_cast<OptionGroup*>(iOption);
     if (!optionGroup) {
+        parser.removeErrorGroup(flag.pos);
         parser.addError(std::format("Flag '{}' is not an option group", flag.value), flag.pos);
         return;
     }

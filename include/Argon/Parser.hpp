@@ -32,8 +32,8 @@ namespace Argon {
         Scanner m_scanner;
 
         std::vector<std::string> m_contextValidationErrors;
-        ErrorGroup m_syntaxErrors;
-        ErrorGroup m_analysisErrors;
+        ErrorGroup m_syntaxErrors = ErrorGroup("Syntax Errors", -1, -1);
+        ErrorGroup m_analysisErrors = ErrorGroup("Analysis Errors", -1, -1);
         std::vector<std::string> m_constraintErrors;
 
         std::vector<Token> m_brackets;
@@ -55,11 +55,15 @@ namespace Argon {
 
         auto addError(std::string_view error, int pos) -> void;
 
+        auto addErrorGroup(std::string_view groupName, int startPos, int endPos) -> void;
+
+        auto removeErrorGroup(int startPos) -> void;
+
         [[nodiscard]] auto hasErrors() const -> bool;
 
         [[nodiscard]] auto getHelpMessage() const -> std::string;
 
-        auto printErrors() const -> void;
+        auto printErrors(PrintMode analysisPrintMode, TextMode analysisTextMode = TextMode::Ascii) const -> void;
 
         auto parse(int argc, const char **argv) -> bool;
 
@@ -140,6 +144,14 @@ inline auto Parser::addError(const std::string_view error, const int pos) -> voi
     m_analysisErrors.addErrorMessage(error, pos);
 }
 
+inline auto Parser::addErrorGroup(const std::string_view groupName, const int startPos, const int endPos) -> void {
+    m_analysisErrors.addErrorGroup(groupName, startPos, endPos);
+}
+
+inline auto Parser::removeErrorGroup(const int startPos) -> void {
+    m_analysisErrors.removeErrorGroup(startPos);
+}
+
 inline auto Parser::hasErrors() const -> bool {
     return !m_contextValidationErrors.empty() || m_syntaxErrors.hasErrors() ||
             m_analysisErrors.hasErrors() || !m_constraintErrors.empty();
@@ -149,7 +161,8 @@ inline auto Parser::getHelpMessage() const -> std::string {
     return m_context.getHelpMessage();
 }
 
-inline auto Parser::printErrors() const -> void {
+inline auto Parser::printErrors(const PrintMode analysisPrintMode,
+                                const TextMode analysisTextMode) const -> void {
     if (!m_contextValidationErrors.empty()) {
         std::cout << "Parser is in an invalid state:\n";
         for (const auto& err : m_contextValidationErrors) {
@@ -162,7 +175,13 @@ inline auto Parser::printErrors() const -> void {
         return;
     }
     if (m_analysisErrors.hasErrors()) {
-        m_analysisErrors.printErrorsFlatMode();
+        switch (analysisPrintMode) {
+            case PrintMode::Flat:
+                m_analysisErrors.printErrorsFlatMode();
+                return;
+            case PrintMode::Tree:
+                m_analysisErrors.printErrorsTreeMode(analysisTextMode);
+        }
         return;
     }
     if (!m_constraintErrors.empty()) {
@@ -314,12 +333,14 @@ inline auto Parser::parseGroupContents(OptionGroupAst& optionGroupAst, Context& 
         if (nextToken.kind == TokenKind::RBRACK) {
             getNextToken();
             optionGroupAst.endPos = nextToken.position;
+            m_analysisErrors.addErrorGroup(optionGroupAst.flag.value, optionGroupAst.flag.pos, optionGroupAst.endPos);
             return;
         }
 
         if (nextToken.kind == TokenKind::END) {
             getNextToken();
             optionGroupAst.endPos = nextToken.position;
+            m_analysisErrors.addErrorGroup(optionGroupAst.flag.value, optionGroupAst.flag.pos, optionGroupAst.endPos);
             m_syntaxErrors.addErrorMessage(
                 std::format("No matching ']' found for group '{}'", optionGroupAst.flag.value), nextToken.position);
             return;

@@ -7,9 +7,9 @@ static void MessageTest1() {
     using namespace Argon;
     ErrorGroup root;
 
-    root.addErrorMessage("one", 1);
-    root.addErrorMessage("three", 3);
-    root.addErrorMessage("two", 2);
+    root.addErrorMessage("one", 1, ErrorType::None);
+    root.addErrorMessage("three", 3, ErrorType::None);
+    root.addErrorMessage("two", 2, ErrorType::None);
 
     const auto errors = root.getErrors();
 
@@ -47,11 +47,11 @@ static void GroupTest1() {
     using namespace Argon;
     ErrorGroup root;
 
-    root.addErrorMessage("one", 1);
+    root.addErrorMessage("one", 1, ErrorType::None);
     root.addErrorGroup("GroupOne",20, 30);
-    root.addErrorMessage("25", 25);
-    root.addErrorMessage("21", 21);
-    root.addErrorMessage("35", 35);
+    root.addErrorMessage("25", 25, ErrorType::None);
+    root.addErrorMessage("21", 21, ErrorType::None);
+    root.addErrorMessage("35", 35, ErrorType::None);
 
     auto errors = root.getErrors();
 

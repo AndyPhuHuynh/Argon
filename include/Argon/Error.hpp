@@ -11,13 +11,29 @@ namespace Argon {
     class ErrorGroup;
 
     using ErrorVariant = std::variant<ErrorMessage, ErrorGroup>;
+
+    enum class ErrorType {
+        None = 0,
+
+        Syntax_MissingFlagName,
+        Syntax_MissingValue,
+        Syntax_MissingLeftBracket,
+        Syntax_MissingRightBracket,
+        Syntax_UnknownFlag,
+
+        Analysis_UnknownFlag,
+        Analysis_IncorrectOptionType,
+        Analysis_ConversionError,
+        Analysis_UnexpectedToken
+    };
     
     struct ErrorMessage {
         std::string msg;
         int pos = -1;
+        ErrorType type = ErrorType::None;
 
         ErrorMessage() = default;
-        ErrorMessage(std::string_view msg, int pos);
+        ErrorMessage(std::string_view msg, int pos, ErrorType type);
         
         std::strong_ordering operator<=>(const ErrorMessage &other) const;
     };
@@ -34,7 +50,7 @@ namespace Argon {
         ErrorGroup(std::string_view groupName, int startPos, int endPos);
 
         void clear();
-        void addErrorMessage(std::string_view msg, int pos);
+        void addErrorMessage(std::string_view msg, int pos, ErrorType type);
         void addErrorGroup(std::string_view name, int startPos, int endPos);
         void removeErrorGroup(int startPos);
 
@@ -61,7 +77,8 @@ static bool inRange(const int value, const int min, const int max) {
     return value >= min && value <= max;
 }
 
-inline Argon::ErrorMessage::ErrorMessage(const std::string_view msg, const int pos) : msg(msg), pos(pos) {}
+inline Argon::ErrorMessage::ErrorMessage(const std::string_view msg, const int pos, const ErrorType type)
+    : msg(msg), pos(pos), type(type) {}
 
 inline std::strong_ordering Argon::ErrorMessage::operator<=>(const ErrorMessage& other) const {
     return pos <=> other.pos;
@@ -90,9 +107,9 @@ inline void Argon::ErrorGroup::setHasErrors() {
     }
 }
 
-inline void Argon::ErrorGroup::addErrorMessage(std::string_view msg, int pos) { //NOLINT (recursion)
+inline void Argon::ErrorGroup::addErrorMessage(std::string_view msg, int pos, ErrorType type) { //NOLINT (recursion)
     if (m_errors.empty()) {
-        m_errors.emplace_back(std::in_place_type<ErrorMessage>, msg, pos);
+        m_errors.emplace_back(std::in_place_type<ErrorMessage>, msg, pos, type);
         setHasErrors();
         return;
     }
@@ -117,7 +134,7 @@ inline void Argon::ErrorGroup::addErrorMessage(std::string_view msg, int pos) { 
     // Index is now the index of the item positioned ahead of where we want
     // If index is zero just insert it at 0
     if (index == 0) {
-        m_errors.emplace(m_errors.begin(), std::in_place_type<ErrorMessage>, msg, pos);
+        m_errors.emplace(m_errors.begin(), std::in_place_type<ErrorMessage>, msg, pos, type);
         setHasErrors();
         return;
     }
@@ -130,17 +147,18 @@ inline void Argon::ErrorGroup::addErrorMessage(std::string_view msg, int pos) { 
         auto& errorGroup = std::get<ErrorGroup>(item);
 
         if (inRange(pos, errorGroup.m_startPos, errorGroup.m_endPos)) {
-            errorGroup.addErrorMessage(msg, pos);
+            errorGroup.addErrorMessage(msg, pos, type);
             return;
         }
     }
 
     // Else insert at that index
     if (index >= m_errors.size()) {
-        m_errors.emplace_back(std::in_place_type<ErrorMessage>, msg, pos);
+        m_errors.emplace_back(std::in_place_type<ErrorMessage>, msg, pos, type);
         setHasErrors();
     } else {
-        m_errors.emplace(m_errors.begin() + static_cast<std::ptrdiff_t>(index), std::in_place_type<ErrorMessage>, msg, pos);
+        m_errors.emplace(m_errors.begin() + static_cast<std::ptrdiff_t>(index), std::in_place_type<ErrorMessage>,
+            msg, pos, type);
         setHasErrors();
     }
 }
@@ -199,7 +217,7 @@ inline void Argon::ErrorGroup::addErrorGroup(ErrorGroup& groupToAdd) { //NOLINT 
         if (std::holds_alternative<ErrorMessage>(m_errors[insertIndex])) {
             auto& errorMsg = std::get<ErrorMessage>(m_errors[insertIndex]);
             if (inRange(errorMsg.pos, groupToAdd.m_startPos, groupToAdd.m_endPos)) {
-                groupToAdd.addErrorMessage(errorMsg.msg, errorMsg.pos);
+                groupToAdd.addErrorMessage(errorMsg.msg, errorMsg.pos, errorMsg.type);
                 m_errors.erase(m_errors.begin() + static_cast<std::ptrdiff_t>(insertIndex));
             } else {
                 break;
@@ -228,7 +246,7 @@ inline void Argon::ErrorGroup::addErrorGroup(ErrorGroup& groupToAdd) { //NOLINT 
 }
 
 inline void Argon::ErrorGroup::removeErrorGroup(int startPos) {
-    auto it = std::ranges::find_if(m_errors, [startPos](const ErrorVariant& item) {
+    const auto it = std::ranges::find_if(m_errors, [startPos](const ErrorVariant& item) {
         if (std::holds_alternative<ErrorGroup>(item)) {
             const auto& errorGroup = std::get<ErrorGroup>(item);
             if (errorGroup.m_startPos == startPos) {

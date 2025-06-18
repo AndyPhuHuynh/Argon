@@ -128,19 +128,19 @@ inline Argon::OptionAst::OptionAst(const Token& flagToken, const Token& valueTok
 inline void Argon::OptionAst::analyze(Parser& parser, Context& context) {
     IOption *iOption = context.getOption(flag.value);
     if (!iOption) {
-        parser.addError(std::format("Unknown option: '{}'", flag.value), flag.pos);
+        parser.addError(std::format("Unknown option: '{}'", flag.value), flag.pos, ErrorType::Analysis_UnknownFlag);
         return;
     }
 
     auto *setValue = dynamic_cast<ISetValue*>(iOption);
     if (!setValue || !dynamic_cast<IsSingleOption*>(iOption)) {
-        parser.addError(std::format("Flag '{}' is not an option", flag.value), flag.pos);
+        parser.addError(std::format("Flag '{}' is not an option", flag.value), flag.pos, ErrorType::Analysis_IncorrectOptionType);
         return;
     }
 
     setValue->setValue(parser.getDefaultConversions(), flag.value, value.value);
     if (iOption->hasError()) {
-        parser.addError(iOption->getError(), value.pos);
+        parser.addError(iOption->getError(), value.pos, ErrorType::Analysis_ConversionError);
     }
 }
 
@@ -155,20 +155,21 @@ inline void Argon::MultiOptionAst::addValue(const Token& value) {
 inline void Argon::MultiOptionAst::analyze(Parser& parser, Context &context) {
     IOption *iOption = context.getOption(flag.value);
     if (!iOption) {
-        parser.addError(std::format("Unknown multi-option: '{}'", flag.value), flag.pos);
+        parser.addError(std::format("Unknown multi-option: '{}'", flag.value), flag.pos, ErrorType::Analysis_UnknownFlag);
         return;
     }
 
     auto *setValue = dynamic_cast<ISetValue*>(iOption);
     if (!setValue || !dynamic_cast<IsMultiOption*>(iOption)) {
-        parser.addError(std::format("Flag '{}' is not a multi-option", flag.value), flag.pos);
+        parser.addError(std::format("Flag '{}' is not a multi-option", flag.value),
+            flag.pos, ErrorType::Analysis_IncorrectOptionType);
         return;
     }
 
     for (const auto&[value, pos] : m_values) {
         setValue->setValue(parser.getDefaultConversions(), flag.value, value);
         if (iOption->hasError()) {
-            parser.addError(iOption->getError(), pos);
+            parser.addError(iOption->getError(), pos, ErrorType::Analysis_ConversionError);
         }
     }
 }
@@ -182,7 +183,7 @@ inline Argon::PositionalAst::PositionalAst(const Token& flagToken) {
 inline void Argon::PositionalAst::analyze(Parser& parser, const Context& context, const size_t position) {
     IsPositional *opt = context.getPositional(position);
     if (!opt) {
-        parser.addError(std::format("Unexpected token: '{}'", value.value), value.pos);
+        parser.addError(std::format("Unexpected token: '{}'", value.value), value.pos, ErrorType::Analysis_UnexpectedToken);
         return;
     }
 
@@ -192,7 +193,7 @@ inline void Argon::PositionalAst::analyze(Parser& parser, const Context& context
 
     setValue->setValue(parser.getDefaultConversions(), iOption->getInputHint(), value.value);
     if (iOption->hasError()) {
-        parser.addError(iOption->getError(), value.pos);
+        parser.addError(iOption->getError(), value.pos, ErrorType::Analysis_ConversionError);
     }
 }
 
@@ -219,14 +220,15 @@ inline void Argon::OptionGroupAst::analyze(Parser& parser, Context& context) {
     IOption *iOption = context.getOption(flag.value);
     if (!iOption) {
         parser.removeErrorGroup(flag.pos);
-        parser.addError(std::format("Unknown option group: '{}'", flag.value), flag.pos);
+        parser.addError(std::format("Unknown option group: '{}'", flag.value), flag.pos, ErrorType::Analysis_UnknownFlag);
         return;
     }
 
     const auto optionGroup = dynamic_cast<OptionGroup*>(iOption);
     if (!optionGroup) {
         parser.removeErrorGroup(flag.pos);
-        parser.addError(std::format("Flag '{}' is not an option group", flag.value), flag.pos);
+        parser.addError(std::format("Flag '{}' is not an option group", flag.value),
+            flag.pos, ErrorType::Analysis_IncorrectOptionType);
         return;
     }
 

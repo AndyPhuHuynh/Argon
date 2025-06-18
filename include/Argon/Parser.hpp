@@ -53,7 +53,7 @@ namespace Argon {
         template<typename T> requires DerivesFrom<T, IOption>
         auto addOption(T&& option) -> void;
 
-        auto addError(std::string_view error, int pos) -> void;
+        auto addError(std::string_view error, int pos, ErrorType type) -> void;
 
         auto addErrorGroup(std::string_view groupName, int startPos, int endPos) -> void;
 
@@ -140,8 +140,8 @@ auto Parser::addOption(T&& option) -> void {
     m_context.addOption(std::forward<T>(option));
 }
 
-inline auto Parser::addError(const std::string_view error, const int pos) -> void {
-    m_analysisErrors.addErrorMessage(error, pos);
+inline auto Parser::addError(const std::string_view error, const int pos, const ErrorType type) -> void {
+    m_analysisErrors.addErrorMessage(error, pos, type);
 }
 
 inline auto Parser::addErrorGroup(const std::string_view groupName, const int startPos, const int endPos) -> void {
@@ -271,7 +271,8 @@ inline auto Parser::parseSingleOption(Context& context, const Token& flag) -> st
     // Get value
     if (value.kind != TokenKind::IDENTIFIER) {
         m_syntaxErrors.addErrorMessage(
-            std::format("Expected flag value, got '{}' at position {}", value.image, value.position), value.position);
+            std::format("Expected flag value, got '{}' at position {}", value.image, value.position),
+            value.position, ErrorType::Syntax_MissingValue);
         skipToNextValidFlag(context);
         return nullptr;
     }
@@ -281,13 +282,13 @@ inline auto Parser::parseSingleOption(Context& context, const Token& flag) -> st
         if (&context == &m_context) {
             m_syntaxErrors.addErrorMessage(
                 std::format("No value provided for flag '{}' at position {}", flag.image, flag.position),
-                value.position
+                value.position, ErrorType::Syntax_MissingValue
             );
         } else {
             m_syntaxErrors.addErrorMessage(
                 std::format("No value provided for flag '{}' inside group '{}' at position {}", flag.image,
                             context.getPath(), flag.position),
-                value.position
+                value.position, ErrorType::Syntax_MissingValue
             );
         }
         getNextValidFlag(context, false);
@@ -335,7 +336,8 @@ inline auto Parser::parseGroupContents(OptionGroupAst& optionGroupAst, Context& 
             optionGroupAst.endPos = nextToken.position;
             m_analysisErrors.addErrorGroup(optionGroupAst.flag.value, optionGroupAst.flag.pos, optionGroupAst.endPos);
             m_syntaxErrors.addErrorMessage(
-                std::format("No matching ']' found for group '{}'", optionGroupAst.flag.value), nextToken.position);
+                std::format("No matching ']' found for group '{}'", optionGroupAst.flag.value),
+                nextToken.position, ErrorType::Syntax_MissingRightBracket);
             return;
         }
         auto parsed = parseOptionBundle(nextContext);
@@ -350,7 +352,8 @@ inline auto Parser::parseOptionGroup(Context& context, const Token& flag) -> std
     const Token lbrack = m_scanner.peekToken();
     if (lbrack.kind != TokenKind::LBRACK) {
         m_syntaxErrors.addErrorMessage(
-            std::format("Expected '[', got '{}' at position {}", lbrack.image, lbrack.position), lbrack.position);
+            std::format("Expected '[', got '{}' at position {}", lbrack.image, lbrack.position),
+            lbrack.position, ErrorType::Syntax_MissingLeftBracket);
         skipToNextValidFlag(context);
         return nullptr;
     }
@@ -388,19 +391,19 @@ inline auto Parser::getNextValidFlag(const Context& context, const bool printErr
     if (printErrors && !isIdentifier) {
         m_syntaxErrors.addErrorMessage(
             std::format("Expected flag name, got '{}' at position {}", flag.image, flag.position),
-            flag.position
+            flag.position, ErrorType::Syntax_MissingFlagName
         );
     } else if (printErrors) {
         if (&context == &m_context) {
             m_syntaxErrors.addErrorMessage(
                 std::format("Unknown flag '{}'  at position {}", flag.image, flag.position),
-                flag.position
+                flag.position, ErrorType::Syntax_UnknownFlag
             );
         } else {
             m_syntaxErrors.addErrorMessage(
                 std::format("Unknown flag '{}' inside group '{}' at position {}", flag.image, context.getPath(),
                             flag.position),
-                flag.position
+                flag.position, ErrorType::Syntax_UnknownFlag
             );
         }
     }
@@ -503,7 +506,7 @@ inline auto Parser::getNextToken() -> Token {
             m_mismatchedRBRACK = true;
             m_syntaxErrors.addErrorMessage(
                 std::format("No matching '[' found for ']' at position {}", nextToken.position),
-                nextToken.position
+                nextToken.position, ErrorType::Syntax_MissingLeftBracket
             );
         } else {
             m_brackets.pop_back();
@@ -522,7 +525,8 @@ inline auto Parser::skipScope() -> void {
         } else if (token.kind == TokenKind::RBRACK) {
             if (brackets.empty()) {
                 m_syntaxErrors.addErrorMessage(
-                    std::format("Unmatched ']' found at position {}", token.position), token.position);
+                    std::format("Unmatched ']' found at position {}", token.position),
+                    token.position, ErrorType::Syntax_MissingLeftBracket);
                 return;
             }
             brackets.pop_back();
@@ -531,7 +535,8 @@ inline auto Parser::skipScope() -> void {
         if (token.kind == TokenKind::END && !brackets.empty()) {
             for (const auto& bracket: brackets) {
                 m_syntaxErrors.addErrorMessage(
-                    std::format("Unmatched '[' found at position {}", bracket.position), bracket.position);
+                    std::format("Unmatched '[' found at position {}", bracket.position),
+                    bracket.position, ErrorType::Syntax_MissingRightBracket);
             }
             return;
         }

@@ -48,6 +48,7 @@ inline void to_upper(std::string& str) {
     std::ranges::transform(str, str.begin(),
         [](const unsigned char c) { return static_cast<char>(std::toupper(c)); });
 }
+
 } // End namespace Argon::StringUtil
 
 #endif // ARGON_STRINGUTIL_INCLUDE

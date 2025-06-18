@@ -33,10 +33,11 @@ namespace Argon {
 
         std::vector<std::string> m_contextValidationErrors;
         ErrorGroup m_syntaxErrors = ErrorGroup("Syntax Errors", -1, -1);
-        ErrorGroup m_analysisErrors = ErrorGroup("", -1, -1);
+        ErrorGroup m_analysisErrors = ErrorGroup("Analysis Errors", -1, -1);
         std::vector<std::string> m_constraintErrors;
 
         std::vector<Token> m_brackets;
+        std::vector<Token> m_poppedBrackets;
         bool m_mismatchedRBRACK = false;
 
         DefaultConversions m_defaultConversions;
@@ -58,6 +59,10 @@ namespace Argon {
         auto addErrorGroup(std::string_view groupName, int startPos, int endPos) -> void;
 
         auto removeErrorGroup(int startPos) -> void;
+
+        [[nodiscard]] auto getSyntaxErrors() const -> const ErrorGroup&;
+
+        [[nodiscard]] auto getAnalysisErrors() const -> const ErrorGroup&;
 
         [[nodiscard]] auto hasErrors() const -> bool;
 
@@ -109,12 +114,14 @@ namespace Argon {
 
         auto parseOptionGroup(Context& context, const Token& flag) -> std::unique_ptr<OptionGroupAst>;
 
-        auto getNextValidFlag(const Context& context, bool printErrors = true) -> ::std::variant<std::monostate,
-            Token, std::unique_ptr<::Argon::PositionalAst>>;
+        auto getNextValidFlag(const Context& context, bool printErrors = true) -> std::variant<std::monostate,
+            Token, std::unique_ptr<PositionalAst>>;
 
         auto skipToNextValidFlag(const Context& context) -> void;
 
         auto getNextToken() -> Token;
+
+        auto rewindScanner(uint32_t rewindAmount) -> void;
 
         auto skipScope() -> void;
 
@@ -150,6 +157,14 @@ inline auto Parser::addErrorGroup(const std::string_view groupName, const int st
 
 inline auto Parser::removeErrorGroup(const int startPos) -> void {
     m_analysisErrors.removeErrorGroup(startPos);
+}
+
+inline auto Parser::getSyntaxErrors() const -> const ErrorGroup& {
+    return m_syntaxErrors;
+}
+
+inline auto Parser::getAnalysisErrors() const -> const ErrorGroup& {
+    return m_analysisErrors;
 }
 
 inline auto Parser::hasErrors() const -> bool {
@@ -293,7 +308,7 @@ inline auto Parser::parseSingleOption(Context& context, const Token& flag) -> st
         }
         getNextValidFlag(context, false);
         if (m_scanner.peekToken().kind != TokenKind::END) {
-            m_scanner.rewind(1);
+            rewindScanner(1);
         }
         return nullptr;
     }
@@ -437,7 +452,7 @@ inline auto Parser::getNextValidFlag(const Context& context, const bool printErr
 inline auto Parser::skipToNextValidFlag(const Context& context) -> void {
     getNextValidFlag(context, false);
     if (m_scanner.peekToken().kind != TokenKind::END) {
-        m_scanner.rewind(1);
+        rewindScanner(1);
     }
 }
 
@@ -509,10 +524,20 @@ inline auto Parser::getNextToken() -> Token {
                 nextToken.position, ErrorType::Syntax_MissingLeftBracket
             );
         } else {
+            m_poppedBrackets.push_back(m_brackets.back());
             m_brackets.pop_back();
         }
     }
     return nextToken;
+}
+
+inline auto Parser::rewindScanner(const uint32_t rewindAmount) -> void {
+    for (const auto& token : std::ranges::reverse_view(m_scanner.rewind(rewindAmount))) {
+        if (token.kind == TokenKind::RBRACK && !m_poppedBrackets.empty()) {
+            m_brackets.push_back(m_poppedBrackets.back());
+            m_poppedBrackets.pop_back();
+        }
+    }
 }
 
 inline auto Parser::skipScope() -> void {

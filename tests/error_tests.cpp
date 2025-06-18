@@ -2,6 +2,9 @@
 #include "Argon/Option.hpp"
 #include "Argon/Parser.hpp"
 #include "catch2/catch_test_macros.hpp"
+#include "catch2/matchers/catch_matchers.hpp"
+#include "catch2/matchers/catch_matchers_string.hpp"
+#include "catch2/matchers/catch_matchers_vector.hpp"
 
 inline auto RequireMsg(const Argon::ErrorVariant& var) {
     REQUIRE(std::holds_alternative<Argon::ErrorMessage>(var));
@@ -177,4 +180,168 @@ TEST_CASE("Error group correctly encompasses errors inside its range", "[errors]
         CheckGroup(groupTwo, "Group two", 10, 20, 2);
         CheckMessage(RequireMsg(groupTwo.getErrors()[0]), "11", 11, ErrorType::None);
         CheckMessage(RequireMsg(groupTwo.getErrors()[1]), "12", 12, ErrorType::None);
+}
+
+TEST_CASE("Option group syntax errors", "[option-group][errors]") {
+    using namespace Argon;
+    using namespace Catch::Matchers;
+
+    std::string name;
+    int age;
+    std::string major;
+
+    auto parser = Option(&name)["--name"]
+                | (
+                    OptionGroup()["--group"]
+                    + Option(&age)["--age"]
+                );
+
+    SECTION("Missing flag for group name") {
+        parser.parse("--name [--age 10]");
+        CHECK(parser.hasErrors());
+        const auto& syntaxErrors = parser.getSyntaxErrors();
+        CheckGroup(syntaxErrors, "Syntax Errors", -1, -1, 1);
+
+        const auto& error = RequireMsg(syntaxErrors.getErrors()[0]);
+        CHECK(error.pos  == 7);
+        CHECK(error.type == ErrorType::Syntax_MissingValue);
+    }
+
+    SECTION("Unknown flag") {
+        parser.parse("--name John --huh [--age 20]");
+        CHECK(parser.hasErrors());
+        const auto& syntaxErrors = parser.getSyntaxErrors();
+        CheckGroup(syntaxErrors, "Syntax Errors", -1, -1, 1);
+
+        const auto& error = RequireMsg(syntaxErrors.getErrors()[0]);
+        CHECK(error.pos  == 12);
+        CHECK(error.type == ErrorType::Syntax_UnknownFlag);
+    }
+
+    SECTION("Missing left bracket") {
+        parser.parse("--name John --group --age 20]");
+        CHECK(parser.hasErrors());
+        const auto& syntaxErrors = parser.getSyntaxErrors();
+        CheckGroup(syntaxErrors, "Syntax Errors", -1, -1, 2);
+
+        const auto& errorOne = RequireMsg(syntaxErrors.getErrors()[0]);
+        CHECK(errorOne.pos  == 20);
+        CHECK(errorOne.type == ErrorType::Syntax_MissingLeftBracket);
+
+        const auto& errorTwo = RequireMsg(syntaxErrors.getErrors()[1]);
+        CHECK_THAT(errorTwo.msg, ContainsSubstring("No matching"));
+        CHECK(errorTwo.pos  == 28);
+        CHECK(errorTwo.type == ErrorType::Syntax_MissingLeftBracket);
+    }
+
+    SECTION("Missing right bracket") {
+        parser.parse("--name John --group [--age 20 --major CS");
+        CHECK(parser.hasErrors());
+        const auto& syntaxErrors = parser.getSyntaxErrors();
+        CheckGroup(syntaxErrors, "Syntax Errors", -1, -1, 2);
+
+        const auto& errorOne = RequireMsg(syntaxErrors.getErrors()[0]);
+        CHECK(errorOne.pos  == 30);
+        CHECK(errorOne.type == ErrorType::Syntax_UnknownFlag);
+
+        const auto& errorTwo = RequireMsg(syntaxErrors.getErrors()[1]);
+        CHECK_THAT(errorTwo.msg, ContainsSubstring("No matching"));
+        CHECK(errorTwo.pos  == 40);
+        CHECK(errorTwo.type == ErrorType::Syntax_MissingRightBracket);
+    }
+}
+
+TEST_CASE("Option group nested syntax errors", "[option-group][errors]") {
+    using namespace Argon;
+    using namespace Catch::Matchers;
+
+    std::string name;
+    int age;
+    std::string major;
+
+    auto parser = Option(&name)["--name"]
+                | (
+                    OptionGroup()["--group"]
+                    + Option(&age)["--age"]
+                    + (
+                        OptionGroup()["--classes"]
+                        + Option(&major)["--major"]
+                    )
+                );
+
+    SECTION("Missing flag for outer group name") {
+        parser.parse("--name [--age 10 --classes [--major Music]]");
+        CHECK(parser.hasErrors());
+        const auto& syntaxErrors = parser.getSyntaxErrors();
+        CheckGroup(syntaxErrors, "Syntax Errors", -1, -1, 1);
+
+        const auto& error = RequireMsg(syntaxErrors.getErrors()[0]);
+        CHECK(error.pos  == 7);
+        CHECK(error.type == ErrorType::Syntax_MissingValue);
+    }
+
+    SECTION("Missing flag for inner group name") {
+        std::cout << "\n\n\n";
+        parser.parse("--name --group [--age [--major Music]]");
+        CHECK(parser.hasErrors());
+        parser.printErrors();
+        const auto& syntaxErrors = parser.getSyntaxErrors();
+        CheckGroup(syntaxErrors, "Syntax Errors", -1, -1, 2);
+
+        const auto& noValueForName   = RequireMsg(syntaxErrors.getErrors()[0]);
+        const auto& noValueForAge    = RequireMsg(syntaxErrors.getErrors()[1]);
+        const auto& noMatchingRBRACK = RequireMsg(syntaxErrors.getErrors()[2]);
+
+        CHECK(noValueForName.pos    == 0);
+        CHECK(noValueForName.type   == ErrorType::Syntax_MissingValue);
+
+        CHECK(noValueForAge.pos     == 22);
+        CHECK(noValueForAge.type    == ErrorType::Syntax_MissingValue);
+
+        CHECK(noMatchingRBRACK.pos     == 22);
+        CHECK(noMatchingRBRACK.type    == ErrorType::Syntax_MissingValue);
+    }
+
+    // SECTION("Unknown flag") {
+    //     parser.parse("--name John --huh [--age 20]");
+    //     CHECK(parser.hasErrors());
+    //     const auto& syntaxErrors = parser.getSyntaxErrors();
+    //     CheckGroup(syntaxErrors, "Syntax Errors", -1, -1, 1);
+    //
+    //     const auto& error = RequireMsg(syntaxErrors.getErrors()[0]);
+    //     CHECK(error.pos  == 12);
+    //     CHECK(error.type == ErrorType::Syntax_UnknownFlag);
+    // }
+    //
+    // SECTION("Missing left bracket") {
+    //     parser.parse("--name John --group --age 20]");
+    //     CHECK(parser.hasErrors());
+    //     const auto& syntaxErrors = parser.getSyntaxErrors();
+    //     CheckGroup(syntaxErrors, "Syntax Errors", -1, -1, 2);
+    //
+    //     const auto& errorOne = RequireMsg(syntaxErrors.getErrors()[0]);
+    //     CHECK(errorOne.pos  == 20);
+    //     CHECK(errorOne.type == ErrorType::Syntax_MissingLeftBracket);
+    //
+    //     const auto& errorTwo = RequireMsg(syntaxErrors.getErrors()[1]);
+    //     CHECK_THAT(errorTwo.msg, ContainsSubstring("No matching"));
+    //     CHECK(errorTwo.pos  == 28);
+    //     CHECK(errorTwo.type == ErrorType::Syntax_MissingLeftBracket);
+    // }
+    //
+    // SECTION("Missing right bracket") {
+    //     parser.parse("--name John --group [--age 20 --major CS");
+    //     CHECK(parser.hasErrors());
+    //     const auto& syntaxErrors = parser.getSyntaxErrors();
+    //     CheckGroup(syntaxErrors, "Syntax Errors", -1, -1, 2);
+    //
+    //     const auto& errorOne = RequireMsg(syntaxErrors.getErrors()[0]);
+    //     CHECK(errorOne.pos  == 30);
+    //     CHECK(errorOne.type == ErrorType::Syntax_UnknownFlag);
+    //
+    //     const auto& errorTwo = RequireMsg(syntaxErrors.getErrors()[1]);
+    //     CHECK_THAT(errorTwo.msg, ContainsSubstring("No matching"));
+    //     CHECK(errorTwo.pos  == 40);
+    //     CHECK(errorTwo.type == ErrorType::Syntax_MissingRightBracket);
+    // }
 }

@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <optional>
 #include <ostream>
+#include <span>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -51,7 +52,7 @@ namespace Argon {
         
         void recordPosition();
         void rewindToPosition();
-        void rewind(uint32_t amount);
+        auto rewind(uint32_t amount) -> std::span<const Token>;
     private:
         std::vector<Token> m_tokens;
         uint32_t m_tokenPos = 0;
@@ -161,12 +162,10 @@ inline void Argon::Scanner::rewindToPosition() {
     m_tokenPos = m_rewindPos;
 }
 
-inline void Argon::Scanner::rewind(const uint32_t amount) {
-    if (amount > m_tokenPos) {
-        m_tokenPos = 0;
-    } else {
-        m_tokenPos -= amount;
-    }
+inline auto Argon::Scanner::rewind(const uint32_t amount) -> std::span<const Token> {
+    const uint32_t rewindAmount = std::min(m_tokenPos, amount);
+    m_tokenPos -= rewindAmount;
+    return {m_tokens.data() + m_tokenPos, rewindAmount};
 }
 
 inline void Argon::Scanner::scanNextToken() {

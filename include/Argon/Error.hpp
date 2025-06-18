@@ -54,10 +54,12 @@ namespace Argon {
         void addErrorGroup(std::string_view name, int startPos, int endPos);
         void removeErrorGroup(int startPos);
 
-        [[nodiscard]] const std::string& getGroupName() const;
-        [[nodiscard]] const std::vector<ErrorVariant>& getErrors() const;
-        [[nodiscard]] bool hasErrors() const;
-        
+        [[nodiscard]] auto getGroupName() const -> const std::string&;
+        [[nodiscard]] auto getErrors() const -> const std::vector<ErrorVariant>&;
+        [[nodiscard]] auto hasErrors() const -> bool;
+        [[nodiscard]] auto getStartPosition() const -> int;
+        [[nodiscard]] auto getEndPosition() const -> int;
+
         void printErrors() const;
     private:
         ErrorGroup(std::string_view groupName, int startPos, int endPos, ErrorGroup* parent);
@@ -204,10 +206,13 @@ inline void Argon::ErrorGroup::addErrorGroup(ErrorGroup& groupToAdd) { //NOLINT 
                                       inRange(groupToAdd.m_endPos, errorGroup.m_startPos, errorGroup.m_endPos);
             if (fullyInRange) {
                 errorGroup.addErrorGroup(groupToAdd);
-            } else {
-                std::cerr << "Error adding error group, not fully in range!\n";
+                return;
             }
-            return;
+            const bool fullyAfter = groupToAdd.m_startPos >= errorGroup.m_endPos &&
+                                    groupToAdd.m_endPos >= errorGroup.m_endPos;
+            if (!fullyAfter) {
+                std::cerr << "Internal Argon Error: Adding error group, not fully in range!\n";
+            }
         }
     }
 
@@ -271,6 +276,14 @@ inline const std::vector<std::variant<Argon::ErrorMessage, Argon::ErrorGroup>>& 
 
 inline bool Argon::ErrorGroup::hasErrors() const {
     return m_hasErrors;
+}
+
+inline auto Argon::ErrorGroup::getStartPosition() const -> int {
+    return m_startPos;
+}
+
+inline auto Argon::ErrorGroup::getEndPosition() const -> int {
+    return m_endPos;
 }
 
 inline void Argon::ErrorGroup::printErrors() const {

@@ -47,10 +47,10 @@ namespace Argon {
         auto applySetFlag(std::initializer_list<std::string_view> flags) -> void;
     public:
         auto operator[](std::string_view flag) & -> Derived&;
-        auto operator[](std::string_view flag) && -> Derived&&;
+        auto operator[](std::string_view flag) && -> Derived;
 
         auto operator[](std::initializer_list<std::string_view> flags) & -> Derived&;
-        auto operator[](std::initializer_list<std::string_view> flags) && -> Derived&&;
+        auto operator[](std::initializer_list<std::string_view> flags) && -> Derived;
     };
 
     class IOption {
@@ -188,7 +188,7 @@ namespace Argon {
         auto operator+(T&& other) & -> OptionGroup&;
 
         template <typename T> requires DerivesFrom<T, IOption>
-        auto operator+(T&& other) && -> OptionGroup&&;
+        auto operator+(T&& other) && -> OptionGroup;
 
         template <typename T> requires DerivesFrom<T, IOption>
         auto addOption(T&& option) -> void;
@@ -370,9 +370,9 @@ auto HasFlag<Derived>::operator[](const std::string_view flag) & -> Derived& {
 }
 
 template<typename Derived>
-auto HasFlag<Derived>::operator[](const std::string_view flag) && -> Derived&& {
+auto HasFlag<Derived>::operator[](const std::string_view flag) && -> Derived {
     applySetFlag(flag);
-    return static_cast<Derived&&>(*this);
+    return static_cast<Derived&>(*this);
 }
 
 template<typename Derived>
@@ -382,9 +382,9 @@ auto HasFlag<Derived>::operator[](const std::initializer_list<std::string_view> 
 }
 
 template<typename Derived>
-auto HasFlag<Derived>::operator[](const std::initializer_list<std::string_view> flags) && -> Derived&& {
+auto HasFlag<Derived>::operator[](const std::initializer_list<std::string_view> flags) && -> Derived {
     applySetFlag(flags);
-    return static_cast<Derived&&>(*this);
+    return static_cast<Derived&>(*this);
 }
 
 template <typename Derived>
@@ -680,9 +680,9 @@ auto OptionGroup::operator+(T&& other) & -> OptionGroup& {
 }
 
 template <typename T> requires DerivesFrom<T, IOption>
-auto OptionGroup::operator+(T&& other) && -> OptionGroup&& {
+auto OptionGroup::operator+(T&& other) && -> OptionGroup {
     m_context->addOption(std::forward<T>(other));
-    return std::move(*this);
+    return *this;
 }
 
 template<typename T> requires DerivesFrom<T, IOption>

@@ -306,10 +306,6 @@ inline auto Parser::parseSingleOption(Context& context, const Token& flag) -> st
                 value.position, ErrorType::Syntax_MissingValue
             );
         }
-        getNextValidFlag(context, false);
-        if (m_scanner.peekToken().kind != TokenKind::END) {
-            rewindScanner(1);
-        }
         return nullptr;
     }
 

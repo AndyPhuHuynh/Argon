@@ -32,7 +32,7 @@ inline auto CheckMessage(const Argon::ErrorMessage& error, const int pos, Argon:
 }
 
 inline auto CheckGroup(const Argon::ErrorGroup& group, const std::string_view groupName,
-    const int start, const int end, const size_t errorCount) {
+    const int start, const int end, const size_t errorCount) -> const Argon::ErrorGroup& {
     CAPTURE(groupName, start, end, errorCount);
     CAPTURE(group.getGroupName(), group.getStartPosition(), group.getEndPosition());
 
@@ -43,6 +43,8 @@ inline auto CheckGroup(const Argon::ErrorGroup& group, const std::string_view gr
     const auto& errors = group.getErrors();
     CAPTURE(errors.size());
     REQUIRE(errors.size() == errorCount);
+
+    return group;
 }
 
 static auto DigitToString(const int i) {
@@ -191,7 +193,7 @@ TEST_CASE("Error group correctly encompasses errors inside its range", "[errors]
         CheckMessage(RequireMsg(groupTwo.getErrors()[1]), "12", 12, ErrorType::None);
 }
 
-TEST_CASE("Option group syntax errors", "[option-group][errors]") {
+TEST_CASE("Option group syntax errors", "[option-group][syntax][errors]") {
     using namespace Argon;
     using namespace Catch::Matchers;
 
@@ -306,7 +308,7 @@ TEST_CASE("Option group syntax errors", "[option-group][errors]") {
     }
 }
 
-TEST_CASE("Option group nested syntax errors", "[option-group][errors]") {
+TEST_CASE("Option group nested syntax errors", "[option-group][syntax][errors]") {
     using namespace Argon;
     using namespace Catch::Matchers;
 
@@ -435,5 +437,68 @@ TEST_CASE("Option group nested syntax errors", "[option-group][errors]") {
 
         CheckMessage(RequireMsg(syntaxErrors.getErrors()[0]),
             46, ErrorType::Syntax_UnknownFlag);
+    }
+}
+
+TEST_CASE("Missing value for flags", "[option][syntax][errors]") {
+    using namespace Argon;
+    int i; float f; std::string s;
+    auto parser = Option(&i)["--int"]
+                | Option(&f)["--float"]
+                | Option(&s)["--str"];
+
+    SECTION("First value") {
+        parser.parse("--int --float 1.0 --str hello");
+        CHECK(parser.hasErrors());
+        const auto& syntaxErrors = CheckGroup(parser.getSyntaxErrors(), "Syntax Errors", -1, -1, 1);
+        CheckMessage(RequireMsg(syntaxErrors.getErrors()[0]), 6, ErrorType::Syntax_MissingValue);
+    }
+
+    SECTION("Second value") {
+        parser.parse("--int 1 --float --str hello");
+        CHECK(parser.hasErrors());
+        const auto& syntaxErrors = CheckGroup(parser.getSyntaxErrors(), "Syntax Errors", -1, -1, 1);
+        CheckMessage(RequireMsg(syntaxErrors.getErrors()[0]), 16, ErrorType::Syntax_MissingValue);
+    }
+
+    SECTION("Third value") {
+        parser.parse("--int 1 --float 1.0 --str");
+        CHECK(parser.hasErrors());
+        const auto& syntaxErrors = CheckGroup(parser.getSyntaxErrors(), "Syntax Errors", -1, -1, 1);
+        CheckMessage(RequireMsg(syntaxErrors.getErrors()[0]), 25, ErrorType::Syntax_MissingValue);
+    }
+
+    SECTION("First and second value") {
+        parser.parse("--int --float --str hello");
+        CHECK(parser.hasErrors());
+        const auto& syntaxErrors = CheckGroup(parser.getSyntaxErrors(), "Syntax Errors", -1, -1, 2);
+        CheckMessage(RequireMsg(syntaxErrors.getErrors()[0]), 6 , ErrorType::Syntax_MissingValue);
+        CheckMessage(RequireMsg(syntaxErrors.getErrors()[1]), 14, ErrorType::Syntax_MissingValue);
+    }
+
+    SECTION("First and third value") {
+        parser.parse("--int --float 1.0 --str");
+        CHECK(parser.hasErrors());
+        const auto& syntaxErrors = CheckGroup(parser.getSyntaxErrors(), "Syntax Errors", -1, -1, 2);
+        CheckMessage(RequireMsg(syntaxErrors.getErrors()[0]), 6 , ErrorType::Syntax_MissingValue);
+        CheckMessage(RequireMsg(syntaxErrors.getErrors()[1]), 23, ErrorType::Syntax_MissingValue);
+    }
+
+    SECTION("Second and third value") {
+        parser.parse("--int 1 --float --str");
+        parser.printErrors();
+        CHECK(parser.hasErrors());
+        const auto& syntaxErrors = CheckGroup(parser.getSyntaxErrors(), "Syntax Errors", -1, -1, 2);
+        CheckMessage(RequireMsg(syntaxErrors.getErrors()[0]), 16, ErrorType::Syntax_MissingValue);
+        CheckMessage(RequireMsg(syntaxErrors.getErrors()[1]), 21, ErrorType::Syntax_MissingValue);
+    }
+
+    SECTION("All values") {
+        parser.parse("--int --float --str");
+        CHECK(parser.hasErrors());
+        const auto& syntaxErrors = CheckGroup(parser.getSyntaxErrors(), "Syntax Errors", -1, -1, 3);
+        CheckMessage(RequireMsg(syntaxErrors.getErrors()[0]), 6 , ErrorType::Syntax_MissingValue);
+        CheckMessage(RequireMsg(syntaxErrors.getErrors()[1]), 14, ErrorType::Syntax_MissingValue);
+        CheckMessage(RequireMsg(syntaxErrors.getErrors()[2]), 19, ErrorType::Syntax_MissingValue);
     }
 }

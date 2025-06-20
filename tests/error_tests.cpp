@@ -1,4 +1,5 @@
-﻿#include "Argon/Error.hpp"
+﻿#include "../cmake-build-debug-msvc/_deps/catch2-src/src/catch2/matchers/catch_matchers_string.hpp"
+#include "Argon/Error.hpp"
 #include "Argon/Option.hpp"
 #include "Argon/Parser.hpp"
 #include "catch2/catch_test_macros.hpp"
@@ -30,6 +31,19 @@ inline auto CheckMessage(const Argon::ErrorMessage& error, const int pos, Argon:
     CHECK(error.pos == pos);
     CHECK(error.type == type);
 }
+
+inline auto CheckMessage(const Argon::ErrorMessage& error, const std::initializer_list<std::string_view> expectedMsgs,
+                         const int pos, Argon::ErrorType type) {
+    CAPTURE(expectedMsgs, pos, type);
+    CAPTURE(error.msg, error.pos, error.type);
+    CHECK(error.pos == pos);
+    CHECK(error.type == type);
+
+    for (const auto& msg : expectedMsgs) {
+        CHECK_THAT(error.msg, Catch::Matchers::ContainsSubstring(std::string(msg)));
+    }
+}
+
 
 inline auto CheckGroup(const Argon::ErrorGroup& group, const std::string_view groupName,
     const int start, const int end, const size_t errorCount) -> const Argon::ErrorGroup& {
@@ -630,4 +644,91 @@ TEST_CASE("Unknown flags", "[option][syntax][errors]") {
     }
 
     CHECK(!parser.getAnalysisErrors().hasErrors());
+}
+
+TEST_CASE("Analysis errors", "[analysis][errors]") {
+    using namespace Argon;
+    bool                fb  = true;
+    bool                tb  = false;
+    char                c   = 0;
+    signed char         sc  = 0;
+    unsigned char       uc  = 0;
+    signed short        ss  = 0;
+    unsigned short      us  = 0;
+    signed int          si  = 0;
+    unsigned int        ui  = 0;
+    signed long         sl  = 0;
+    unsigned long       ul  = 0;
+    signed long long    sll = 0;
+    unsigned long long  ull = 0;
+
+    float               f   = 0;
+    double              d   = 0;
+    long double         ld  = 0;
+
+    auto parser = Option(&fb)  ["-fb"]      | Option(&tb)  ["-tb"]
+                | Option(&sc)  ["-sc"]      | Option(&uc)  ["-uc"]      | Option(&c)  ["-c"]
+                | Option(&ss)  ["-ss"]      | Option(&us)  ["-us"]
+                | Option(&si)  ["-si"]      | Option(&ui)  ["-ui"]
+                | Option(&sl)  ["-sl"]      | Option(&ul)  ["-ul"]
+                | Option(&sll) ["-sll"]     | Option(&ull) ["-ull"]
+                | Option(&f)   ["-f"]       | Option(&d)   ["-d"]       | Option(&ld) ["-ld"];
+
+    // SECTION("Strings instead of numbers") {
+    //     parser.parse("-fb hello -tb world -c string -sc  asdf -uc asdf "
+    //              "-ss asdf  -us asdf  -si  asdf -ui  asdf "
+    //              "-sl asdf  -ul asdf  -sll asdf -ull asdf "
+    //              "-f  word  -d  word  -ld  long");
+    //     parser.printErrors();
+    //     CHECK(parser.hasErrors());
+    //     const auto& analysisErrors = CheckGroup(parser.getAnalysisErrors(), "Analysis Errors", -1, -1, 16);
+    //     CheckMessage(RequireMsg(analysisErrors.getErrors()[0]),
+    //         {"'-fb'", "boolean", "'hello'"},            4 , ErrorType::Analysis_ConversionError);
+    //     CheckMessage(RequireMsg(analysisErrors.getErrors()[1]),
+    //         {"'-tb'", "boolean", "'world'"},            14, ErrorType::Analysis_ConversionError);
+    //     CheckMessage(RequireMsg(analysisErrors.getErrors()[2]),
+    //         {"'-c'", "char", "'string'"},               23, ErrorType::Analysis_ConversionError);
+    //     CheckMessage(RequireMsg(analysisErrors.getErrors()[3]),
+    //         {"'-sc'", "signed char", "'asdf'"},         35, ErrorType::Analysis_ConversionError);
+    //     CheckMessage(RequireMsg(analysisErrors.getErrors()[4]),
+    //         {"'-uc'", "unsigned char", "'asdf'"},       44, ErrorType::Analysis_ConversionError);
+    //     CheckMessage(RequireMsg(analysisErrors.getErrors()[5]),
+    //         {"'-ss'", "short", "'asdf'"},               53, ErrorType::Analysis_ConversionError);
+    //     CheckMessage(RequireMsg(analysisErrors.getErrors()[6]),
+    //         {"'-us'", "unsigned short", "'asdf'"},      63, ErrorType::Analysis_ConversionError);
+    //     CheckMessage(RequireMsg(analysisErrors.getErrors()[7]),
+    //         {"'-si'", "integer", "'asdf'"},             74, ErrorType::Analysis_ConversionError);
+    //     CheckMessage(RequireMsg(analysisErrors.getErrors()[8]),
+    //         {"'-ui'", "unsigned integer", "'asdf'"} ,   84, ErrorType::Analysis_ConversionError);
+    // }
+    //
+    // SECTION("Integrals over max") {
+    //     parser.parse("-c  256        -sc 256        -uc  128 "
+    //                  "-ss 32768      -us 65536 "
+    //                  "-si 2147483648 -ui 4294967295 "
+    //                  "-sl 2147483648 -ul 4294967295 "
+    //                  "-sll 9223372036854775808 "
+    //                  "-ull 18446744073709551616 ");
+    //     parser.printErrors();
+    //     CHECK(parser.hasErrors());
+    //     const auto& analysisErrors = CheckGroup(parser.getAnalysisErrors(), "Analysis Errors", -1, -1, 11);
+    //     CheckMessage(RequireMsg(analysisErrors.getErrors()[0]),
+    //         {"'-c'", "char", "'256'"},               23, ErrorType::Analysis_ConversionError);
+    //     CheckMessage(RequireMsg(analysisErrors.getErrors()[1]),
+    //         {"'-sc'", "signed char", "'256'"},         35, ErrorType::Analysis_ConversionError);
+    //     CheckMessage(RequireMsg(analysisErrors.getErrors()[2]),
+    //         {"'-uc'", "unsigned char", "'128'"},       44, ErrorType::Analysis_ConversionError);
+    //     CheckMessage(RequireMsg(analysisErrors.getErrors()[3]),
+    //         {"'-ss'", "short", "'32768'"},               53, ErrorType::Analysis_ConversionError);
+    //     CheckMessage(RequireMsg(analysisErrors.getErrors()[4]),
+    //         {"'-us'", "unsigned short", "'65536'"},      63, ErrorType::Analysis_ConversionError);
+    //     CheckMessage(RequireMsg(analysisErrors.getErrors()[5]),
+    //         {"'-si'", "integer", "'2147483648'"},             74, ErrorType::Analysis_ConversionError);
+    //     CheckMessage(RequireMsg(analysisErrors.getErrors()[6]),
+    //         {"'-ui'", "unsigned integer", "'4294967295'"} ,   84, ErrorType::Analysis_ConversionError);
+    //     CheckMessage(RequireMsg(analysisErrors.getErrors()[7]),
+    //         {"'-sl'", "", "'2147483648'"} ,   84, ErrorType::Analysis_ConversionError);
+    //     CheckMessage(RequireMsg(analysisErrors.getErrors()[8]),
+    //         {"'-ul'", "unsigned integer", "'4294967295'"} ,   84, ErrorType::Analysis_ConversionError);
+    // }
 }

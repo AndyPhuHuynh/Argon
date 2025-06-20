@@ -1,6 +1,7 @@
 #ifndef ARGON_PARSER_INCLUDE
 #define ARGON_PARSER_INCLUDE
 
+#include <functional>
 #include <memory>
 #include <string>
 #include <typeindex>
@@ -8,13 +9,11 @@
 #include <unordered_map>
 #include <variant>
 
-#include "Attributes.hpp"
-#include "Context.hpp"
 #include "Error.hpp"
-#include "Option.hpp"
-#include "MultiOption.hpp"
+#include "Flag.hpp"
 #include "Scanner.hpp"
 #include "Traits.hpp"
+#include "catch2/internal/catch_windows_h_proxy.hpp"
 
 namespace Argon {
     class StatementAst;
@@ -24,11 +23,34 @@ namespace Argon {
     class OptionBaseAst;
     class PositionalAst;
 
+    class IOption;
+    class Context;
+    class Constraints;
+
     using DefaultConversionFn = std::function<bool(std::string_view, void*)>;
     using DefaultConversions  = std::unordered_map<std::type_index, DefaultConversionFn>;
 
+    enum class CharMode {
+        ExpectAsciiOnly,
+        ExpectIntegerOnly,
+        ExpectAsciiOrInteger,
+    };
+
+    class ParserConfig {
+        DefaultConversions m_defaultConversions;
+        CharMode m_charMode = CharMode::ExpectAsciiOrInteger;
+
+    public:
+        [[nodiscard]] auto getCharMode() const -> CharMode;
+        auto setCharMode(CharMode newCharMode) -> ParserConfig&;
+
+        template <typename T>
+        auto registerConversionFn(std::function<bool(std::string_view, T*)>conversionFn) -> void;
+        [[nodiscard]] auto getDefaultConversions() const -> const DefaultConversions&;
+    };
+
     class Parser {
-        Context m_context;
+        std::unique_ptr<Context> m_context = std::make_unique<Context>();
         Scanner m_scanner;
 
         std::vector<std::string> m_contextValidationErrors;
@@ -40,13 +62,19 @@ namespace Argon {
         std::vector<Token> m_poppedBrackets;
         bool m_mismatchedRBRACK = false;
 
-        DefaultConversions m_defaultConversions;
-        Constraints m_constraints;
+        ParserConfig m_config;
+        std::unique_ptr<Constraints> m_constraints = std::make_unique<Constraints>();
 
         std::string m_shortPrefix = "-";
         std::string m_longPrefix  = "--";
     public:
         Parser() = default;
+
+        Parser(const Parser&);
+        auto operator=(const Parser&) -> Parser&;
+
+        Parser(Parser&&) = default;
+        auto operator=(Parser&&) -> Parser& = default;
 
         template<typename T> requires DerivesFrom<T, IOption>
         explicit Parser(T&& option);
@@ -89,16 +117,15 @@ namespace Argon {
         template<typename Container>
         auto getMultiValue(const FlagPath& flagPath) -> const Container&;
 
-        auto constraints() -> Constraints&;
+        auto getConfig() -> ParserConfig&;
+
+        auto constraints() const -> Constraints&;
 
         auto setDefaultPrefixes(std::string_view shortPrefix, std::string_view longPrefix);
 
-        template <typename T>
-        auto registerConversionFn(std::function<bool(std::string_view, T*)>conversionFn) -> void;
-
-        [[nodiscard]] auto getDefaultConversions() const -> const DefaultConversions&;
-
     private:
+        auto copyFrom(const Parser& other) -> void;
+
         auto reset() -> void;
 
         auto parseStatement() -> StatementAst;
@@ -135,6 +162,8 @@ namespace Argon {
 // --------------------------------------------- Implementations -------------------------------------------------------
 
 #include "Ast.hpp"
+#include "Attributes.hpp"
+#include "MultiOption.hpp"
 
 namespace Argon {
 template<typename T> requires DerivesFrom<T, IOption>
@@ -144,7 +173,17 @@ Parser::Parser(T&& option) {
 
 template<typename T> requires DerivesFrom<T, IOption>
 auto Parser::addOption(T&& option) -> void {
-    m_context.addOption(std::forward<T>(option));
+    m_context->addOption(std::forward<T>(option));
+}
+
+inline Parser::Parser(const Parser& other) {
+    copyFrom(other);
+}
+
+inline auto Parser::operator=(const Parser& other) -> Parser& {
+    if (this == &other) return *this;
+    copyFrom(other);
+    return *this;
 }
 
 inline auto Parser::addError(const std::string_view error, const int pos, const ErrorType type) -> void {
@@ -173,7 +212,7 @@ inline auto Parser::hasErrors() const -> bool {
 }
 
 inline auto Parser::getHelpMessage() const -> std::string {
-    return m_context.getHelpMessage();
+    return m_context->getHelpMessage();
 }
 
 inline auto Parser::printErrors() const -> void {
@@ -209,9 +248,9 @@ inline auto Parser::parse(const int argc, const char **argv) -> bool {
 }
 
 inline auto Parser::parse(const std::string_view str) -> bool {
-    m_context.applyPrefixes(m_shortPrefix, m_longPrefix);
+    m_context->applyPrefixes(m_shortPrefix, m_longPrefix);
 
-    m_context.validate(m_contextValidationErrors);
+    m_context->validate(m_contextValidationErrors);
     if (!m_contextValidationErrors.empty()) {
         return false;
     }
@@ -223,7 +262,7 @@ inline auto Parser::parse(const std::string_view str) -> bool {
         return false;
     }
 
-    ast.analyze(*this, m_context);
+    ast.analyze(*this, *m_context);
     validateConstraints();
     return !hasErrors();
 }
@@ -236,7 +275,7 @@ inline auto Parser::parseStatement() -> StatementAst {
             getNextToken();
             continue;
         }
-        auto parsed = parseOptionBundle(m_context);
+        auto parsed = parseOptionBundle(*m_context);
         std::visit([&statement]<typename T>(T& opt) {
             if constexpr (std::is_same_v<T, std::monostate>) {}
             else {statement.addOption(std::move(opt));}
@@ -298,7 +337,7 @@ inline auto Parser::parseSingleOption(Context& context, const Token& flag) -> st
 
     // If value matches a flag (no value supplied)
     if (context.containsLocalFlag(value.image)) {
-        if (&context == &m_context) {
+        if (&context == &*m_context) {
             m_syntaxErrors.addErrorMessage(
                 std::format("No value provided for flag '{}' at position {}", flag.image, flag.position),
                 value.position, ErrorType::Syntax_MissingValue
@@ -409,7 +448,7 @@ inline auto Parser::getNextValidFlag(const Context& context, const bool printErr
             flag.position, ErrorType::Syntax_MissingFlagName
         );
     } else if (printErrors) {
-        if (&context == &m_context) {
+        if (&context == &*m_context) {
             m_syntaxErrors.addErrorMessage(
                 std::format("Unknown flag '{}' at position {}", flag.image, flag.position),
                 flag.position, ErrorType::Syntax_UnknownFlag
@@ -464,34 +503,30 @@ auto Parser::operator|(T&& option) -> Parser& {
 
 template<typename ValueType>
 auto Parser::getValue(const std::string_view flag) -> const ValueType& {
-    return m_context.getValue<ValueType>(FlagPath(flag));
+    return m_context->getValue<ValueType>(FlagPath(flag));
 }
 
 template<typename ValueType>
 auto Parser::getValue(const FlagPath& flagPath) -> const ValueType& {
-    return m_context.getValue<ValueType>(flagPath);
+    return m_context->getValue<ValueType>(flagPath);
 }
 
 template<typename Container>
 auto Parser::getMultiValue(const std::string_view flag) -> const Container& {
-    return m_context.getMultiValue<Container>(FlagPath(flag));
+    return m_context->getMultiValue<Container>(FlagPath(flag));
 }
 
 template<typename Container>
 auto Parser::getMultiValue(const FlagPath& flagPath) -> const Container& {
-    return m_context.getMultiValue<Container>(flagPath);
+    return m_context->getMultiValue<Container>(flagPath);
 }
 
-template<typename T>
-auto Parser::registerConversionFn(std::function<bool(std::string_view, T *)> conversionFn) -> void {
-    auto wrapper = [conversionFn](std::string_view arg, void *out) -> bool {
-        return conversionFn(arg, static_cast<T*>(out));
-    };
-    m_defaultConversions[std::type_index(typeid(T))] = wrapper;
+inline auto Parser::getConfig() -> ParserConfig& {
+    return m_config;
 }
 
-inline auto Parser::constraints() -> Constraints& {
-    return m_constraints;
+inline auto Parser::constraints() const -> Constraints& {
+    return *m_constraints;
 }
 
 inline auto Parser::setDefaultPrefixes(const std::string_view shortPrefix, const std::string_view longPrefix) {
@@ -499,8 +534,24 @@ inline auto Parser::setDefaultPrefixes(const std::string_view shortPrefix, const
     m_longPrefix = longPrefix;
 }
 
-inline auto Parser::getDefaultConversions() const -> const DefaultConversions& {
-    return m_defaultConversions;
+inline auto Parser::copyFrom(const Parser& other) -> void {
+    m_context = std::make_unique<Context>(*other.m_context);
+    m_scanner = other.m_scanner;
+
+    m_contextValidationErrors   = other.m_contextValidationErrors;
+    m_syntaxErrors              = other.m_syntaxErrors;
+    m_analysisErrors            = other.m_analysisErrors;
+    m_constraintErrors          = other.m_constraintErrors;
+
+    m_brackets                  = other.m_brackets;
+    m_poppedBrackets            = other.m_poppedBrackets;
+    m_mismatchedRBRACK          = other.m_mismatchedRBRACK;
+
+    m_config      = other.m_config;
+    m_constraints = std::make_unique<Constraints>(*other.m_constraints);
+
+    m_shortPrefix = other.m_shortPrefix;
+    m_longPrefix  = other.m_longPrefix;
 }
 
 inline auto Parser::reset() -> void {
@@ -573,7 +624,28 @@ inline auto Parser::skipScope() -> void {
 }
 
 inline auto Parser::validateConstraints() -> void {
-    m_constraints.validate(m_context, m_constraintErrors);
+    m_constraints->validate(*m_context, m_constraintErrors);
+}
+
+inline auto ParserConfig::getCharMode() const -> CharMode {
+    return m_charMode;
+}
+
+inline auto ParserConfig::setCharMode(const CharMode newCharMode) -> ParserConfig& {
+    m_charMode = newCharMode;
+    return *this;
+}
+
+template<typename T>
+auto ParserConfig::registerConversionFn(std::function<bool(std::string_view, T *)> conversionFn) -> void {
+    auto wrapper = [conversionFn](std::string_view arg, void *out) -> bool {
+        return conversionFn(arg, static_cast<T*>(out));
+    };
+    m_defaultConversions[std::type_index(typeid(T))] = wrapper;
+}
+
+inline auto ParserConfig::getDefaultConversions() const -> const DefaultConversions& {
+    return m_defaultConversions;
 }
 
 template<typename Left, typename Right> requires

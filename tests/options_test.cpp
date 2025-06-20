@@ -610,16 +610,16 @@ TEST_CASE("Default conversion table", "[options]") {
                 | Option(&d)["--double"]
                 | Option(&s)["--student"];
 
-    parser.registerConversionFn<int>([](std::string_view, int *out) {
+    parser.getConfig().registerConversionFn<int>([](std::string_view, int *out) {
         *out = 1; return true;
     });
-    parser.registerConversionFn<float>([](std::string_view, float *out) {
+    parser.getConfig().registerConversionFn<float>([](std::string_view, float *out) {
         *out = 2.0; return true;
     });
-    parser.registerConversionFn<double>([](std::string_view, double *out) {
+    parser.getConfig().registerConversionFn<double>([](std::string_view, double *out) {
         *out = 3.0; return true;
     });
-    parser.registerConversionFn<Student>([](std::string_view, Student *out) {
+    parser.getConfig().registerConversionFn<Student>([](std::string_view, Student *out) {
         *out = { .name = "Joshua", .age = 20 }; return true;
     });
     parser.parse("--int hi --float hello --double world --student :D");

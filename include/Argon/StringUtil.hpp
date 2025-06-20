@@ -2,12 +2,12 @@
 #define ARGON_STRINGUTIL_INCLUDE
 
 #include <algorithm>
-#include <cstdint>
 #include <string>
 
 namespace Argon {
 
-inline std::string format_with_commas(const int64_t value) {
+template<typename T> requires std::is_integral_v<T>
+std::string format_with_commas(const T value) {
     std::string num = std::to_string(value);
 
     if (num.length() <= 3) return num;
@@ -23,7 +23,8 @@ inline std::string format_with_commas(const int64_t value) {
     return num;
 }
 
-inline std::string format_with_underscores(const int64_t value) {
+template<typename T> requires std::is_integral_v<T>
+std::string format_with_underscores(const T value) {
     std::string num = std::to_string(value);
 
     if (num.length() <= 3) return num;

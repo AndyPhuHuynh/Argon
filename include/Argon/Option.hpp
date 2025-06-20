@@ -19,6 +19,8 @@ namespace Argon {
     template <typename T> class Option;
     class OptionGroup;
     class Context;
+    class Parser;
+    class ParserConfig;
 
     using DefaultConversionFn = std::function<bool(std::string_view, void*)>;
     using DefaultConversions  = std::unordered_map<std::type_index, DefaultConversionFn>;
@@ -107,7 +109,7 @@ namespace Argon {
         ISetValue() = default;
         virtual ~ISetValue() = default;
 
-        virtual void setValue(const DefaultConversions& conversions, std::string_view flag, std::string_view value) = 0;
+        virtual void setValue(const ParserConfig& config, std::string_view flag, std::string_view value) = 0;
     };
 
     template <typename T>
@@ -124,7 +126,7 @@ namespace Argon {
         auto generateErrorMsg(std::string_view optionName, std::string_view invalidArg) -> void;
 
     public:
-        auto convert(const DefaultConversions& conversions, std::string_view flag, std::string_view value, T& outValue) -> void;
+        auto convert(const ParserConfig& config, std::string_view flag, std::string_view value, T& outValue) -> void;
 
         [[nodiscard]] auto hasConversionError() const -> bool;
 
@@ -152,9 +154,9 @@ namespace Argon {
 
         SetValueImpl(T defaultValue, T *out);
 
-        auto getValue() const -> const T&;
+        [[nodiscard]] auto getValue() const -> const T&;
     protected:
-        auto setValue(const DefaultConversions& conversions, std::string_view flag, std::string_view value) -> void override;
+        auto setValue(const ParserConfig& config, std::string_view flag, std::string_view value) -> void override;
     };
 
     class IsSingleOption {};
@@ -171,7 +173,7 @@ namespace Argon {
 
         Option(T defaultValue, T *out);
     protected:
-        auto setValue(const DefaultConversions& conversions, std::string_view flag, std::string_view value) -> void override;
+        auto setValue(const ParserConfig& config, std::string_view flag, std::string_view value) -> void override;
     };
 
     class OptionGroup : public HasFlag<OptionGroup>, public OptionComponent<OptionGroup>{
@@ -211,7 +213,7 @@ namespace Argon {
     template <typename T>
     class Positional : public SetValueImpl<Positional<T>, T>,
                        public OptionComponent<Positional<T>>, public IsPositional {
-        auto setValue(const DefaultConversions& conversions, std::string_view flag, std::string_view value) -> void override;
+        auto setValue(const ParserConfig& config, std::string_view flag, std::string_view value) -> void override;
     public:
         Positional() = default;
 
@@ -228,6 +230,7 @@ namespace Argon {
 //------------------------------------------------------Includes--------------------------------------------------------
 
 #include "Context.hpp" //NOLINT (unused include)
+#include "Parser.hpp"
 #include "StringUtil.hpp"
 
 //---------------------------------------------------Free Functions-----------------------------------------------------
@@ -331,6 +334,8 @@ auto parseFloatingPoint(const std::string_view arg, T& out) -> bool {
 } // Namespace Argon
 
 //---------------------------------------------------Implementations----------------------------------------------------
+
+#include "Parser.hpp" //NOLINT (unused include)
 
 namespace Argon {
 inline auto IFlag::getFlag() const -> const Flag& {
@@ -454,22 +459,30 @@ auto Converter<Derived, T>::generateErrorMsg(std::string_view optionName, std::s
     } else {
         ss << std::format("Invalid value for '{}': ", optionName);
     }
-    ss << "expected " << type_name<T>();
 
+    // Type name
+    ss << "expected " << type_name<T>();
+    if constexpr (is_non_bool_integral<T>) {
+        ss << "expected integer";
+    }
+
+    // Expected values
     if constexpr (is_non_bool_integral<T>) {
         ss << std::format(
             " between {} and {}",
-            format_with_commas(static_cast<int64_t>(std::numeric_limits<T>::min())),
-            format_with_commas(static_cast<int64_t>(std::numeric_limits<T>::max())));
+            format_with_commas(std::numeric_limits<T>::min()),
+            format_with_commas(std::numeric_limits<T>::max()));
     } else if constexpr (std::is_same_v<T, bool>) {
         ss << " (true or false)";
     }
+
+    // Actual value
     ss << std::format(", got: '{}'", invalidArg);
     this->m_conversionError = ss.str();
 }
 
 template <typename Derived, typename T>
-auto Converter<Derived, T>::convert(const DefaultConversions& conversions,
+auto Converter<Derived, T>::convert(const ParserConfig& config,
                                     const std::string_view flag, std::string_view value, T& outValue) -> void {
     m_conversionError.clear();
     bool success;
@@ -478,8 +491,8 @@ auto Converter<Derived, T>::convert(const DefaultConversions& conversions,
         success = this->m_conversion_fn(value, outValue);
     }
     // Search for conversion list for conversion for this type if specified
-    else if (conversions.contains(std::type_index(typeid(T)))) {
-        success = conversions.at(std::type_index(typeid(T)))(value, static_cast<void*>(&outValue));
+    else if (config.getDefaultConversions().contains(std::type_index(typeid(T)))) {
+        success = config.getDefaultConversions().at(std::type_index(typeid(T)))(value, static_cast<void*>(&outValue));
     }
     // Fallback to generic parsing
     // Parse as a character
@@ -566,9 +579,9 @@ auto SetValueImpl<Derived, T>::getValue() const -> const T& {
 }
 
 template<typename Derived, typename T>
-auto SetValueImpl<Derived, T>::setValue(const DefaultConversions& conversions, std::string_view flag, std::string_view value) -> void {
+auto SetValueImpl<Derived, T>::setValue(const ParserConfig& config, std::string_view flag, std::string_view value) -> void {
     T temp;
-    this->convert(conversions, flag, value, temp);
+    this->convert(config, flag, value, temp);
     if (this->hasConversionError()) {
         return;
     }
@@ -588,8 +601,8 @@ template<typename T>
 Option<T>::Option(T defaultValue, T *out) : SetValueImpl<Option, T>(defaultValue, out) {}
 
 template<typename T>
-void Option<T>::setValue(const DefaultConversions& conversions, std::string_view flag, std::string_view value) {
-    SetValueImpl<Option, T>::setValue(conversions, flag, value);
+void Option<T>::setValue(const ParserConfig& config, std::string_view flag, std::string_view value) {
+    SetValueImpl<Option, T>::setValue(config, flag, value);
     this->m_error = this->getConversionError();
     this->m_isSet = true;
 }
@@ -691,8 +704,8 @@ auto OptionGroup::addOption(T&& option) -> void {
 }
 
 template<typename T>
-void Positional<T>::setValue(const DefaultConversions& conversions, std::string_view flag, std::string_view value) {
-    SetValueImpl<Positional, T>::setValue(conversions, flag, value);
+void Positional<T>::setValue(const ParserConfig& config, std::string_view flag, std::string_view value) {
+    SetValueImpl<Positional, T>::setValue(config, flag, value);
     this->m_error = this->getConversionError();
     this->m_isSet = true;
 }

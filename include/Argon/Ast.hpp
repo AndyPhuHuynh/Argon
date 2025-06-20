@@ -110,7 +110,7 @@ namespace Argon {
 #include <utility>
 
 #include "Context.hpp"
-#include "Option.hpp"
+#include "Option.hpp" // NOLINT (unused include)
 #include "Parser.hpp" // NOLINT (unused include)
 #include "MultiOption.hpp"
 
@@ -138,7 +138,7 @@ inline void Argon::OptionAst::analyze(Parser& parser, Context& context) {
         return;
     }
 
-    setValue->setValue(parser.getDefaultConversions(), flag.value, value.value);
+    setValue->setValue(parser.getConfig(), flag.value, value.value);
     if (iOption->hasError()) {
         parser.addError(iOption->getError(), value.pos, ErrorType::Analysis_ConversionError);
     }
@@ -167,7 +167,7 @@ inline void Argon::MultiOptionAst::analyze(Parser& parser, Context &context) {
     }
 
     for (const auto&[value, pos] : m_values) {
-        setValue->setValue(parser.getDefaultConversions(), flag.value, value);
+        setValue->setValue(parser.getConfig(), flag.value, value);
         if (iOption->hasError()) {
             parser.addError(iOption->getError(), pos, ErrorType::Analysis_ConversionError);
         }
@@ -191,7 +191,7 @@ inline void Argon::PositionalAst::analyze(Parser& parser, const Context& context
     const auto *iOption = dynamic_cast<IOption*>(opt);
     if (!setValue || !iOption) std::unreachable();
 
-    setValue->setValue(parser.getDefaultConversions(), iOption->getInputHint(), value.value);
+    setValue->setValue(parser.getConfig(), iOption->getInputHint(), value.value);
     if (iOption->hasError()) {
         parser.addError(iOption->getError(), value.pos, ErrorType::Analysis_ConversionError);
     }

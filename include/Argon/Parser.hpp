@@ -219,6 +219,10 @@ inline auto Parser::parse(const std::string_view str) -> bool {
     reset();
     m_scanner = Scanner(str);
     StatementAst ast = parseStatement();
+    if (m_syntaxErrors.hasErrors()) {
+        return false;
+    }
+
     ast.analyze(*this, m_context);
     validateConstraints();
     return !hasErrors();
@@ -407,7 +411,7 @@ inline auto Parser::getNextValidFlag(const Context& context, const bool printErr
     } else if (printErrors) {
         if (&context == &m_context) {
             m_syntaxErrors.addErrorMessage(
-                std::format("Unknown flag '{}'  at position {}", flag.image, flag.position),
+                std::format("Unknown flag '{}' at position {}", flag.image, flag.position),
                 flag.position, ErrorType::Syntax_UnknownFlag
             );
         } else {

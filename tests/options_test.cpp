@@ -514,14 +514,21 @@ TEST_CASE("Multioption default values") {
     const auto& array  = parser.getMultiValue<std::array<int, 2>>("--array");
     const auto& vector = parser.getMultiValue<std::vector<int>>("--vector");
 
-    CHECK(!parser.hasErrors());
-    CHECK(array[0] == 1);
-    CHECK(array[1] == 2);
-    REQUIRE(vector.size() == 4);
-    CHECK(vector[0] == 1);
-    CHECK(vector[1] == 2);
-    CHECK(vector[2] == 3);
-    CHECK(vector[3] == 4);
+    SECTION("Nothing set") {
+        CHECK(!parser.hasErrors());
+        CHECK(array[0] == 1);   CHECK(array[1] == 2);
+        REQUIRE(vector.size() == 4);
+        CHECK(vector[0] == 1);  CHECK(vector[1] == 2);
+        CHECK(vector[2] == 3);  CHECK(vector[3] == 4);
+    }
+
+    SECTION("Values set") {
+        parser.parse("--array -1 -2 --vector -1 -2");
+        CHECK(!parser.hasErrors());
+        CHECK(array[0] == -1);  CHECK(array[1] == -2);
+        REQUIRE(vector.size() == 2);
+        CHECK(vector[0] == -1); CHECK(vector[1] == -2);
+    }
 }
 
 TEST_CASE("Booleans options", "[options]") {

@@ -303,6 +303,9 @@ auto MultiOptionVectorBase<Derived, T>::setValue(const ParserConfig& parserConfi
         this->m_error = this->getConversionError();
         return;
     }
+    if (!this->m_isSet) {
+        m_values.clear();
+    }
     m_values.push_back(temp);
     if (m_out != nullptr) {
         m_out->push_back(temp);

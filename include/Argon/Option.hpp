@@ -2,6 +2,7 @@
 #define ARGON_OPTION_INCLUDE
 
 #include <algorithm>
+#include <charconv>
 #include <cstdlib>
 #include <functional>
 #include <limits>
@@ -296,25 +297,26 @@ auto parseIntegralType(const std::string_view arg, T& out) -> bool {
     if (base == Base::Invalid) return false;
 
     // Calculate begin offset
-    int beginOffset = 0;
-    if (base != Base::Decimal)          { beginOffset += 2; }
-    if (arg[0] == '-' || arg[0] == '+') { beginOffset += 1; }
+    const bool hasSignPrefix = arg[0] == '-' || arg[0] == '+';
+    size_t beginOffset = 0;
+    if (base != Base::Decimal)  { beginOffset += 2; }
+    if (hasSignPrefix)          { beginOffset += 1; }
+
+    const std::string_view digits = arg.substr(beginOffset);
+    if (digits.empty()) return false;
+
+    std::string noBasePrefix;
+    if (hasSignPrefix) {
+        noBasePrefix += arg[0];
+    }
+    noBasePrefix += digits;
 
     // Calculate begin and end pointers
-    const char *begin = arg.data() + beginOffset;
-    const char *end   = arg.data() + arg.size();
+    const char *begin = noBasePrefix.data();
+    const char *end   = noBasePrefix.data() + noBasePrefix.size();
     if (begin == end) return false;
 
     auto [ptr, ec] = std::from_chars(begin, end, out, static_cast<int>(base));
-
-    // Check for negative sign
-    if (arg[0] == '-') {
-        if constexpr (std::is_unsigned_v<T>) {
-            return false;
-        } else {
-            out *= -1;
-        }
-    }
     return ec == std::errc() && ptr == end;
 }
 

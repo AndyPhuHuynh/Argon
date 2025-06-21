@@ -760,4 +760,48 @@ TEST_CASE("Analysis errors", "[analysis][errors]") {
         CHECK(!parser.hasErrors());
         parser.printErrors();
     }
+
+    SECTION("Integrals below min") {
+        parser.parse("-c   -129        -sc -129      -uc -1 "
+                     "-ss  -32769      -us -1 "
+                     "-si  -2147483649 -ui -1 "
+                     "-sl  -2147483649 -ul -1 "
+                     "-sll -9223372036854775809 "
+                     "-ull -1 ");
+        CHECK(parser.hasErrors());
+        const auto& analysisErrors = CheckGroup(parser.getAnalysisErrors(), "Analysis Errors", -1, -1, 11);
+        CheckMessage(RequireMsg(analysisErrors.getErrors()[0]),
+            {"'-c'", "integer", "'-129'"},          5 , ErrorType::Analysis_ConversionError);
+        CheckMessage(RequireMsg(analysisErrors.getErrors()[1]),
+            {"'-sc'", "integer", "'-129'"},         21, ErrorType::Analysis_ConversionError);
+        CheckMessage(RequireMsg(analysisErrors.getErrors()[2]),
+            {"'-uc'", "integer", "'-1'"},           35, ErrorType::Analysis_ConversionError);
+        CheckMessage(RequireMsg(analysisErrors.getErrors()[3]),
+            {"'-ss'", "integer", "'-32769'"},       43, ErrorType::Analysis_ConversionError);
+        CheckMessage(RequireMsg(analysisErrors.getErrors()[4]),
+            {"'-us'", "integer", "'-1'"},           59, ErrorType::Analysis_ConversionError);
+        CheckMessage(RequireMsg(analysisErrors.getErrors()[5]),
+            {"'-si'", "integer", "'-2147483649'"},  67, ErrorType::Analysis_ConversionError);
+        CheckMessage(RequireMsg(analysisErrors.getErrors()[6]),
+            {"'-ui'", "integer", "'-1'"} ,          83, ErrorType::Analysis_ConversionError);
+        CheckMessage(RequireMsg(analysisErrors.getErrors()[7]),
+            {"'-sl'", "integer", "'-2147483649'"},  91, ErrorType::Analysis_ConversionError);
+        CheckMessage(RequireMsg(analysisErrors.getErrors()[8]),
+            {"'-ul'", "integer", "'-1'"} ,          107, ErrorType::Analysis_ConversionError);
+        CheckMessage(RequireMsg(analysisErrors.getErrors()[9]),
+            {"'-sll'", "integer", "'-9223372036854775809'"} ,   115, ErrorType::Analysis_ConversionError);
+        CheckMessage(RequireMsg(analysisErrors.getErrors()[10]),
+            {"'-ull'", "integer", "'-1'"} ,                     141, ErrorType::Analysis_ConversionError);
+    }
+
+    SECTION("Integrals at min") {
+        parser.parse("-c   0            -sc -128        -uc 0 "
+                     "-ss  -32768       -us 0 "
+                     "-si  -32768       -ui 0 "
+                     "-sl  -2147483648  -ul 0 "
+                     "-sll -9223372036854775808 "
+                     "-ull 0 ");
+        CHECK(!parser.hasErrors());
+        parser.printErrors();
+    }
 }

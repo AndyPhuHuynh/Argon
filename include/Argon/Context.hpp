@@ -222,6 +222,11 @@ auto Context::addNonPositionalOption(T&& option) -> void {
     else {
         optPtr = getRawPointer(m_options.emplace_back(option.clone()));
     }
+    if (const auto flag = dynamic_cast<IFlag*>(optPtr)) {
+        if (flag->getFlag().isEmpty()) {
+            throw std::invalid_argument("All non positional options must have at least one flag");
+        }
+    }
 
     if (const auto optionGroup = dynamic_cast<OptionGroup*>(optPtr); optionGroup != nullptr) {
         optionGroup->getContext().m_parent = this;

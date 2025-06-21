@@ -814,29 +814,81 @@ TEST_CASE("Integer analysis errors", "[analysis][errors]") {
     }
 }
 
-TEST_CASE("Ascii analysis errors", "[analysis][errors]") {
+TEST_CASE("Parser setCharMode errors", "[parser][config][errors][char]") {
     using namespace Argon;
-    char c; signed char sc; unsigned char uc;
-    auto parser = Option(&c)["-c"]
-                | Option(&sc)["-sc"]
-                | Option(&uc)["-uc"];
-    parser.getConfig().setCharMode(CharMode::ExpectAscii);
-
-    SECTION("Test 1") {
-        parser.parse("-c a -sc b -uc c");
-        CHECK(!parser.hasErrors());
-        CHECK(c == 'a'); CHECK(sc == 'b'); CHECK(uc == 'c');
+    char cOpt; signed char scOpt; unsigned char ucOpt;
+    char cPos; signed char scPos; unsigned char ucPos;
+    auto parser = Option(&cOpt)["-c"]
+                | Option(&scOpt)["-sc"]
+                | Option(&ucOpt)["-uc"]
+                | Positional(&cPos)
+                | Positional(&scPos)
+                | Positional(&ucPos);
+    SECTION("Ascii partially correct") {
+        parser.getConfig().setCharMode(CharMode::ExpectAscii);
+        parser.parse("a  -c  10 "
+                     "20 -sc b "
+                     "c  -uc 30");
+        CHECK(parser.hasErrors());
+        CHECK(cPos == 'a'); CHECK(scOpt == 'b'); CHECK(ucPos == 'c');
+        const auto& analysisErrors = CheckGroup(parser.getAnalysisErrors(), "Analysis Errors", -1, -1, 3);
+        CheckMessage(RequireMsg(analysisErrors.getErrors()[0]), {"ASCII", "10", "-c"},  7,  ErrorType::Analysis_ConversionError);
+        CheckMessage(RequireMsg(analysisErrors.getErrors()[1]), {"ASCII", "20"},        10, ErrorType::Analysis_ConversionError);
+        CheckMessage(RequireMsg(analysisErrors.getErrors()[2]), {"ASCII", "30", "-uc"}, 26, ErrorType::Analysis_ConversionError);
     }
+    SECTION("Integer partially correct") {
+        parser.getConfig().setCharMode(CharMode::ExpectInteger);
+        parser.parse("a -c  1 "
+                     "2 -sc b "
+                     "c -uc 3");
+        CHECK(parser.hasErrors());
+        CHECK(cOpt == 1); CHECK(scPos == 2); CHECK(ucOpt == 3);
+        const auto& analysisErrors = CheckGroup(parser.getAnalysisErrors(), "Analysis Errors", -1, -1, 3);
+        CheckMessage(RequireMsg(analysisErrors.getErrors()[0]), {"integer", "a"},           0,  ErrorType::Analysis_ConversionError);
+        CheckMessage(RequireMsg(analysisErrors.getErrors()[1]), {"integer", "b", "-sc"},    14, ErrorType::Analysis_ConversionError);
+        CheckMessage(RequireMsg(analysisErrors.getErrors()[2]), {"integer", "c",},          16, ErrorType::Analysis_ConversionError);
+    }
+}
 
+TEST_CASE("Positional", "[positional][analysis][errors]") {
+    using namespace Argon;
+    int input, output, input2, output2;
+    std::string name, home;
+
+    auto parser = Positional(10, &input)("Input", "Input count")
+                | Positional(20, &output)("Output", "Output count")
+                | Option<std::string>("Sally", &name)["--name"]
+                | (
+                    OptionGroup()["--group"]
+                    + Positional(30, &input2)("Input2", "Input2 count")
+                    + Positional(40, &output2)("Output2", "Output2 count")
+                    + Option<std::string>("Street", &home)["--home"]
+                );
+    SECTION("Test 1") {
+        parser.parse("100 200 --name John --group []");
+        CHECK(!parser.hasErrors());
+        CHECK(input == 100); CHECK(output == 200); CHECK(name == "John");
+        CHECK(input2 == 30); CHECK(output2 == 40); CHECK(home == "Street");
+    }
     SECTION("Test 2") {
-        parser.parse("-c d -sc e -uc f");
+        parser.parse("100 --name John 200 --group [--home MyHome 50 60]");
         CHECK(!parser.hasErrors());
-        CHECK(c == 'd'); CHECK(sc == 'e'); CHECK(uc == 'f');
+        CHECK(input == 100); CHECK(output == 200); CHECK(name == "John");
+        CHECK(input2 == 50); CHECK(output2 == 60); CHECK(home == "MyHome");
     }
-
-    SECTION("Test 1") {
-        parser.parse("-c g -sc h -uc i");
-        CHECK(!parser.hasErrors());
-        CHECK(c == 'g'); CHECK(sc == 'h'); CHECK(uc == 'i');
+    SECTION("Test 3") {
+        parser.parse("100 200 300 400");
+        CHECK(parser.hasErrors());
+        const auto& analysisErrors = CheckGroup(parser.getAnalysisErrors(), "Analysis Errors", -1, -1, 2);
+        CheckMessage(RequireMsg(analysisErrors.getErrors()[0]), {"300"}, 8,  ErrorType::Analysis_UnexpectedToken);
+        CheckMessage(RequireMsg(analysisErrors.getErrors()[1]), {"400"}, 12, ErrorType::Analysis_UnexpectedToken);
+    }
+    SECTION("Test 4") {
+        parser.parse("100 --name 200 John 300 400");
+        CHECK(parser.hasErrors());
+        const auto& analysisErrors = CheckGroup(parser.getAnalysisErrors(), "Analysis Errors", -1, -1, 3);
+        CheckMessage(RequireMsg(analysisErrors.getErrors()[0]), {"Output","John"}, 15,  ErrorType::Analysis_ConversionError);
+        CheckMessage(RequireMsg(analysisErrors.getErrors()[1]), {"300"}, 20, ErrorType::Analysis_UnexpectedToken);
+        CheckMessage(RequireMsg(analysisErrors.getErrors()[2]), {"400"}, 24, ErrorType::Analysis_UnexpectedToken);
     }
 }

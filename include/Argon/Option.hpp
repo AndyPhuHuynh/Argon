@@ -238,9 +238,28 @@ namespace Argon {
         [[nodiscard]] virtual auto cloneAsPositional() const -> std::unique_ptr<IsPositional> = 0;
     };
 
+    template <typename T, typename Enable = void>
+    class Positional : public SetValueImpl<Positional<T, Enable>, T>,
+                       public OptionComponent<Positional<T, Enable>>, public IsPositional {
+        using SetValueImpl<Positional, T>::setValue;
+    public:
+        Positional() = default;
+
+        explicit Positional(T defaultValue);
+
+        explicit Positional(T *out);
+
+        Positional(T defaultValue, T *out);
+
+        [[nodiscard]] auto cloneAsPositional() const -> std::unique_ptr<IsPositional> override;
+    protected:
+        auto setValue(const ParserConfig& parserConfig, std::string_view flag, std::string_view value) -> void override;
+    };
+
     template <typename T>
-    class Positional : public SetValueImpl<Positional<T>, T>,
-                       public OptionComponent<Positional<T>>, public IsPositional {
+    class Positional<T, std::enable_if_t<is_numeric_char_type<T>>>
+        : public SetValueImpl<Positional<T>, T>, public OptionComponent<Positional<T>>,
+          public IsPositional, public OptionCharBase<Positional<T>> {
         using SetValueImpl<Positional, T>::setValue;
     public:
         Positional() = default;
@@ -773,25 +792,50 @@ auto OptionGroup::addOption(T&& option) -> void {
     m_context->addOption(std::forward<T>(option));
 }
 
-template<typename T>
-void Positional<T>::setValue(const ParserConfig& parserConfig, std::string_view flag, std::string_view value) {
+template<typename T, typename Enable>
+void Positional<T, Enable>::setValue(const ParserConfig& parserConfig, std::string_view flag, std::string_view value) {
     SetValueImpl<Positional, T>::setValue(parserConfig, {}, flag, value);
     this->m_error = this->getConversionError();
     this->m_isSet = true;
 }
 
-template<typename T>
-Positional<T>::Positional(T defaultValue) : SetValueImpl<Positional, T>(defaultValue) {}
+template<typename T, typename Enable>
+Positional<T, Enable>::Positional(T defaultValue) : SetValueImpl<Positional, T>(defaultValue) {}
 
-template<typename T>
-Positional<T>::Positional(T *out) : SetValueImpl<Positional, T>(out) {}
+template<typename T, typename Enable>
+Positional<T, Enable>::Positional(T *out) : SetValueImpl<Positional, T>(out) {}
 
-template<typename T>
-Positional<T>::Positional(T defaultValue, T *out) : SetValueImpl<Positional, T>(defaultValue, out) {}
+template<typename T, typename Enable>
+Positional<T, Enable>::Positional(T defaultValue, T *out) : SetValueImpl<Positional, T>(defaultValue, out) {}
 
-template<typename T>
-auto Positional<T>::cloneAsPositional() const -> std::unique_ptr<IsPositional> {
+template<typename T, typename Enable>
+auto Positional<T, Enable>::cloneAsPositional() const -> std::unique_ptr<IsPositional> {
     return std::make_unique<Positional>(*this);
+}
+
+template<typename T>
+Positional<T, std::enable_if_t<is_numeric_char_type<T>>>::Positional(T defaultValue)
+    : SetValueImpl<Positional, T>(defaultValue) {}
+
+template<typename T>
+Positional<T, std::enable_if_t<is_numeric_char_type<T>>>::Positional(T *out)
+    : SetValueImpl<Positional, T>(out) {}
+
+template<typename T>
+Positional<T, std::enable_if_t<is_numeric_char_type<T>>>::Positional(T defaultValue, T *out)
+    : SetValueImpl<Positional, T>(defaultValue, out) {}
+
+template<typename T>
+auto Positional<T, std::enable_if_t<is_numeric_char_type<T>>>::cloneAsPositional() const -> std::unique_ptr<IsPositional> {
+    return std::make_unique<Positional>(*this);
+}
+
+template<typename T>
+auto Positional<T, std::enable_if_t<is_numeric_char_type<T>>>::setValue(const ParserConfig& parserConfig,
+    std::string_view flag, std::string_view value) -> void {
+    SetValueImpl<Positional, T>::setValue(parserConfig, { .charMode = this->m_charMode }, flag, value);
+    this->m_error = this->getConversionError();
+    this->m_isSet = true;
 }
 
 inline auto OptionGroup::getOption(std::string_view flag) -> IOption* { //NOLINT (function is not const)

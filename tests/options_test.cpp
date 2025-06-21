@@ -688,3 +688,60 @@ TEST_CASE("Positional args basic test", "[options][positional]") {
     CHECK(n1  == 10);
     CHECK(n2  == 20);
 }
+
+TEST_CASE("Ascii CharMode", "[options][char]") {
+    using namespace Argon;
+    char c; signed char sc; unsigned char uc;
+    auto parser = Option(&c)["-c"]
+                | Option(&sc)["-sc"]
+                | Option(&uc)["-uc"];
+    parser.getConfig().setCharMode(CharMode::ExpectAscii);
+
+    SECTION("Test 1") {
+        parser.parse("-c a -sc b -uc c");
+        CHECK(!parser.hasErrors());
+        CHECK(c == 'a'); CHECK(sc == 'b'); CHECK(uc == 'c');
+    }
+
+    SECTION("Test 2") {
+        parser.parse("-c d -sc e -uc f");
+        CHECK(!parser.hasErrors());
+        CHECK(c == 'd'); CHECK(sc == 'e'); CHECK(uc == 'f');
+    }
+
+    SECTION("Test 3") {
+        parser.parse("-c g -sc h -uc i");
+        CHECK(!parser.hasErrors());
+        CHECK(c == 'g'); CHECK(sc == 'h'); CHECK(uc == 'i');
+    }
+}
+
+TEST_CASE("Parsing setCharMode", "[options][positional][char]") {
+    using namespace Argon;
+    char cOpt; signed char scOpt; unsigned char ucOpt;
+    char cPos; signed char scPos; unsigned char ucPos;
+    auto parser = Option(&cOpt)["-c"]
+                | Option(&scOpt)["-sc"]
+                | Option(&ucOpt)["-uc"]
+                | Positional(&cPos)
+                | Positional(&scPos)
+                | Positional(&ucPos);
+    SECTION("Ascii correct") {
+        parser.getConfig().setCharMode(CharMode::ExpectAscii);
+        parser.parse("a -c  a "
+                     "b -sc b "
+                     "c -uc c");
+        CHECK(!parser.hasErrors());
+        CHECK(cOpt == 'a'); CHECK(scOpt == 'b'); CHECK(ucOpt == 'c');
+        CHECK(cPos == 'a'); CHECK(scPos == 'b'); CHECK(ucPos == 'c');
+    }
+    SECTION("Integer correct") {
+        parser.getConfig().setCharMode(CharMode::ExpectInteger);
+        parser.parse("1 -c  2 "
+                     "3 -sc 4 "
+                     "5 -uc 6");
+        CHECK(!parser.hasErrors());
+        CHECK(cOpt == 2); CHECK(scOpt == 4); CHECK(ucOpt == 6);
+        CHECK(cPos == 1); CHECK(scPos == 3); CHECK(ucPos == 5);
+    }
+}

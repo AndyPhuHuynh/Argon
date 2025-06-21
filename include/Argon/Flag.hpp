@@ -22,6 +22,8 @@ struct Flag {
 
     [[nodiscard]] auto getString() const -> std::string;
 
+    [[nodiscard]] auto isEmpty() const -> bool;
+
     auto applyPrefixes(std::string_view shortPrefix, std::string_view longPrefix);
 
     auto operator<=>(const Flag&) const = default;
@@ -155,6 +157,10 @@ inline auto Flag::getString() const -> std::string {
         ss << ", " << alias;
     }
     return ss.str();
+}
+
+inline auto Flag::isEmpty() const -> bool {
+    return mainFlag.empty() && aliases.empty();
 }
 
 inline auto Flag::applyPrefixes(const std::string_view shortPrefix, const std::string_view longPrefix) {

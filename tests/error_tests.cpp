@@ -646,7 +646,7 @@ TEST_CASE("Unknown flags", "[option][syntax][errors]") {
     CHECK(!parser.getAnalysisErrors().hasErrors());
 }
 
-TEST_CASE("Analysis errors", "[analysis][errors]") {
+TEST_CASE("Integer analysis errors", "[analysis][errors]") {
     using namespace Argon;
     bool                fb  = true;
     bool                tb  = false;
@@ -749,17 +749,21 @@ TEST_CASE("Analysis errors", "[analysis][errors]") {
         CheckMessage(RequireMsg(analysisErrors.getErrors()[10]),
             {"'-ull'", "integer", "'18446744073709551616'"} ,   153, ErrorType::Analysis_ConversionError);
     }
-
     SECTION("Integrals at max") {
         parser.parse("-c  127        -sc 127        -uc 255 "
-                     "-ss 32767      -us 65535 "
-                     "-si 32767      -ui 65535 "
-                     "-sl 2147483645 -ul 4294967295 "
-                     "-sll 9223372036854775807 "
-                     "-ull 18446744073709551615 ");
+            "-ss 32767      -us 65535 "
+            "-si 32767      -ui 65535 "
+            "-sl 2147483645 -ul 4294967295 "
+            "-sll 9223372036854775807 "
+            "-ull 18446744073709551615 ");
         CHECK(!parser.hasErrors());
-        parser.printErrors();
+        CHECK(c == 127);    CHECK(sc == 127); CHECK(uc == 255);
+        CHECK(ss == 32767); CHECK(us == 65535);
+        CHECK(si == 32767); CHECK(ui == 65535);
+        CHECK(sl == 2147483645);                CHECK(ul == 4294967295);
+        CHECK(sll == 9223372036854775807ll);    CHECK(ull == 18446744073709551615ull);
     }
+
 
     SECTION("Integrals below min") {
         parser.parse("-c   -129        -sc -129      -uc -1 "
@@ -802,6 +806,37 @@ TEST_CASE("Analysis errors", "[analysis][errors]") {
                      "-sll -9223372036854775808 "
                      "-ull 0 ");
         CHECK(!parser.hasErrors());
-        parser.printErrors();
+        CHECK(c == 0); CHECK(sc == -128); CHECK(uc == 0);
+        CHECK(ss == -32768); CHECK(us == 0);
+        CHECK(si == -32768); CHECK(ui == 0);
+        CHECK(sl == -2147483648); CHECK(ull == 0);
+        CHECK(sll == std::numeric_limits<long long>::min()); CHECK(ull == 0);
+    }
+}
+
+TEST_CASE("Ascii analysis errors", "[analysis][errors]") {
+    using namespace Argon;
+    char c; signed char sc; unsigned char uc;
+    auto parser = Option(&c)["-c"]
+                | Option(&sc)["-sc"]
+                | Option(&uc)["-uc"];
+    parser.getConfig().setCharMode(CharMode::ExpectAscii);
+
+    SECTION("Test 1") {
+        parser.parse("-c a -sc b -uc c");
+        CHECK(!parser.hasErrors());
+        CHECK(c == 'a'); CHECK(sc == 'b'); CHECK(uc == 'c');
+    }
+
+    SECTION("Test 2") {
+        parser.parse("-c d -sc e -uc f");
+        CHECK(!parser.hasErrors());
+        CHECK(c == 'd'); CHECK(sc == 'e'); CHECK(uc == 'f');
+    }
+
+    SECTION("Test 1") {
+        parser.parse("-c g -sc h -uc i");
+        CHECK(!parser.hasErrors());
+        CHECK(c == 'g'); CHECK(sc == 'h'); CHECK(uc == 'i');
     }
 }

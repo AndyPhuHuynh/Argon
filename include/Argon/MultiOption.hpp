@@ -10,30 +10,54 @@ namespace Argon {
     class MultiOption;
 
     class IsMultiOption {};
-    
-    // MultiOption with std::array
 
-    class MultiOptionStdArrayBase : public IsMultiOption {
+    class IArrayCapacity {
     protected:
         size_t m_maxSize;
         size_t m_nextIndex = 0;
 
-        explicit MultiOptionStdArrayBase(size_t maxSize);
+        explicit IArrayCapacity(size_t maxSize);
+
+        virtual ~IArrayCapacity() = default;
     public:
         [[nodiscard]] auto getMaxSize() const -> size_t;
 
         [[nodiscard]] auto isAtMaxCapacity() const -> bool;
     };
 
-    template<typename T, size_t N>
-    class MultiOption<std::array<T, N>> : public HasFlag<MultiOption<std::array<T, N>>>, public ISetValue,
-                                          public OptionComponent<MultiOption<std::array<T, N>>>,
-                                          public MultiOptionStdArrayBase, public Converter<MultiOption<std::array<T, N>>, T>{
+    // MultiOptionArrayBase
+
+    template <typename Derived, typename T, size_t N>
+    class MultiOptionArrayBase
+        : public HasFlag<Derived>, public ISetValue,
+          public OptionComponent<Derived>, public IArrayCapacity,
+          public Converter<Derived, T>, public IsMultiOption {
+    protected:
         std::array<T, N> m_values;
         std::array<T, N>* m_out = nullptr;
         bool m_maxCapacityError = false;
+
+        MultiOptionArrayBase();
+
+        explicit MultiOptionArrayBase(const std::array<T, N>& defaultValue);
+
+        explicit MultiOptionArrayBase(std::array<T, N> *out);
+
+        MultiOptionArrayBase(const std::array<T, N>& defaultValue, const std::array<T, N> *out);
     public:
-        MultiOption();
+        auto getValue() const -> const std::array<T, N>&;
+    protected:
+        auto setValue(const ParserConfig& parserConfig, const OptionConfig& optionConfig,
+                      std::string_view flag, std::string_view value) -> void override;
+    };
+
+    // MultiOption with std::array<T, N> where T is not a char type
+
+    template<typename T, size_t N> requires (!is_numeric_char_type<T>)
+    class MultiOption<std::array<T, N>> : public MultiOptionArrayBase<MultiOption<std::array<T, N>>, T, N> {
+        using ISetValue::setValue;
+    public:
+        MultiOption() = default;
 
         explicit MultiOption(const std::array<T, N>& defaultValue);
 
@@ -41,20 +65,58 @@ namespace Argon {
 
         MultiOption(const std::array<T, N>& defaultValue, const std::array<T, N> *out);
 
-        auto getValue() const -> const std::array<T, N>&;
+        auto setValue(const ParserConfig& parserConfig, std::string_view flag, std::string_view value) -> void override;
+    };
+
+    // MultiOption with std::array<T, N> where T is a char type
+
+    template<typename T, size_t N> requires is_numeric_char_type<T>
+    class MultiOption<std::array<T, N>>
+        : public MultiOptionArrayBase<MultiOption<std::array<T, N>>, T, N>,
+          public OptionCharBase<MultiOption<std::array<T, N>>> {
+        using ISetValue::setValue;
+    public:
+        MultiOption() = default;
+
+        explicit MultiOption(const std::array<T, N>& defaultValue);
+
+        explicit MultiOption(std::array<T, N> *out);
+
+        MultiOption(const std::array<T, N>& defaultValue, const std::array<T, N> *out);
 
         auto setValue(const ParserConfig& parserConfig, std::string_view flag, std::string_view value) -> void override;
-    private:
+    };
+
+    // MultiOptionVectorBase
+
+    template <typename Derived, typename T>
+    class MultiOptionVectorBase
+        : public HasFlag<Derived>, public ISetValue,
+          public OptionComponent<Derived>,
+          public IsMultiOption, public Converter<Derived, T> {
+    protected:
+        std::vector<T> m_values;
+        std::vector<T>* m_out = nullptr;
+
+        MultiOptionVectorBase() = default;
+
+        explicit MultiOptionVectorBase(const std::vector<T>& defaultValue);
+
+        explicit MultiOptionVectorBase(std::vector<T> *out);
+
+        MultiOptionVectorBase(const std::vector<T>& defaultValue, std::vector<T> *out);
+    public:
+        auto getValue() const -> const std::vector<T>&;
+    protected:
         auto setValue(const ParserConfig& parserConfig, const OptionConfig& optionConfig,
                       std::string_view flag, std::string_view value) -> void override;
     };
 
-    // MultiOption with std::vector
+    // MultiOption with std::vector (where T is not numeric char)
 
-    template<typename T>
-    class MultiOption<std::vector<T>> : public HasFlag<MultiOption<std::vector<T>>>, public ISetValue,
-                                        public OptionComponent<MultiOption<std::vector<T>>>,
-                                        public IsMultiOption, public Converter<MultiOption<std::vector<T>>, T> {
+    template<typename T> requires (!is_numeric_char_type<T>)
+    class MultiOption<std::vector<T>> : public MultiOptionVectorBase<MultiOption<std::vector<T>>, T> {
+        using ISetValue::setValue;
         std::vector<T> m_values;
         std::vector<T>* m_out = nullptr;
     public:
@@ -66,12 +128,28 @@ namespace Argon {
 
         MultiOption(const std::vector<T>& defaultValue, std::vector<T> *out);
 
-        auto getValue() const -> const std::vector<T>&;
+        auto setValue(const ParserConfig& parserConfig, std::string_view flag, std::string_view value) -> void override;
+    };
+
+    // MultiOption with std::vector (where T is numeric char)
+
+    template<typename T> requires is_numeric_char_type<T>
+    class MultiOption<std::vector<T>>
+        : public MultiOptionVectorBase<MultiOption<std::vector<T>>, T>,
+          public OptionCharBase<MultiOption<std::vector<T>>> {
+        using ISetValue::setValue;
+        std::vector<T> m_values;
+        std::vector<T>* m_out = nullptr;
+    public:
+        MultiOption() = default;
+
+        explicit MultiOption(const std::vector<T>& defaultValue);
+
+        explicit MultiOption(std::vector<T> *out);
+
+        MultiOption(const std::vector<T>& defaultValue, std::vector<T> *out);
 
         auto setValue(const ParserConfig& parserConfig, std::string_view flag, std::string_view value) -> void override;
-    private:
-        auto setValue(const ParserConfig& parserConfig, const OptionConfig& optionConfig,
-                      std::string_view flag, std::string_view value) -> void override;
     };
 }
 
@@ -92,116 +170,194 @@ namespace Argon {
 // Template Implementations
 
 namespace Argon {
-    // MultiOptionStdArrayBase
+// IArrayCapacity
 
-    inline MultiOptionStdArrayBase::MultiOptionStdArrayBase(const size_t maxSize) : m_maxSize(maxSize) {}
+inline IArrayCapacity::IArrayCapacity(const size_t maxSize) : m_maxSize(maxSize) {}
 
-    inline auto MultiOptionStdArrayBase::getMaxSize() const -> size_t {
-        return m_maxSize;
-    }
+inline auto IArrayCapacity::getMaxSize() const -> size_t {
+    return m_maxSize;
+}
 
-    inline auto MultiOptionStdArrayBase::isAtMaxCapacity() const -> bool {
-        return m_nextIndex == m_maxSize;
-    }
+inline auto IArrayCapacity::isAtMaxCapacity() const -> bool {
+    return m_nextIndex == m_maxSize;
+}
 
-    // MultiOption with std::array
+// MultiOptionArrayBase
 
-    template<typename T, size_t N>
-    MultiOption<std::array<T, N>>::MultiOption() : MultiOptionStdArrayBase(N) {}
+template<typename Derived, typename T, size_t N>
+MultiOptionArrayBase<Derived, T, N>::MultiOptionArrayBase() : IArrayCapacity(N) {}
 
-    template<typename T, size_t N>
-    MultiOption<std::array<T, N>>::MultiOption(const std::array<T, N>& defaultValue)
-        : MultiOptionStdArrayBase(N), m_values(defaultValue) {}
+template<typename Derived, typename T, size_t N>
+MultiOptionArrayBase<Derived, T, N>::MultiOptionArrayBase(const std::array<T, N>& defaultValue)
+    : IArrayCapacity(N), m_values(defaultValue) {}
 
-    template <typename T, size_t N>
-    MultiOption<std::array<T, N>>::MultiOption(std::array<T, N>* out) : MultiOptionStdArrayBase(N), m_out(out) {}
+template<typename Derived, typename T, size_t N>
+MultiOptionArrayBase<Derived, T, N>::MultiOptionArrayBase(std::array<T, N>* out) : IArrayCapacity(N), m_out(out) {}
 
-    template<typename T, size_t N>
-    MultiOption<std::array<T, N>>::MultiOption(const std::array<T, N>& defaultValue, const std::array<T, N> *out)
-        : MultiOptionStdArrayBase(N), m_values(defaultValue), m_out(out) {
+template<typename Derived, typename T, size_t N>
+MultiOptionArrayBase<Derived, T, N>::MultiOptionArrayBase(const std::array<T, N>& defaultValue, const std::array<T, N> *out)
+    : IArrayCapacity(N), m_values(defaultValue), m_out(out) {
+    if (m_out != nullptr) {
         *m_out = m_values;
-    }
-
-    template<typename T, size_t N>
-    auto MultiOption<std::array<T, N>>::getValue() const -> const std::array<T, N>& {
-        return m_values;
-    }
-
-    template <typename T, size_t N>
-    void MultiOption<std::array<T, N>>::setValue(const ParserConfig& parserConfig,
-        const std::string_view flag, const std::string_view value) {
-        setValue(parserConfig, {}, flag, value);
-    }
-
-    template<typename T, size_t N>
-    auto MultiOption<std::array<T, N>>::setValue(const ParserConfig& parserConfig, const OptionConfig& optionConfig,
-        std::string_view flag, std::string_view value) -> void {
-        if (m_maxCapacityError) {
-            this->m_error.clear();
-            return;
-        }
-
-        if (m_nextIndex >= N) {
-            this->m_error = std::format("Flag '{}' only supports a maximum of {} values", flag, N);
-            m_maxCapacityError = true;
-            return;
-        }
-
-        this->convert(parserConfig, optionConfig, flag, value, m_values[m_nextIndex]);
-        if (this->hasConversionError()) {
-            this->m_error = this->getConversionError();
-            return;
-        }
-        if (m_out != nullptr) {
-            (*m_out)[m_nextIndex] = m_values[m_nextIndex];
-        }
-        m_nextIndex++;
-        this->m_isSet = true;
-    }
-
-    // MultiOption with std::vector
-
-    template<typename T>
-    MultiOption(std::vector<T>) -> MultiOption<std::vector<T>>;
-
-    template<typename T>
-    MultiOption<std::vector<T>>::MultiOption(const std::vector<T>& defaultValue) : m_values(defaultValue) {}
-
-    template <typename T>
-    MultiOption<std::vector<T>>::MultiOption(std::vector<T>* out) : m_out(out) {}
-
-    template<typename T>
-    MultiOption<std::vector<T>>::MultiOption(const std::vector<T>& defaultValue, std::vector<T> *out)
-        : m_values(defaultValue), m_out(out) {
-        *m_out = m_values;
-    }
-
-    template<typename T>
-    auto MultiOption<std::vector<T>>::getValue() const -> const std::vector<T>& {
-        return m_values;
-    }
-
-    template <typename T>
-    void MultiOption<std::vector<T>>::setValue(const ParserConfig& parserConfig,
-        const std::string_view flag, const std::string_view value) {
-        setValue(parserConfig, {}, flag, value);
-    }
-
-    template<typename T>
-    auto MultiOption<std::vector<T>>::setValue(const ParserConfig& parserConfig, const OptionConfig& optionConfig,
-                                               std::string_view flag, std::string_view value) -> void {
-        T temp;
-        this->convert(parserConfig, optionConfig, flag, value, temp);
-        if (this->hasConversionError()) {
-            this->m_error = this->getConversionError();
-            return;
-        }
-        m_values.push_back(temp);
-        if (m_out != nullptr) {
-            m_out->push_back(temp);
-        }
-        this->m_isSet = true;
     }
 }
+
+template<typename Derived, typename T, size_t N>
+auto MultiOptionArrayBase<Derived, T, N>::getValue() const -> const std::array<T, N>& {
+    return m_values;
+}
+
+template<typename Derived, typename T, size_t N>
+auto MultiOptionArrayBase<Derived, T, N>::setValue(const ParserConfig& parserConfig, const OptionConfig& optionConfig,
+    std::string_view flag, std::string_view value) -> void {
+    if (this->m_maxCapacityError) {
+        this->m_error.clear();
+        return;
+    }
+
+    if (m_nextIndex >= N) {
+        this->m_error = std::format("Flag '{}' only supports a maximum of {} values", flag, N);
+        m_maxCapacityError = true;
+        return;
+    }
+
+    this->convert(parserConfig, optionConfig, flag, value, m_values[m_nextIndex]);
+    if (this->hasConversionError()) {
+        this->m_error = this->getConversionError();
+        return;
+    }
+    if (m_out != nullptr) {
+        (*m_out)[m_nextIndex] = m_values[m_nextIndex];
+    }
+    m_nextIndex++;
+    this->m_isSet = true;
+}
+
+// MultiOption with std::array (T is not numeric char)
+
+template<typename T, size_t N> requires (!is_numeric_char_type<T>)
+MultiOption<std::array<T, N>>::MultiOption(const std::array<T, N>& defaultValue)
+    : MultiOptionArrayBase<MultiOption, T, N>(defaultValue) {}
+
+template<typename T, size_t N> requires (!is_numeric_char_type<T>)
+MultiOption<std::array<T, N>>::MultiOption(std::array<T, N> *out)
+    : MultiOptionArrayBase<MultiOption, T, N>(out) {}
+
+template<typename T, size_t N> requires (!is_numeric_char_type<T>)
+MultiOption<std::array<T, N>>::MultiOption(const std::array<T, N>& defaultValue, const std::array<T, N> *out)
+    : MultiOptionArrayBase<MultiOption, T, N>(defaultValue, out) {}
+
+template<typename T, size_t N> requires (!is_numeric_char_type<T>)
+auto MultiOption<std::array<T, N>>::setValue(const ParserConfig& parserConfig, std::string_view flag, std::string_view value) -> void {
+    MultiOptionArrayBase<MultiOption, T, N>::setValue(parserConfig, {}, flag, value);
+}
+
+// MultiOption with std::array (T is numeric char)
+
+template<typename T, size_t N> requires is_numeric_char_type<T>
+MultiOption<std::array<T, N>>::MultiOption(const std::array<T, N>& defaultValue)
+        : MultiOptionArrayBase<MultiOption, T, N>(defaultValue) {}
+
+template<typename T, size_t N> requires is_numeric_char_type<T>
+MultiOption<std::array<T, N>>::MultiOption(std::array<T, N> *out)
+        : MultiOptionArrayBase<MultiOption, T, N>(out) {}
+
+template<typename T, size_t N> requires is_numeric_char_type<T>
+MultiOption<std::array<T, N>>::MultiOption(const std::array<T, N>& defaultValue, const std::array<T, N> *out)
+        : MultiOptionArrayBase<MultiOption, T, N>(defaultValue, out) {}
+
+template<typename T, size_t N> requires is_numeric_char_type<T>
+auto MultiOption<std::array<T, N>>::setValue(const ParserConfig& parserConfig, std::string_view flag, std::string_view value) -> void {
+    MultiOptionArrayBase<MultiOption, T, N>::setValue(parserConfig, { .charMode = this->m_charMode }, flag, value);
+}
+
+// MultiOptionVectorBase
+
+template<typename Derived, typename T>
+MultiOptionVectorBase<Derived, T>::MultiOptionVectorBase(const std::vector<T>& defaultValue)
+    : m_values(defaultValue) {}
+
+template<typename Derived, typename T>
+MultiOptionVectorBase<Derived, T>::MultiOptionVectorBase(std::vector<T> *out)
+    : m_out(out) {}
+
+template<typename Derived, typename T>
+MultiOptionVectorBase<Derived, T>::MultiOptionVectorBase(const std::vector<T>& defaultValue, std::vector<T> *out)
+    : m_values(defaultValue), m_out(out) {
+    if (out != nullptr) {
+        *m_out = m_values;
+    }
+}
+
+template<typename Derived, typename T>
+auto MultiOptionVectorBase<Derived, T>::getValue() const -> const std::vector<T>& {
+    return m_values;
+}
+
+template<typename Derived, typename T>
+auto MultiOptionVectorBase<Derived, T>::setValue(const ParserConfig& parserConfig, const OptionConfig& optionConfig,
+    std::string_view flag, std::string_view value) -> void {
+    T temp;
+    this->convert(parserConfig, optionConfig, flag, value, temp);
+    if (this->hasConversionError()) {
+        this->m_error = this->getConversionError();
+        return;
+    }
+    m_values.push_back(temp);
+    if (m_out != nullptr) {
+        m_out->push_back(temp);
+    }
+    this->m_isSet = true;
+}
+
+// MultiOption with std::vector<T> (where T is a numeric char)
+
+template<typename T> requires (!is_numeric_char_type<T>)
+MultiOption<std::vector<T>>::MultiOption(const std::vector<T>& defaultValue)
+    : MultiOptionVectorBase<MultiOption, T>(defaultValue) {}
+
+template <typename T> requires (!is_numeric_char_type<T>)
+MultiOption<std::vector<T>>::MultiOption(std::vector<T>* out)
+    : MultiOptionVectorBase<MultiOption, T>(out) {}
+
+template<typename T> requires (!is_numeric_char_type<T>)
+MultiOption<std::vector<T>>::MultiOption(const std::vector<T>& defaultValue, std::vector<T> *out)
+    : MultiOptionVectorBase<MultiOption, T>(defaultValue, out) {
+    if (m_out != nullptr) {
+        *m_out = m_values;
+    }
+}
+
+template <typename T> requires (!is_numeric_char_type<T>)
+void MultiOption<std::vector<T>>::setValue(const ParserConfig& parserConfig,
+    const std::string_view flag, const std::string_view value) {
+setValue(parserConfig, {}, flag, value);
+}
+
+// MultiOption with std::vector<T> (where T is a numeric char)
+
+template<typename T> requires is_numeric_char_type<T>
+MultiOption<std::vector<T>>::MultiOption(const std::vector<T>& defaultValue)
+    : MultiOptionVectorBase<MultiOption, T>(defaultValue) {}
+
+template <typename T> requires is_numeric_char_type<T>
+MultiOption<std::vector<T>>::MultiOption(std::vector<T>* out)
+    : MultiOptionVectorBase<MultiOption, T>(out) {}
+
+template<typename T> requires is_numeric_char_type<T>
+MultiOption<std::vector<T>>::MultiOption(const std::vector<T>& defaultValue, std::vector<T> *out)
+    : MultiOptionVectorBase<MultiOption, T>(defaultValue, out) {
+    if (m_out != nullptr) {
+        *m_out = m_values;
+    }
+}
+
+template <typename T> requires is_numeric_char_type<T>
+void MultiOption<std::vector<T>>::setValue(const ParserConfig& parserConfig,
+    const std::string_view flag, const std::string_view value) {
+    setValue(parserConfig, { .charMode = this->m_charMode }, flag, value);
+}
+
+} // End namespace Argon
 
 #endif // ARGON_MULTIOPTION_INCLUDE

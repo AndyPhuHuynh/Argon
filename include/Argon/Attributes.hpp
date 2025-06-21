@@ -81,7 +81,7 @@ inline auto Constraints::validate(Context& rootContext, std::vector<std::string>
 
 inline auto Constraints::checkMultiOptionStdArray(const OptionMap& setOptions, std::vector<std::string>& errorMsgs) -> void {
     for (const auto& [flag, option] : setOptions) {
-        const auto multiOption = dynamic_cast<MultiOptionStdArrayBase*>(option);
+        const auto multiOption = dynamic_cast<IArrayCapacity*>(option);
         if (multiOption == nullptr) continue;
 
         if (!multiOption->isAtMaxCapacity()) {

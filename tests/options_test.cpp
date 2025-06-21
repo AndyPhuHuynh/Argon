@@ -716,6 +716,64 @@ TEST_CASE("Ascii CharMode", "[options][char]") {
     }
 }
 
+TEST_CASE("CharMode with MultiOption array", "[options][multi][char][array]") {
+    using namespace Argon;
+    std::array<char, 3> chars;
+    std::array<signed char, 3> signedChars;
+    std::array<unsigned char, 3> unsignedChars;
+
+    auto parser = MultiOption(&chars)["--chars"]
+                | MultiOption(&signedChars)["--signed"]
+                | MultiOption(&unsignedChars)["--unsigned"];
+    SECTION("Expect ASCII") {
+        parser.getConfig().setCharMode(CharMode::ExpectAscii);
+        parser.parse("--chars a b c --signed d e f --unsigned g h i");
+        CHECK(!parser.hasErrors());
+        CHECK(chars[0]         == 'a'); CHECK(chars[1]         == 'b'); CHECK(chars[2]         == 'c');
+        CHECK(signedChars[0]   == 'd'); CHECK(signedChars[1]   == 'e'); CHECK(signedChars[2]   == 'f');
+        CHECK(unsignedChars[0] == 'g'); CHECK(unsignedChars[1] == 'h'); CHECK(unsignedChars[2] == 'i');
+    }
+
+    SECTION("Expect integers") {
+        parser.getConfig().setCharMode(CharMode::ExpectInteger);
+        parser.parse("--chars 10 20 30 --signed 40 50 60 --unsigned 70 80 90");
+        CHECK(!parser.hasErrors());
+        CHECK(chars[0]         == 10); CHECK(chars[1]         == 20); CHECK(chars[2]         == 30);
+        CHECK(signedChars[0]   == 40); CHECK(signedChars[1]   == 50); CHECK(signedChars[2]   == 60);
+        CHECK(unsignedChars[0] == 70); CHECK(unsignedChars[1] == 80); CHECK(unsignedChars[2] == 90);
+    }
+}
+
+TEST_CASE("CharMode with MultiOption vector", "[options][multi][char][vector]") {
+    using namespace Argon;
+    std::vector<char> chars;
+    std::vector<signed char> signedChars;
+    std::vector<unsigned char> unsignedChars;
+
+    auto parser = MultiOption(&chars)["--chars"]
+                | MultiOption(&signedChars)["--signed"]
+                | MultiOption(&unsignedChars)["--unsigned"];
+    SECTION("Expect ASCII") {
+        parser.getConfig().setCharMode(CharMode::ExpectAscii);
+        parser.parse("--chars a b c --signed d e f --unsigned g h i");
+        CHECK(!parser.hasErrors());
+        REQUIRE(chars.size() == 3); REQUIRE(signedChars.size() == 3); REQUIRE(unsignedChars.size() == 3);
+        CHECK(chars[0]         == 'a'); CHECK(chars[1]         == 'b'); CHECK(chars[2]         == 'c');
+        CHECK(signedChars[0]   == 'd'); CHECK(signedChars[1]   == 'e'); CHECK(signedChars[2]   == 'f');
+        CHECK(unsignedChars[0] == 'g'); CHECK(unsignedChars[1] == 'h'); CHECK(unsignedChars[2] == 'i');
+    }
+
+    SECTION("Expect integers") {
+        parser.getConfig().setCharMode(CharMode::ExpectInteger);
+        parser.parse("--chars 10 20 30 --signed 40 50 60 --unsigned 70 80 90");
+        CHECK(!parser.hasErrors());
+        REQUIRE(chars.size() == 3); REQUIRE(signedChars.size() == 3); REQUIRE(unsignedChars.size() == 3);
+        CHECK(chars[0]         == 10); CHECK(chars[1]         == 20); CHECK(chars[2]         == 30);
+        CHECK(signedChars[0]   == 40); CHECK(signedChars[1]   == 50); CHECK(signedChars[2]   == 60);
+        CHECK(unsignedChars[0] == 70); CHECK(unsignedChars[1] == 80); CHECK(unsignedChars[2] == 90);
+    }
+}
+
 TEST_CASE("Parsing setCharMode", "[options][positional][char]") {
     using namespace Argon;
     char cOpt; signed char scOpt; unsigned char ucOpt;

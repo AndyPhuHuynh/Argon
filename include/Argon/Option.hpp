@@ -89,8 +89,7 @@ namespace Argon {
 
     template <typename Derived>
     class OptionComponent : public IOption {
-        friend Derived;
-
+    protected:
         OptionComponent() = default;
     public:
         [[nodiscard]] std::unique_ptr<IOption> clone() const override;

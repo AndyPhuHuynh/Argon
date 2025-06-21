@@ -667,68 +667,97 @@ TEST_CASE("Analysis errors", "[analysis][errors]") {
     long double         ld  = 0;
 
     auto parser = Option(&fb)  ["-fb"]      | Option(&tb)  ["-tb"]
-                | Option(&sc)  ["-sc"]      | Option(&uc)  ["-uc"]      | Option(&c)  ["-c"]
+                | Option(&sc)  ["-sc"].setCharMode(CharMode::ExpectInteger)
+                | Option(&uc)  ["-uc"].setCharMode(CharMode::ExpectInteger)
+                | Option(&c)   ["-c"] .setCharMode(CharMode::ExpectInteger)
                 | Option(&ss)  ["-ss"]      | Option(&us)  ["-us"]
                 | Option(&si)  ["-si"]      | Option(&ui)  ["-ui"]
                 | Option(&sl)  ["-sl"]      | Option(&ul)  ["-ul"]
                 | Option(&sll) ["-sll"]     | Option(&ull) ["-ull"]
                 | Option(&f)   ["-f"]       | Option(&d)   ["-d"]       | Option(&ld) ["-ld"];
 
-    // SECTION("Strings instead of numbers") {
-    //     parser.parse("-fb hello -tb world -c string -sc  asdf -uc asdf "
-    //              "-ss asdf  -us asdf  -si  asdf -ui  asdf "
-    //              "-sl asdf  -ul asdf  -sll asdf -ull asdf "
-    //              "-f  word  -d  word  -ld  long");
-    //     parser.printErrors();
-    //     CHECK(parser.hasErrors());
-    //     const auto& analysisErrors = CheckGroup(parser.getAnalysisErrors(), "Analysis Errors", -1, -1, 16);
-    //     CheckMessage(RequireMsg(analysisErrors.getErrors()[0]),
-    //         {"'-fb'", "boolean", "'hello'"},            4 , ErrorType::Analysis_ConversionError);
-    //     CheckMessage(RequireMsg(analysisErrors.getErrors()[1]),
-    //         {"'-tb'", "boolean", "'world'"},            14, ErrorType::Analysis_ConversionError);
-    //     CheckMessage(RequireMsg(analysisErrors.getErrors()[2]),
-    //         {"'-c'", "char", "'string'"},               23, ErrorType::Analysis_ConversionError);
-    //     CheckMessage(RequireMsg(analysisErrors.getErrors()[3]),
-    //         {"'-sc'", "signed char", "'asdf'"},         35, ErrorType::Analysis_ConversionError);
-    //     CheckMessage(RequireMsg(analysisErrors.getErrors()[4]),
-    //         {"'-uc'", "unsigned char", "'asdf'"},       44, ErrorType::Analysis_ConversionError);
-    //     CheckMessage(RequireMsg(analysisErrors.getErrors()[5]),
-    //         {"'-ss'", "short", "'asdf'"},               53, ErrorType::Analysis_ConversionError);
-    //     CheckMessage(RequireMsg(analysisErrors.getErrors()[6]),
-    //         {"'-us'", "unsigned short", "'asdf'"},      63, ErrorType::Analysis_ConversionError);
-    //     CheckMessage(RequireMsg(analysisErrors.getErrors()[7]),
-    //         {"'-si'", "integer", "'asdf'"},             74, ErrorType::Analysis_ConversionError);
-    //     CheckMessage(RequireMsg(analysisErrors.getErrors()[8]),
-    //         {"'-ui'", "unsigned integer", "'asdf'"} ,   84, ErrorType::Analysis_ConversionError);
-    // }
-    //
-    // SECTION("Integrals over max") {
-    //     parser.parse("-c  256        -sc 256        -uc  128 "
-    //                  "-ss 32768      -us 65536 "
-    //                  "-si 2147483648 -ui 4294967295 "
-    //                  "-sl 2147483648 -ul 4294967295 "
-    //                  "-sll 9223372036854775808 "
-    //                  "-ull 18446744073709551616 ");
-    //     parser.printErrors();
-    //     CHECK(parser.hasErrors());
-    //     const auto& analysisErrors = CheckGroup(parser.getAnalysisErrors(), "Analysis Errors", -1, -1, 11);
-    //     CheckMessage(RequireMsg(analysisErrors.getErrors()[0]),
-    //         {"'-c'", "char", "'256'"},               23, ErrorType::Analysis_ConversionError);
-    //     CheckMessage(RequireMsg(analysisErrors.getErrors()[1]),
-    //         {"'-sc'", "signed char", "'256'"},         35, ErrorType::Analysis_ConversionError);
-    //     CheckMessage(RequireMsg(analysisErrors.getErrors()[2]),
-    //         {"'-uc'", "unsigned char", "'128'"},       44, ErrorType::Analysis_ConversionError);
-    //     CheckMessage(RequireMsg(analysisErrors.getErrors()[3]),
-    //         {"'-ss'", "short", "'32768'"},               53, ErrorType::Analysis_ConversionError);
-    //     CheckMessage(RequireMsg(analysisErrors.getErrors()[4]),
-    //         {"'-us'", "unsigned short", "'65536'"},      63, ErrorType::Analysis_ConversionError);
-    //     CheckMessage(RequireMsg(analysisErrors.getErrors()[5]),
-    //         {"'-si'", "integer", "'2147483648'"},             74, ErrorType::Analysis_ConversionError);
-    //     CheckMessage(RequireMsg(analysisErrors.getErrors()[6]),
-    //         {"'-ui'", "unsigned integer", "'4294967295'"} ,   84, ErrorType::Analysis_ConversionError);
-    //     CheckMessage(RequireMsg(analysisErrors.getErrors()[7]),
-    //         {"'-sl'", "", "'2147483648'"} ,   84, ErrorType::Analysis_ConversionError);
-    //     CheckMessage(RequireMsg(analysisErrors.getErrors()[8]),
-    //         {"'-ul'", "unsigned integer", "'4294967295'"} ,   84, ErrorType::Analysis_ConversionError);
-    // }
+    SECTION("Strings instead of numbers") {
+        parser.parse("-fb hello -tb world -c string -sc  asdf -uc asdf "
+                 "-ss asdf  -us asdf  -si  asdf -ui  asdf "
+                 "-sl asdf  -ul asdf  -sll asdf -ull asdf "
+                 "-f  word  -d  word  -ld  long");
+        CHECK(parser.hasErrors());
+        const auto& analysisErrors = CheckGroup(parser.getAnalysisErrors(), "Analysis Errors", -1, -1, 16);
+        CheckMessage(RequireMsg(analysisErrors.getErrors()[0]),
+            {"'-fb'", "boolean", "'hello'"},    4 , ErrorType::Analysis_ConversionError);
+        CheckMessage(RequireMsg(analysisErrors.getErrors()[1]),
+            {"'-tb'", "boolean", "'world'"},    14, ErrorType::Analysis_ConversionError);
+        CheckMessage(RequireMsg(analysisErrors.getErrors()[2]),
+            {"'-c'", "integer", "'string'"},    23, ErrorType::Analysis_ConversionError);
+        CheckMessage(RequireMsg(analysisErrors.getErrors()[3]),
+            {"'-sc'", "integer", "'asdf'"},     35, ErrorType::Analysis_ConversionError);
+        CheckMessage(RequireMsg(analysisErrors.getErrors()[4]),
+            {"'-uc'", "integer", "'asdf'"},     44, ErrorType::Analysis_ConversionError);
+        CheckMessage(RequireMsg(analysisErrors.getErrors()[5]),
+            {"'-ss'", "integer", "'asdf'"},     53, ErrorType::Analysis_ConversionError);
+        CheckMessage(RequireMsg(analysisErrors.getErrors()[6]),
+            {"'-us'", "integer", "'asdf'"},     63, ErrorType::Analysis_ConversionError);
+        CheckMessage(RequireMsg(analysisErrors.getErrors()[7]),
+            {"'-si'", "integer", "'asdf'"},     74, ErrorType::Analysis_ConversionError);
+        CheckMessage(RequireMsg(analysisErrors.getErrors()[8]),
+            {"'-ui'", "integer", "'asdf'"},     84, ErrorType::Analysis_ConversionError);
+        CheckMessage(RequireMsg(analysisErrors.getErrors()[9]),
+            {"'-sl'", "integer", "'asdf'"},     93, ErrorType::Analysis_ConversionError);
+        CheckMessage(RequireMsg(analysisErrors.getErrors()[10]),
+            {"'-ul'", "integer", "'asdf'"},     103, ErrorType::Analysis_ConversionError);
+        CheckMessage(RequireMsg(analysisErrors.getErrors()[11]),
+            {"'-sll'", "integer", "'asdf'"},    114, ErrorType::Analysis_ConversionError);
+        CheckMessage(RequireMsg(analysisErrors.getErrors()[12]),
+            {"'-ull'", "integer", "'asdf'"},    124, ErrorType::Analysis_ConversionError);
+        CheckMessage(RequireMsg(analysisErrors.getErrors()[13]),
+            {"'-f'", "floating", "'word'"},     133, ErrorType::Analysis_ConversionError);
+        CheckMessage(RequireMsg(analysisErrors.getErrors()[14]),
+            {"'-d'", "floating", "'word'"},     143, ErrorType::Analysis_ConversionError);
+        CheckMessage(RequireMsg(analysisErrors.getErrors()[15]),
+            {"'-ld'", "floating", "'long'"},    154, ErrorType::Analysis_ConversionError);
+    }
+
+    SECTION("Integrals over max") {
+        parser.parse("-c  256        -sc 128        -uc 256 "
+                     "-ss 32768      -us 65536 "
+                     "-si 2147483648 -ui 4294967296 "
+                     "-sl 2147483648 -ul 4294967296 "
+                     "-sll 9223372036854775808 "
+                     "-ull 18446744073709551616 ");
+        CHECK(parser.hasErrors());
+        const auto& analysisErrors = CheckGroup(parser.getAnalysisErrors(), "Analysis Errors", -1, -1, 11);
+        CheckMessage(RequireMsg(analysisErrors.getErrors()[0]),
+            {"'-c'", "integer", "'256'"},           4, ErrorType::Analysis_ConversionError);
+        CheckMessage(RequireMsg(analysisErrors.getErrors()[1]),
+            {"'-sc'", "integer", "'128'"},          19, ErrorType::Analysis_ConversionError);
+        CheckMessage(RequireMsg(analysisErrors.getErrors()[2]),
+            {"'-uc'", "integer", "'256'"},          34, ErrorType::Analysis_ConversionError);
+        CheckMessage(RequireMsg(analysisErrors.getErrors()[3]),
+            {"'-ss'", "integer", "'32768'"},        42, ErrorType::Analysis_ConversionError);
+        CheckMessage(RequireMsg(analysisErrors.getErrors()[4]),
+            {"'-us'", "integer", "'65536'"},        57, ErrorType::Analysis_ConversionError);
+        CheckMessage(RequireMsg(analysisErrors.getErrors()[5]),
+            {"'-si'", "integer", "'2147483648'"},   67, ErrorType::Analysis_ConversionError);
+        CheckMessage(RequireMsg(analysisErrors.getErrors()[6]),
+            {"'-ui'", "integer", "'4294967296'"} ,  82, ErrorType::Analysis_ConversionError);
+        CheckMessage(RequireMsg(analysisErrors.getErrors()[7]),
+            {"'-sl'", "integer", "'2147483648'"} ,  97, ErrorType::Analysis_ConversionError);
+        CheckMessage(RequireMsg(analysisErrors.getErrors()[8]),
+            {"'-ul'", "integer", "'4294967296'"} ,  112, ErrorType::Analysis_ConversionError);
+        CheckMessage(RequireMsg(analysisErrors.getErrors()[9]),
+            {"'-sll'", "integer", "'9223372036854775808'"} ,    128, ErrorType::Analysis_ConversionError);
+        CheckMessage(RequireMsg(analysisErrors.getErrors()[10]),
+            {"'-ull'", "integer", "'18446744073709551616'"} ,   153, ErrorType::Analysis_ConversionError);
+    }
+
+    SECTION("Integrals at max") {
+        parser.parse("-c  127        -sc 127        -uc 255 "
+                     "-ss 32767      -us 65535 "
+                     "-si 32767      -ui 65535 "
+                     "-sl 2147483645 -ul 4294967295 "
+                     "-sll 9223372036854775807 "
+                     "-ull 18446744073709551615 ");
+        CHECK(!parser.hasErrors());
+        parser.printErrors();
+    }
 }

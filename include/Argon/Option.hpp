@@ -126,7 +126,8 @@ namespace Argon {
         GenerateErrorMsgFn m_generate_error_msg_fn = nullptr;
         std::string m_conversionError;
 
-        auto generateErrorMsg(const ParserConfig& config, std::string_view optionName, std::string_view invalidArg) -> void;
+        auto generateErrorMsg(const ParserConfig& parserConfig, const OptionConfig&
+                              optionConfig, std::string_view optionName, std::string_view invalidArg) -> void;
 
     public:
         auto convert(const ParserConfig& parserConfig, const OptionConfig& optionConfig, std::string_view flag, std::string_view value, T& outValue) -> void;
@@ -475,7 +476,8 @@ auto OptionComponent<Derived>::operator()(const std::string_view inputHint, cons
 }
 
 template <typename Derived, typename T>
-auto Converter<Derived, T>::generateErrorMsg(const ParserConfig&, std::string_view optionName, std::string_view invalidArg) -> void {
+auto Converter<Derived, T>::generateErrorMsg(const ParserConfig& parserConfig, const OptionConfig& optionConfig,
+                                             const std::string_view optionName, const std::string_view invalidArg) -> void {
     // Generate custom error message if provided
     if (this->m_generate_error_msg_fn != nullptr) {
         this->m_conversionError = this->m_generate_error_msg_fn(optionName, invalidArg);
@@ -491,20 +493,18 @@ auto Converter<Derived, T>::generateErrorMsg(const ParserConfig&, std::string_vi
         ss << std::format("Invalid value for '{}': ", optionName);
     }
 
-    // Type name
-    ss << "expected " << type_name<T>();
-    if constexpr (is_non_bool_integral<T>) {
-        ss << "expected integer";
-    }
-
-    // Expected values
-    if constexpr (is_non_bool_integral<T>) {
+    const CharMode charMode = optionConfig.charMode == CharMode::None ? parserConfig.getCharMode() : optionConfig.charMode;
+    if (is_numeric_char_type<T> && charMode == CharMode::ExpectAscii) {
+        ss << "expected ASCII character";
+    } else if constexpr (is_non_bool_integral<T>) {
         ss << std::format(
-            " between {} and {}",
+            "expected integer between {} and {}",
             format_with_commas(std::numeric_limits<T>::min()),
             format_with_commas(std::numeric_limits<T>::max()));
     } else if constexpr (std::is_same_v<T, bool>) {
-        ss << " (true or false)";
+        ss << "expected boolean (true or false)";
+    } else {
+        ss << std::format("expected {}", type_name<T>());
     }
 
     // Actual value
@@ -556,7 +556,7 @@ auto Converter<Derived, T>::convert(const ParserConfig& parserConfig, const Opti
     }
     // Set error if not successful
     if (!success) {
-        generateErrorMsg(parserConfig, flag, value);
+        generateErrorMsg(parserConfig, optionConfig, flag, value);
     }
 }
 

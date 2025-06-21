@@ -113,7 +113,9 @@ TEST_CASE("Option all built-in numeric types", "[options]") {
     long double         ld  = 0;
 
     auto parser = Option(&fb)  ["-fb"]      | Option(&tb)  ["-tb"]
-                | Option(&sc)  ["-sc"]      | Option(&uc)  ["-uc"]      | Option(&c)  ["-c"]
+                | Option(&sc)  ["-sc"].setCharMode(CharMode::ExpectInteger)
+                | Option(&uc)  ["-uc"].setCharMode(CharMode::ExpectInteger)
+                | Option(&c)   ["-c"] .setCharMode(CharMode::ExpectAscii)
                 | Option(&ss)  ["-ss"]      | Option(&us)  ["-us"]
                 | Option(&si)  ["-si"]      | Option(&ui)  ["-ui"]
                 | Option(&sl)  ["-sl"]      | Option(&ul)  ["-ul"]

@@ -43,7 +43,10 @@ namespace Argon {
 
         auto getValue() const -> const std::array<T, N>&;
 
-        auto setValue(const ParserConfig& config, std::string_view flag, std::string_view value) -> void override;
+        auto setValue(const ParserConfig& parserConfig, std::string_view flag, std::string_view value) -> void override;
+    private:
+        auto setValue(const ParserConfig& parserConfig, const OptionConfig& optionConfig,
+                      std::string_view flag, std::string_view value) -> void override;
     };
 
     // MultiOption with std::vector
@@ -65,7 +68,10 @@ namespace Argon {
 
         auto getValue() const -> const std::vector<T>&;
 
-        auto setValue(const ParserConfig& config, std::string_view flag, std::string_view value) -> void override;
+        auto setValue(const ParserConfig& parserConfig, std::string_view flag, std::string_view value) -> void override;
+    private:
+        auto setValue(const ParserConfig& parserConfig, const OptionConfig& optionConfig,
+                      std::string_view flag, std::string_view value) -> void override;
     };
 }
 
@@ -122,19 +128,26 @@ namespace Argon {
     }
 
     template <typename T, size_t N>
-    void MultiOption<std::array<T, N>>::setValue(const ParserConfig& config, std::string_view flag, std::string_view value) {
+    void MultiOption<std::array<T, N>>::setValue(const ParserConfig& parserConfig,
+        const std::string_view flag, const std::string_view value) {
+        setValue(parserConfig, {}, flag, value);
+    }
+
+    template<typename T, size_t N>
+    auto MultiOption<std::array<T, N>>::setValue(const ParserConfig& parserConfig, const OptionConfig& optionConfig,
+        std::string_view flag, std::string_view value) -> void {
         if (m_maxCapacityError) {
             this->m_error.clear();
             return;
         }
-        
+
         if (m_nextIndex >= N) {
             this->m_error = std::format("Flag '{}' only supports a maximum of {} values", flag, N);
             m_maxCapacityError = true;
             return;
         }
 
-        this->convert(config, flag, value, m_values[m_nextIndex]);
+        this->convert(parserConfig, optionConfig, flag, value, m_values[m_nextIndex]);
         if (this->hasConversionError()) {
             this->m_error = this->getConversionError();
             return;
@@ -169,9 +182,16 @@ namespace Argon {
     }
 
     template <typename T>
-    void MultiOption<std::vector<T>>::setValue(const ParserConfig& config, std::string_view flag, std::string_view value) {
+    void MultiOption<std::vector<T>>::setValue(const ParserConfig& parserConfig,
+        const std::string_view flag, const std::string_view value) {
+        setValue(parserConfig, {}, flag, value);
+    }
+
+    template<typename T>
+    auto MultiOption<std::vector<T>>::setValue(const ParserConfig& parserConfig, const OptionConfig& optionConfig,
+                                               std::string_view flag, std::string_view value) -> void {
         T temp;
-        this->convert(config, flag, value, temp);
+        this->convert(parserConfig, optionConfig, flag, value, temp);
         if (this->hasConversionError()) {
             this->m_error = this->getConversionError();
             return;

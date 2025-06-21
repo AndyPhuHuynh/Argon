@@ -12,11 +12,12 @@
 #include <vector>
 
 #include "Flag.hpp"
+#include "ParserConfig.hpp"
 #include "Traits.hpp"
 
 namespace Argon {
     class IOption;
-    template <typename T> class Option;
+    template <typename T, typename Enable> class Option;
     class OptionGroup;
     class Context;
     class Parser;
@@ -109,7 +110,9 @@ namespace Argon {
         ISetValue() = default;
         virtual ~ISetValue() = default;
 
-        virtual void setValue(const ParserConfig& config, std::string_view flag, std::string_view value) = 0;
+        virtual void setValue(const ParserConfig& parserConfig, std::string_view flag, std::string_view value) = 0;
+        virtual void setValue(const ParserConfig& parserConfig, const OptionConfig& optionConfig,
+                              std::string_view flag, std::string_view value) = 0;
     };
 
     template <typename T>
@@ -123,10 +126,10 @@ namespace Argon {
         GenerateErrorMsgFn m_generate_error_msg_fn = nullptr;
         std::string m_conversionError;
 
-        auto generateErrorMsg(std::string_view optionName, std::string_view invalidArg) -> void;
+        auto generateErrorMsg(const ParserConfig& config, std::string_view optionName, std::string_view invalidArg) -> void;
 
     public:
-        auto convert(const ParserConfig& config, std::string_view flag, std::string_view value, T& outValue) -> void;
+        auto convert(const ParserConfig& parserConfig, const OptionConfig& optionConfig, std::string_view flag, std::string_view value, T& outValue) -> void;
 
         [[nodiscard]] auto hasConversionError() const -> bool;
 
@@ -156,24 +159,47 @@ namespace Argon {
 
         [[nodiscard]] auto getValue() const -> const T&;
     protected:
-        auto setValue(const ParserConfig& config, std::string_view flag, std::string_view value) -> void override;
+        auto setValue(const ParserConfig& parserConfig, const OptionConfig& optionConfig,
+                      std::string_view flag, std::string_view value) -> void override;
     };
 
     class IsSingleOption {};
 
-    template <typename T>
-    class Option : public HasFlag<Option<T>>, public SetValueImpl<Option<T>, T>,
-                   public OptionComponent<Option<T>>, public IsSingleOption {
+    template <typename T, typename Enable = void>
+    class Option : public HasFlag<Option<T, Enable>>, public SetValueImpl<Option<T, Enable>, T>,
+                   public OptionComponent<Option<T, Enable>>, public IsSingleOption {
+        using SetValueImpl<Option, T>::setValue;
     public:
         Option() = default;
-
         explicit Option(T defaultValue);
-
         explicit Option(T *out);
-
         Option(T defaultValue, T *out);
     protected:
-        auto setValue(const ParserConfig& config, std::string_view flag, std::string_view value) -> void override;
+        auto setValue(const ParserConfig& parserConfig, std::string_view flag, std::string_view value) -> void override;
+    };
+
+    template <typename Derived>
+    class OptionCharBase {
+    protected:
+        CharMode m_charMode = CharMode::None;
+    public:
+        [[nodiscard]] auto getCharMode() const -> CharMode;
+        auto setCharMode(CharMode mode) & -> Derived&;
+        auto setCharMode(CharMode mode) && -> Derived&&;
+    };
+
+    template <typename T>
+    class Option<T, std::enable_if_t<is_numeric_char_type<T>>>
+        : public HasFlag<Option<T>>, public SetValueImpl<Option<T>, T>,
+          public OptionComponent<Option<T>>, public IsSingleOption, public OptionCharBase<Option<T>> {
+        using SetValueImpl<Option, T>::setValue;
+    public:
+        Option() = default;
+        explicit Option(T defaultValue);
+        explicit Option(T *out);
+        Option(T defaultValue, T *out);
+    protected:
+        auto setValue(const ParserConfig& parserConfig, std::string_view flag, std::string_view value) -> void override;
     };
 
     class OptionGroup : public HasFlag<OptionGroup>, public OptionComponent<OptionGroup>{
@@ -213,7 +239,7 @@ namespace Argon {
     template <typename T>
     class Positional : public SetValueImpl<Positional<T>, T>,
                        public OptionComponent<Positional<T>>, public IsPositional {
-        auto setValue(const ParserConfig& config, std::string_view flag, std::string_view value) -> void override;
+        using SetValueImpl<Positional, T>::setValue;
     public:
         Positional() = default;
 
@@ -224,6 +250,8 @@ namespace Argon {
         Positional(T defaultValue, T *out);
 
         [[nodiscard]] auto cloneAsPositional() const -> std::unique_ptr<IsPositional> override;
+    protected:
+        auto setValue(const ParserConfig& parserConfig, std::string_view flag, std::string_view value) -> void override;
     };
 }
 
@@ -304,12 +332,15 @@ inline auto parseBool(const std::string_view arg, bool& out) -> bool {
 }
 
 template <typename T> requires is_numeric_char_type<T>
-auto parseNumericChar(const std::string_view arg, T& out) -> bool {
+auto parseNumericChar(const std::string_view arg, T& out, const CharMode charMode) -> bool {
+    if (charMode == CharMode::ExpectInteger) {
+        return parseIntegralType(arg, out);
+    }
     if (arg.length() == 1) {
         out = static_cast<T>(arg[0]);
         return true;
     }
-    return parseIntegralType(arg, out);
+    return false;
 }
 
 template <typename T> requires std::is_floating_point_v<T>
@@ -444,7 +475,7 @@ auto OptionComponent<Derived>::operator()(const std::string_view inputHint, cons
 }
 
 template <typename Derived, typename T>
-auto Converter<Derived, T>::generateErrorMsg(std::string_view optionName, std::string_view invalidArg) -> void {
+auto Converter<Derived, T>::generateErrorMsg(const ParserConfig&, std::string_view optionName, std::string_view invalidArg) -> void {
     // Generate custom error message if provided
     if (this->m_generate_error_msg_fn != nullptr) {
         this->m_conversionError = this->m_generate_error_msg_fn(optionName, invalidArg);
@@ -482,7 +513,7 @@ auto Converter<Derived, T>::generateErrorMsg(std::string_view optionName, std::s
 }
 
 template <typename Derived, typename T>
-auto Converter<Derived, T>::convert(const ParserConfig& config,
+auto Converter<Derived, T>::convert(const ParserConfig& parserConfig, const OptionConfig& optionConfig,
                                     const std::string_view flag, std::string_view value, T& outValue) -> void {
     m_conversionError.clear();
     bool success;
@@ -491,13 +522,14 @@ auto Converter<Derived, T>::convert(const ParserConfig& config,
         success = this->m_conversion_fn(value, outValue);
     }
     // Search for conversion list for conversion for this type if specified
-    else if (config.getDefaultConversions().contains(std::type_index(typeid(T)))) {
-        success = config.getDefaultConversions().at(std::type_index(typeid(T)))(value, static_cast<void*>(&outValue));
+    else if (parserConfig.getDefaultConversions().contains(std::type_index(typeid(T)))) {
+        success = parserConfig.getDefaultConversions().at(std::type_index(typeid(T)))(value, static_cast<void*>(&outValue));
     }
     // Fallback to generic parsing
     // Parse as a character
     else if constexpr (is_numeric_char_type<T>) {
-        success = parseNumericChar<T>(value, outValue);
+        success = parseNumericChar<T>(value, outValue,
+            optionConfig.charMode == CharMode::None ? parserConfig.getCharMode() : optionConfig.charMode);
     }
     // Parse as a floating point
     else if constexpr (std::is_floating_point_v<T>) {
@@ -524,7 +556,7 @@ auto Converter<Derived, T>::convert(const ParserConfig& config,
     }
     // Set error if not successful
     if (!success) {
-        generateErrorMsg(flag, value);
+        generateErrorMsg(parserConfig, flag, value);
     }
 }
 
@@ -579,9 +611,10 @@ auto SetValueImpl<Derived, T>::getValue() const -> const T& {
 }
 
 template<typename Derived, typename T>
-auto SetValueImpl<Derived, T>::setValue(const ParserConfig& config, std::string_view flag, std::string_view value) -> void {
+auto SetValueImpl<Derived, T>::setValue(const ParserConfig& parserConfig, const OptionConfig& optionConfig,
+                                        const std::string_view flag, std::string_view value) -> void {
     T temp;
-    this->convert(config, flag, value, temp);
+    this->convert(parserConfig, optionConfig, flag, value, temp);
     if (this->hasConversionError()) {
         return;
     }
@@ -591,18 +624,53 @@ auto SetValueImpl<Derived, T>::setValue(const ParserConfig& config, std::string_
     }
 }
 
-template<typename T>
-Option<T>::Option(T defaultValue) : SetValueImpl<Option, T>(defaultValue) {}
+template<typename T, typename Enable>
+Option<T, Enable>::Option(T defaultValue) : SetValueImpl<Option, T>(defaultValue) {}
+
+template<typename T, typename Enable>
+Option<T, Enable>::Option(T *out) : SetValueImpl<Option, T>(out) {}
+
+template<typename T, typename Enable>
+Option<T, Enable>::Option(T defaultValue, T *out) : SetValueImpl<Option, T>(defaultValue, out) {}
+
+template<typename T, typename Enable>
+void Option<T, Enable>::setValue(const ParserConfig& parserConfig, std::string_view flag, std::string_view value) {
+    SetValueImpl<Option, T>::setValue(parserConfig, {}, flag, value);
+    this->m_error = this->getConversionError();
+    this->m_isSet = true;
+}
+
+template<typename Derived>
+auto OptionCharBase<Derived>::getCharMode() const -> CharMode {
+    return m_charMode;
+}
+
+template<typename Derived>
+auto OptionCharBase<Derived>::setCharMode(const CharMode mode) & -> Derived& {
+    m_charMode = mode;
+    return *this;
+}
+
+template<typename Derived>
+auto OptionCharBase<Derived>::setCharMode(const CharMode mode) && -> Derived&& {
+    m_charMode = mode;
+    return static_cast<Derived&&>(*this);
+}
 
 template<typename T>
-Option<T>::Option(T *out) : SetValueImpl<Option, T>(out) {}
+Option<T, std::enable_if_t<is_numeric_char_type<T>>>::Option(T defaultValue) : SetValueImpl<Option, T>(defaultValue) {}
 
 template<typename T>
-Option<T>::Option(T defaultValue, T *out) : SetValueImpl<Option, T>(defaultValue, out) {}
+Option<T, std::enable_if_t<is_numeric_char_type<T>>>::Option(T *out) : SetValueImpl<Option, T>(out) {}
 
 template<typename T>
-void Option<T>::setValue(const ParserConfig& config, std::string_view flag, std::string_view value) {
-    SetValueImpl<Option, T>::setValue(config, flag, value);
+Option<T, std::enable_if_t<is_numeric_char_type<T>>>::Option(T defaultValue, T *out)
+    : SetValueImpl<Option, T>(defaultValue, out) {}
+
+template<typename T>
+void Option<T, std::enable_if_t<is_numeric_char_type<T>>>::setValue(const ParserConfig& parserConfig,
+                                                                    std::string_view flag, std::string_view value) {
+    SetValueImpl<Option, T>::setValue(parserConfig, { .charMode = this->m_charMode }, flag, value);
     this->m_error = this->getConversionError();
     this->m_isSet = true;
 }
@@ -704,8 +772,8 @@ auto OptionGroup::addOption(T&& option) -> void {
 }
 
 template<typename T>
-void Positional<T>::setValue(const ParserConfig& config, std::string_view flag, std::string_view value) {
-    SetValueImpl<Positional, T>::setValue(config, flag, value);
+void Positional<T>::setValue(const ParserConfig& parserConfig, std::string_view flag, std::string_view value) {
+    SetValueImpl<Positional, T>::setValue(parserConfig, {}, flag, value);
     this->m_error = this->getConversionError();
     this->m_isSet = true;
 }

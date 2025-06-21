@@ -1,19 +1,15 @@
 #ifndef ARGON_PARSER_INCLUDE
 #define ARGON_PARSER_INCLUDE
 
-#include <functional>
 #include <memory>
 #include <string>
-#include <typeindex>
-#include <typeinfo>
-#include <unordered_map>
 #include <variant>
 
 #include "Error.hpp"
 #include "Flag.hpp"
+#include "ParserConfig.hpp"
 #include "Scanner.hpp"
 #include "Traits.hpp"
-#include "catch2/internal/catch_windows_h_proxy.hpp"
 
 namespace Argon {
     class StatementAst;
@@ -26,28 +22,6 @@ namespace Argon {
     class IOption;
     class Context;
     class Constraints;
-
-    using DefaultConversionFn = std::function<bool(std::string_view, void*)>;
-    using DefaultConversions  = std::unordered_map<std::type_index, DefaultConversionFn>;
-
-    enum class CharMode {
-        ExpectAsciiOnly,
-        ExpectIntegerOnly,
-        ExpectAsciiOrInteger,
-    };
-
-    class ParserConfig {
-        DefaultConversions m_defaultConversions;
-        CharMode m_charMode = CharMode::ExpectAsciiOrInteger;
-
-    public:
-        [[nodiscard]] auto getCharMode() const -> CharMode;
-        auto setCharMode(CharMode newCharMode) -> ParserConfig&;
-
-        template <typename T>
-        auto registerConversionFn(std::function<bool(std::string_view, T*)>conversionFn) -> void;
-        [[nodiscard]] auto getDefaultConversions() const -> const DefaultConversions&;
-    };
 
     class Parser {
         std::unique_ptr<Context> m_context = std::make_unique<Context>();
@@ -625,27 +599,6 @@ inline auto Parser::skipScope() -> void {
 
 inline auto Parser::validateConstraints() -> void {
     m_constraints->validate(*m_context, m_constraintErrors);
-}
-
-inline auto ParserConfig::getCharMode() const -> CharMode {
-    return m_charMode;
-}
-
-inline auto ParserConfig::setCharMode(const CharMode newCharMode) -> ParserConfig& {
-    m_charMode = newCharMode;
-    return *this;
-}
-
-template<typename T>
-auto ParserConfig::registerConversionFn(std::function<bool(std::string_view, T *)> conversionFn) -> void {
-    auto wrapper = [conversionFn](std::string_view arg, void *out) -> bool {
-        return conversionFn(arg, static_cast<T*>(out));
-    };
-    m_defaultConversions[std::type_index(typeid(T))] = wrapper;
-}
-
-inline auto ParserConfig::getDefaultConversions() const -> const DefaultConversions& {
-    return m_defaultConversions;
 }
 
 template<typename Left, typename Right> requires

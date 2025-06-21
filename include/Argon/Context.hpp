@@ -251,7 +251,7 @@ inline auto Context::getPositional(const size_t position) const -> IsPositional 
 }
 
 template <typename T>
-auto Context::getOptionDynamic(std::string_view flag) -> T * {
+auto Context::getOptionDynamic(const std::string_view flag) -> T * {
     return dynamic_cast<T*>(getOption(flag));
 }
 
@@ -275,7 +275,7 @@ auto Context::getMultiValue(const FlagPath& flagPath) -> const Container& {
     return opt->getValue();
 }
 
-inline auto Context::setName(std::string_view name) -> void {
+inline auto Context::setName(const std::string_view name) -> void {
     m_name = name;
 }
 

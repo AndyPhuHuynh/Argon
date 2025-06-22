@@ -108,7 +108,7 @@ auto getRawPointer(const PtrVariant<T>& ptrVariant) -> T * {
     }, ptrVariant);
 }
 
-inline auto containsFlag(const OptionMap& map, const FlagPath& flag) -> const FlagPathWithAlias * {
+inline auto containsFlagPath(const OptionMap& map, const FlagPath& flag) -> const FlagPathWithAlias * {
     for (const auto& flagWithAlias : map | std::views::keys) {
         if (flagWithAlias == flag) return &flagWithAlias;
     }

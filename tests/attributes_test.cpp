@@ -17,39 +17,29 @@ TEST_CASE("Attributes test 1", "[attributes]") {
 }
 
 TEST_CASE("Attributes test 2", "[attributes]") {
-    auto parser = Option<int>()["-x"]["--x2"]
+    auto parser = Option<int>()[{"-x", "-x2"}]
                 | Option<int>()["-y"]
                 | Option<int>()["-z"]
                 | MultiOption<std::array<int, 3>>()["-w"]
                 | (
-                    OptionGroup()["-g"]["--group"]
+                    OptionGroup()[{"--group", "-g"}]
                     + Option<int>()["-a"]
                     + Option<int>()["-b"]
                     + Option<int>()["-c"]
                 );
 
     parser.constraints()
-        .require({"-x"})
-        // .mutuallyExclusive({"-x"}, {{"-y"}, {"-g", "-a"}})
-        .dependsOn({"-x"}, {{"-y"}, {"--group", "-a"}})
-        // .dependsOn({"-g", "-a"}, {{"-x"}, {"-y"}})
-    ;
-    // c.mutuallyExclusive("-x", {"-y", "-z"});
-    parser.parse("-x 10 -z 30 -w 1 2 3");
-    // parser.parse("-x 10");
-
-    // auto v = parser.getValue<float>(FlagPath{"--what", "--the", "--heck"});
-    // auto v = parser.getValue<float>(FlagPath{"--what"});
-
-    // const char *argv[] = {"argontest.exe", "-x", "10", "-y", "20", "-z", "30"};
-    // parser.parse(7, argv);
-
-    // const std::string input = "-x 10 -y 20 -g [-a 40 -b 50]";
-    // parser.parse(input);
-
-    // if (parser.hasErrors()) {
-    //     parser.printErrors(PrintMode::Flat);
-    // }
+        .require({"-x"}, "Flag 'X' is a required flag, this must be set otherwise the program fails")
+        .dependsOn({"-x"}, {{"-y"}, {"--group", "-a"}}, [](const std::vector<std::string>& args) {
+            std::string msg = "This flag REQUIRES the following flag to be set:";
+            for (const auto& arg : args) {
+                msg += " ";
+                msg += arg;
+            }
+            return msg;
+        });
+    parser.parse("-x 10 -y 2 -z 30 -w 1 2 3");
+    parser.printErrors();
 }
 
 TEST_CASE("Duplicate flags") {

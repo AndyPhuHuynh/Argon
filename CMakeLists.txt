@@ -16,6 +16,7 @@ set(INCLUDE_FILES
     ${CMAKE_SOURCE_DIR}/include/Argon/MultiOption.hpp
     ${CMAKE_SOURCE_DIR}/include/Argon/Option.hpp
     ${CMAKE_SOURCE_DIR}/include/Argon/Parser.hpp
+    ${CMAKE_SOURCE_DIR}/include/Argon/ParserConfig.hpp
     ${CMAKE_SOURCE_DIR}/include/Argon/Scanner.hpp
     ${CMAKE_SOURCE_DIR}/include/Argon/StringUtil.hpp
     ${CMAKE_SOURCE_DIR}/include/Argon/Traits.hpp

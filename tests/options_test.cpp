@@ -385,9 +385,9 @@ TEST_CASE("Parser getValue basic", "[options][getValue]") {
     const std::string input = "--name John --age 0x14 --gpa 5.5";
     parser.parse(input);
 
-    const auto& name    = parser.getValue<std::string>  ("--name");
-    const auto& age     = parser.getValue<int>          ("--age");
-    const auto& gpa     = parser.getValue<float>        ("--gpa");
+    const auto& name    = parser.getOptionValue<std::string>  ("--name");
+    const auto& age     = parser.getOptionValue<int>          ("--age");
+    const auto& gpa     = parser.getOptionValue<float>        ("--gpa");
 
     CHECK(name          == "John");
     CHECK(age           == 20);
@@ -412,10 +412,10 @@ TEST_CASE("Parser getValue nested", "[options][getValue][option-group]") {
     const std::string input = "--one 1 --g1 [--two 2 --g2 [--three 3 --g3 [--four 4]]]";
     parser.parse(input);
 
-    const auto& one      = parser.getValue<std::string>("--one");
-    const auto& two      = parser.getValue<std::string>(FlagPath{"--g1", "--two"});
-    const auto& three    = parser.getValue<std::string>(FlagPath{"--g1", "--g2", "--three"});
-    const auto& four     = parser.getValue<std::string>(FlagPath{"--g1", "--g2", "--g3", "--four"});
+    const auto& one      = parser.getOptionValue<std::string>("--one");
+    const auto& two      = parser.getOptionValue<std::string>(FlagPath{"--g1", "--two"});
+    const auto& three    = parser.getOptionValue<std::string>(FlagPath{"--g1", "--g2", "--three"});
+    const auto& four     = parser.getOptionValue<std::string>(FlagPath{"--g1", "--g2", "--g3", "--four"});
 
     CHECK(!parser.hasErrors());
 
@@ -497,9 +497,9 @@ TEST_CASE("Option default values", "[options][default-value]") {
                 | Option(5.5f)["-f"]
                 | Option<std::string>("hello world!")["-s"];
 
-    const int   i = parser.getValue<int>("-i");
-    const float f = parser.getValue<float>("-f");
-    const auto  s = parser.getValue<std::string>("-s");
+    const int   i = parser.getOptionValue<int>("-i");
+    const float f = parser.getOptionValue<float>("-f");
+    const auto  s = parser.getOptionValue<std::string>("-s");
 
     CHECK(!parser.hasErrors());
     CHECK(i == 5);
@@ -696,6 +696,84 @@ TEST_CASE("Positional args basic test", "[options][positional]") {
     CHECK(n2  == 20);
 }
 
+TEST_CASE("Positional getValue", "[options][positional]") {
+    auto parser = Positional('a')
+                | Positional(1)
+                | Positional(1.0f)
+                | Positional(1.0)
+                | Positional(std::string("Hello world!"))
+                | Option(1)["--integer"]
+                | Option(1.0f)["--float"]
+                | Option(1.0)["--double"];
+
+    SECTION("Default values") {
+        CHECK(!parser.hasErrors());
+        CHECK(parser.getPositionalValue<char, 0>()          == 'a');
+        CHECK(parser.getPositionalValue<int, 1>()           == 1);
+        CHECK(parser.getPositionalValue<float, 2>()         == Catch::Approx(1.0).epsilon(1e-6));
+        CHECK(parser.getPositionalValue<double, 3>()        == Catch::Approx(1.0).epsilon(1e-6));
+        CHECK(parser.getPositionalValue<std::string, 4>()   == "Hello world!");
+    }
+
+    SECTION("First three set") {
+        parser.parse("b 2 2.0");
+        CHECK(!parser.hasErrors());
+        CHECK(parser.getPositionalValue<char, 0>()          == 'b');
+        CHECK(parser.getPositionalValue<int, 1>()           == 2);
+        CHECK(parser.getPositionalValue<float, 2>()         == Catch::Approx(2.0).epsilon(1e-6));
+        CHECK(parser.getPositionalValue<double, 3>()        == Catch::Approx(1.0).epsilon(1e-6));
+        CHECK(parser.getPositionalValue<std::string, 4>()   == "Hello world!");
+    }
+
+    SECTION("All five set") {
+        parser.parse("b 2 2.0 2.0 Goodbye!");
+        CHECK(!parser.hasErrors());
+        CHECK(parser.getPositionalValue<char, 0>()          == 'b');
+        CHECK(parser.getPositionalValue<int, 1>()           == 2);
+        CHECK(parser.getPositionalValue<float, 2>()         == Catch::Approx(2.0).epsilon(1e-6));
+        CHECK(parser.getPositionalValue<double, 3>()        == Catch::Approx(2.0).epsilon(1e-6));
+        CHECK(parser.getPositionalValue<std::string, 4>()   == "Goodbye!");
+    }
+
+    SECTION("With normal options") {
+        parser.parse("c --integer 10 20 30.5 --double 2.5 --float 2.5 40.5 Hello!");
+        CHECK(!parser.hasErrors());
+        CHECK(parser.getPositionalValue<char, 0>()          == 'c');
+        CHECK(parser.getPositionalValue<int, 1>()           == 20);
+        CHECK(parser.getPositionalValue<float, 2>()         == Catch::Approx(30.5).epsilon(1e-6));
+        CHECK(parser.getPositionalValue<double, 3>()        == Catch::Approx(40.5).epsilon(1e-6));
+        CHECK(parser.getPositionalValue<std::string, 4>()   == "Hello!");
+        CHECK(parser.getOptionValue<int>("--integer")       == 10);
+        CHECK(parser.getOptionValue<float>("--float")       == 2.5);
+        CHECK(parser.getOptionValue<double>("--double")     == 2.5);
+    }
+}
+
+TEST_CASE("Positional getValue with groups", "[option-group][positional]") {
+    auto parser = Option<char>(123)["--num"].setCharMode(CharMode::ExpectInteger)
+                | Positional(123)
+                | (
+                    OptionGroup()["--group"]
+                    + Positional<char>('a')
+                    + Positional<int>(1)
+                    + Positional<float>(2.5)
+                    + (
+                        OptionGroup()["--nested"]
+                        + Positional<char>('a')
+                        + Positional<std::string>()
+                    )
+                );
+    parser.parse("--num 10 20 --group [b 30 --nested [c Hello!] 40.5]");
+    CHECK(!parser.hasErrors());
+    CHECK(parser.getOptionValue<char>("--num")                                          == 10);
+    CHECK(parser.getPositionalValue<int, 0>()                                           == 20);
+    CHECK(parser.getPositionalValue<char, 0>("--group")                                 == 'b');
+    CHECK(parser.getPositionalValue<int,  1>("--group")                                 == 30);
+    CHECK(parser.getPositionalValue<float,  2>("--group")                               == Catch::Approx(40.5).epsilon(1e-6));
+    CHECK(parser.getPositionalValue<char, 0>(FlagPath{"hello, world!"})                 == 'c');
+    CHECK(parser.getPositionalValue<std::string, 1>(FlagPath{"--group", "--nested"})    == "Hello!");
+}
+
 TEST_CASE("Ascii CharMode", "[options][char]") {
     using namespace Argon;
     char c; signed char sc; unsigned char uc;
@@ -725,9 +803,9 @@ TEST_CASE("Ascii CharMode", "[options][char]") {
 
 TEST_CASE("CharMode with MultiOption array", "[options][multi][char][array]") {
     using namespace Argon;
-    std::array<char, 3> chars;
-    std::array<signed char, 3> signedChars;
-    std::array<unsigned char, 3> unsignedChars;
+    std::array<char, 3> chars{};
+    std::array<signed char, 3> signedChars{};
+    std::array<unsigned char, 3> unsignedChars{};
 
     auto parser = MultiOption(&chars)["--chars"]
                 | MultiOption(&signedChars)["--signed"]

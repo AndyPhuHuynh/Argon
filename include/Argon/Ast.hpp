@@ -126,7 +126,7 @@ inline Argon::OptionAst::OptionAst(const Token& flagToken, const Token& valueTok
 }
 
 inline void Argon::OptionAst::analyze(Parser& parser, Context& context) {
-    IOption *iOption = context.getOption(flag.value);
+    IOption *iOption = context.getFlagOption(flag.value);
     if (!iOption) {
         parser.addError(std::format("Unknown option: '{}'", flag.value), flag.pos, ErrorType::Analysis_UnknownFlag);
         return;
@@ -153,7 +153,7 @@ inline void Argon::MultiOptionAst::addValue(const Token& value) {
 }
 
 inline void Argon::MultiOptionAst::analyze(Parser& parser, Context &context) {
-    IOption *iOption = context.getOption(flag.value);
+    IOption *iOption = context.getFlagOption(flag.value);
     if (!iOption) {
         parser.addError(std::format("Unknown multi-option: '{}'", flag.value), flag.pos, ErrorType::Analysis_UnknownFlag);
         return;
@@ -217,7 +217,7 @@ inline void Argon::OptionGroupAst::addOption(std::unique_ptr<PositionalAst> opti
 }
 
 inline void Argon::OptionGroupAst::analyze(Parser& parser, Context& context) {
-    IOption *iOption = context.getOption(flag.value);
+    IOption *iOption = context.getFlagOption(flag.value);
     if (!iOption) {
         parser.removeErrorGroup(flag.pos);
         parser.addError(std::format("Unknown option group: '{}'", flag.value), flag.pos, ErrorType::Analysis_UnknownFlag);

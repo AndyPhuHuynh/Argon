@@ -80,16 +80,34 @@ namespace Argon {
         auto operator|(T&& option) -> Parser&;
 
         template<typename ValueType>
-        auto getValue(std::string_view flag) -> const ValueType&;
+        auto getOptionValue(std::string_view flag) -> const ValueType&;
 
         template<typename ValueType>
-        auto getValue(const FlagPath& flagPath) -> const ValueType&;
+        auto getOptionValue(std::initializer_list<std::string_view> flagPath) -> const ValueType&;
+
+        template<typename ValueType>
+        auto getOptionValue(const FlagPath& flagPath) -> const ValueType&;
 
         template<typename Container>
         auto getMultiValue(std::string_view flag) -> const Container&;
 
         template<typename Container>
+        auto getMultiValue(std::initializer_list<std::string_view> flagPath) -> const Container&;
+
+        template<typename Container>
         auto getMultiValue(const FlagPath& flagPath) -> const Container&;
+
+        template <typename ValueType, size_t Pos>
+        auto getPositionalValue() const;
+
+        template <typename ValueType, size_t Pos>
+        auto getPositionalValue(std::string_view groupFlag) const;
+
+        template <typename ValueType, size_t Pos>
+        auto getPositionalValue(std::initializer_list<std::string_view> groupPath) const;
+
+        template <typename ValueType, size_t Pos>
+        auto getPositionalValue(const FlagPath& groupPath) const;
 
         auto getConfig() -> ParserConfig&;
 
@@ -265,7 +283,7 @@ inline auto Parser::parseOptionBundle(Context& context) -> // NOLINT(misc-no-rec
     if (std::holds_alternative<Token>(var)) {
         const auto& flagToken = std::get<Token>(var);
 
-        IOption *iOption = context.getOption(flagToken.image);
+        IOption *iOption = context.getFlagOption(flagToken.image);
         if (dynamic_cast<IsSingleOption *>(iOption)) {
             return parseSingleOption(context, flagToken);
         }
@@ -476,13 +494,18 @@ auto Parser::operator|(T&& option) -> Parser& {
 }
 
 template<typename ValueType>
-auto Parser::getValue(const std::string_view flag) -> const ValueType& {
-    return m_context->getValue<ValueType>(FlagPath(flag));
+auto Parser::getOptionValue(const std::string_view flag) -> const ValueType& {
+    return m_context->getOptionValue<ValueType>(FlagPath(flag));
 }
 
 template<typename ValueType>
-auto Parser::getValue(const FlagPath& flagPath) -> const ValueType& {
-    return m_context->getValue<ValueType>(flagPath);
+auto Parser::getOptionValue(std::initializer_list<std::string_view> flagPath) -> const ValueType& {
+    return m_context->getOptionValue<ValueType>(flagPath);
+}
+
+template<typename ValueType>
+auto Parser::getOptionValue(const FlagPath& flagPath) -> const ValueType& {
+    return m_context->getOptionValue<ValueType>(flagPath);
 }
 
 template<typename Container>
@@ -491,8 +514,33 @@ auto Parser::getMultiValue(const std::string_view flag) -> const Container& {
 }
 
 template<typename Container>
+auto Parser::getMultiValue(std::initializer_list<std::string_view> flagPath) -> const Container& {
+    return m_context->getMultiValue<Container>(flagPath);
+}
+
+template<typename Container>
 auto Parser::getMultiValue(const FlagPath& flagPath) -> const Container& {
     return m_context->getMultiValue<Container>(flagPath);
+}
+
+template<typename ValueType, size_t Pos>
+auto Parser::getPositionalValue() const {
+    return m_context->getPositionalValue<ValueType, Pos>();
+}
+
+template<typename ValueType, size_t Pos>
+auto Parser::getPositionalValue(const std::string_view groupFlag) const {
+    return m_context->getPositionalValue<ValueType, Pos>(FlagPath(groupFlag));
+}
+
+template<typename ValueType, size_t Pos>
+auto Parser::getPositionalValue(std::initializer_list<std::string_view> groupPath) const {
+    return m_context->getPositionalValue<ValueType, Pos>(groupPath);
+}
+
+template<typename ValueType, size_t Pos>
+auto Parser::getPositionalValue(const FlagPath& groupPath) const {
+    return m_context->getPositionalValue<ValueType, Pos>(groupPath);
 }
 
 inline auto Parser::getConfig() -> ParserConfig& {

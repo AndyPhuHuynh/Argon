@@ -230,10 +230,10 @@ namespace Argon {
     };
 
     class IsPositional {
-    public:
+    protected:
         IsPositional() = default;
+    public:
         virtual ~IsPositional() = default;
-
         [[nodiscard]] virtual auto cloneAsPositional() const -> std::unique_ptr<IsPositional> = 0;
     };
 
@@ -278,7 +278,6 @@ namespace Argon {
 //------------------------------------------------------Includes--------------------------------------------------------
 
 #include "Context.hpp" //NOLINT (unused include)
-#include "Parser.hpp"
 #include "StringUtil.hpp"
 
 //---------------------------------------------------Free Functions-----------------------------------------------------
@@ -838,7 +837,7 @@ auto Positional<T, std::enable_if_t<is_numeric_char_type<T>>>::setValue(const Pa
 }
 
 inline auto OptionGroup::getOption(std::string_view flag) -> IOption* { //NOLINT (function is not const)
-    return m_context->getOption(flag);
+    return m_context->getFlagOption(flag);
 }
 
 inline auto OptionGroup::getContext() -> Context& { //NOLINT (function is not const)

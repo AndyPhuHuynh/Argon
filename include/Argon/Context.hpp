@@ -41,9 +41,9 @@ namespace Argon {
         template <typename T> requires DerivesFrom<T, IOption>
         auto addOption(T&& option) -> void;
 
-        auto getOption(std::string_view flag) -> IOption *;
+        auto getFlagOption(std::string_view flag) -> IOption *;
 
-        auto getOption(const FlagPath& flagPath) -> IOption *;
+        auto getFlagOption(const FlagPath& flagPath) -> IOption *;
 
         [[nodiscard]] auto getPositional(size_t position) const -> IsPositional *;
 
@@ -59,10 +59,16 @@ namespace Argon {
         [[nodiscard]] auto getHelpMessage(size_t maxLineWidth = 120) const -> std::string;
 
         template<typename ValueType>
-        auto getValue(const FlagPath& flagPath) -> const ValueType&;
+        auto getOptionValue(const FlagPath& flagPath) -> const ValueType&;
 
         template<typename Container>
         auto getMultiValue(const FlagPath& flagPath) -> const Container&;
+
+        template <typename ValueType, size_t Pos>
+        auto getPositionalValue() -> const ValueType&;
+
+        template <typename ValueType, size_t Pos>
+        auto getPositionalValue(const FlagPath& groupPath) -> const ValueType&;
 
         auto collectAllSetOptions() -> OptionMap;
 
@@ -233,7 +239,7 @@ auto Context::addNonPositionalOption(T&& option) -> void {
     }
 }
 
-inline auto Context::getOption(const std::string_view flag) -> IOption * {
+inline auto Context::getFlagOption(const std::string_view flag) -> IOption * {
     const auto it = std::ranges::find_if(m_options, [&flag](const OptionPtr& option) {
         const auto optPtr = getRawPointer(option);
         if (!dynamic_cast<const IFlag*>(optPtr)) {
@@ -245,9 +251,9 @@ inline auto Context::getOption(const std::string_view flag) -> IOption * {
     return it == m_options.end() ? nullptr : getRawPointer(*it);
 }
 
-inline auto Context::getOption(const FlagPath& flagPath) -> IOption * {
+inline auto Context::getFlagOption(const FlagPath& flagPath) -> IOption * {
     auto& context = resolveFlagGroup(flagPath);
-    return context.getOption(flagPath.flag);
+    return context.getFlagOption(flagPath.flag);
 }
 
 inline auto Context::getPositional(const size_t position) const -> IsPositional * {
@@ -257,11 +263,11 @@ inline auto Context::getPositional(const size_t position) const -> IsPositional 
 
 template <typename T>
 auto Context::getOptionDynamic(const std::string_view flag) -> T * {
-    return dynamic_cast<T*>(getOption(flag));
+    return dynamic_cast<T*>(getFlagOption(flag));
 }
 
 template<typename ValueType>
-auto Context::getValue(const FlagPath& flagPath) -> const ValueType& {
+auto Context::getOptionValue(const FlagPath& flagPath) -> const ValueType& {
     auto& context = resolveFlagGroup(flagPath);
     const auto opt = context.getOptionDynamic<Option<ValueType>>(flagPath.flag);
     if (opt == nullptr) {
@@ -278,6 +284,33 @@ auto Context::getMultiValue(const FlagPath& flagPath) -> const Container& {
         throw InvalidFlagPathException(flagPath);
     }
     return opt->getValue();
+}
+
+template<typename ValueType, size_t Pos>
+auto Context::getPositionalValue() -> const ValueType& {
+    if (Pos >= m_positionals.size()) {
+        throw std::invalid_argument(std::format(
+            "Max positional is {}, attempted to get position {}",
+            m_positionals.size() - 1, Pos));
+    }
+    const auto ptr = dynamic_cast<Positional<ValueType>*>(getRawPointer(m_positionals[Pos]));
+    if (!ptr) {
+        throw std::invalid_argument(std::format("Positional at position {} is not of the specified type", Pos));
+    }
+    return ptr->getValue();
+}
+
+template<typename ValueType, size_t Pos>
+auto Context::getPositionalValue(const FlagPath& groupPath) -> const ValueType& {
+    const auto iOption = getFlagOption(groupPath);
+    if (iOption == nullptr) {
+        throw InvalidFlagPathException(groupPath);
+    }
+    const auto groupPtr = dynamic_cast<OptionGroup*>(iOption);
+    if (groupPtr == nullptr) {
+        throw std::invalid_argument(std::format("Given flag path is not an Option Group: {}", groupPath.getString()));
+    }
+    return groupPtr->getContext().getPositionalValue<ValueType, Pos>();
 }
 
 inline auto Context::setName(const std::string_view name) -> void {

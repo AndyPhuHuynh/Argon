@@ -770,7 +770,7 @@ TEST_CASE("Positional getValue with groups", "[option-group][positional]") {
     CHECK(parser.getPositionalValue<char, 0>("--group")                                 == 'b');
     CHECK(parser.getPositionalValue<int,  1>("--group")                                 == 30);
     CHECK(parser.getPositionalValue<float,  2>("--group")                               == Catch::Approx(40.5).epsilon(1e-6));
-    CHECK(parser.getPositionalValue<char, 0>(FlagPath{"hello, world!"})                 == 'c');
+    CHECK(parser.getPositionalValue<char, 0>(FlagPath{"--group", "--nested"})           == 'c');
     CHECK(parser.getPositionalValue<std::string, 1>(FlagPath{"--group", "--nested"})    == "Hello!");
 }
 

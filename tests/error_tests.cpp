@@ -892,3 +892,91 @@ TEST_CASE("Positional", "[positional][analysis][errors]") {
         CheckMessage(RequireMsg(analysisErrors.getErrors()[2]), {"400"}, 24, ErrorType::Analysis_UnexpectedToken);
     }
 }
+
+TEST_CASE("Positional policy", "[positional][errors]") {
+    using namespace Argon;
+    int input, output, input2, output2;
+    std::string name, home;
+
+    auto parser = Positional(10, &input)("Input", "Input count")
+                | Positional(20, &output)("Output", "Output count")
+                | Option<std::string>("Sally", &name)["--name1"]
+                | Option<std::string>("Sally", &name)["--name2"]
+                | Option<std::string>("Sally", &name)["--name3"]
+                | (
+                    OptionGroup()["--group"]
+                    + Positional(30, &input2)("Input2", "Input2 count")
+                    + Positional(40, &output2)("Output2", "Output2 count")
+                    + Option<std::string>("Street", &home)["--home"]
+                );
+
+    SECTION("Before flags test 1") {
+        parser.getConfig().setPositionalPolicy(PositionalPolicy::BeforeFlags);
+        parser.parse("--name1 John 100 --name2 Sammy 200 --name3 Joshua 300 Sam");
+        parser.printErrors();
+        CHECK(parser.hasErrors());
+        const auto& syntaxErrors = CheckGroup(parser.getSyntaxErrors(), "Syntax Errors", -1, -1, 4);
+        CheckMessage(RequireMsg(syntaxErrors.getErrors()[0]), {"--name1", "100"}, 13, ErrorType::Syntax_MisplacedPositional);
+        CheckMessage(RequireMsg(syntaxErrors.getErrors()[1]), {"--name2", "200"}, 31, ErrorType::Syntax_MisplacedPositional);
+        CheckMessage(RequireMsg(syntaxErrors.getErrors()[2]), {"--name3", "300"}, 50, ErrorType::Syntax_MisplacedPositional);
+        CheckMessage(RequireMsg(syntaxErrors.getErrors()[3]), {"--name3", "Sam"}, 54, ErrorType::Syntax_MisplacedPositional);
+    }
+
+    SECTION("Before flags test 2") {
+        parser.getConfig().setPositionalPolicy(PositionalPolicy::BeforeFlags);
+        parser.parse("100 --name1 John --name2 Sammy 200 300 Sam --name3 Joshua");
+        parser.printErrors();
+        CHECK(parser.hasErrors());
+        const auto& syntaxErrors = CheckGroup(parser.getSyntaxErrors(), "Syntax Errors", -1, -1, 3);
+        CheckMessage(RequireMsg(syntaxErrors.getErrors()[1]), {"--name2", "200"}, 31, ErrorType::Syntax_MisplacedPositional);
+        CheckMessage(RequireMsg(syntaxErrors.getErrors()[2]), {"--name2", "300"}, 35, ErrorType::Syntax_MisplacedPositional);
+        CheckMessage(RequireMsg(syntaxErrors.getErrors()[3]), {"--name2", "Sam"}, 39, ErrorType::Syntax_MisplacedPositional);
+    }
+
+    // SECTION("After flags no syntax errors") {
+    //     parser.getConfig().setPositionalPolicy(PositionalPolicy::AfterFlags);
+    //     parser.parse("--name John 100 200 300 Sam");
+    //     CHECK(!parser.getSyntaxErrors().hasErrors());
+    //     CHECK(parser.hasErrors());
+    // }
+    //
+    // SECTION("After flags test 1") {
+    //     parser.getConfig().setPositionalPolicy(PositionalPolicy::AfterFlags);
+    //     parser.parse("100 --name John 200 300 Sam");
+    //     CHECK(parser.hasErrors());
+    //     const auto& syntaxErrors = CheckGroup(parser.getSyntaxErrors(), "Syntax Errors", -1, -1, 1);
+    //     CheckMessage(RequireMsg(syntaxErrors.getErrors()[0]), {"--name"}, 0, ErrorType::Syntax_MisplacedPositional);
+    // }
+    //
+    // SECTION("After flags test 2") {
+    //     parser.getConfig().setPositionalPolicy(PositionalPolicy::AfterFlags);
+    //     parser.parse("100 200 --name John 300 Sam");
+    //     CHECK(parser.hasErrors());
+    //     const auto& syntaxErrors = CheckGroup(parser.getSyntaxErrors(), "Syntax Errors", -1, -1, 2);
+    //     CheckMessage(RequireMsg(syntaxErrors.getErrors()[0]), {"--name"}, 0, ErrorType::Syntax_MisplacedPositional);
+    //     CheckMessage(RequireMsg(syntaxErrors.getErrors()[1]), {"--name"}, 4, ErrorType::Syntax_MisplacedPositional);
+    // }
+    //
+    // SECTION("After flags test 3") {
+    //     parser.getConfig().setPositionalPolicy(PositionalPolicy::AfterFlags);
+    //     parser.parse("100 200 300 --name John Sam --flag2 value2");
+    //     parser.printErrors();
+    //     CHECK(parser.hasErrors());
+    //     const auto& syntaxErrors = CheckGroup(parser.getSyntaxErrors(), "Syntax Errors", -1, -1, 3);
+    //     CheckMessage(RequireMsg(syntaxErrors.getErrors()[0]), {"--name"}, 0, ErrorType::Syntax_MisplacedPositional);
+    //     CheckMessage(RequireMsg(syntaxErrors.getErrors()[0]), {"--name"}, 4, ErrorType::Syntax_MisplacedPositional);
+    //     CheckMessage(RequireMsg(syntaxErrors.getErrors()[0]), {"--name"}, 8, ErrorType::Syntax_MisplacedPositional);
+    // }
+
+    // SECTION("After flags test 4") {
+    //     parser.getConfig().setPositionalPolicy(PositionalPolicy::AfterFlags);
+    //     parser.parse("100 200 300 Sam --name John");
+    //     parser.printErrors();
+    //     CHECK(parser.hasErrors());
+    //     const auto& syntaxErrors = CheckGroup(parser.getSyntaxErrors(), "Syntax Errors", -1, -1, 4);
+    //     CheckMessage(RequireMsg(syntaxErrors.getErrors()[0]), {"--name"}, 0,  ErrorType::Syntax_MisplacedPositional);
+    //     CheckMessage(RequireMsg(syntaxErrors.getErrors()[0]), {"--name"}, 4,  ErrorType::Syntax_MisplacedPositional);
+    //     CheckMessage(RequireMsg(syntaxErrors.getErrors()[0]), {"--name"}, 8,  ErrorType::Syntax_MisplacedPositional);
+    //     CheckMessage(RequireMsg(syntaxErrors.getErrors()[0]), {"--name"}, 12, ErrorType::Syntax_MisplacedPositional);
+    // }
+}

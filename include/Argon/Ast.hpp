@@ -5,6 +5,7 @@
 #include <string>
 #include <vector>
 
+#include "ParserConfig.hpp"
 #include "Scanner.hpp"
 
 namespace Argon {
@@ -98,6 +99,7 @@ namespace Argon {
 
         void addOption(std::unique_ptr<OptionBaseAst> option);
         void addOption(std::unique_ptr<PositionalAst> option);
+        void checkPositionals(Parser& parser, const Context& context) const;
         void analyze(Parser& parser, Context& context) override;
     private:
         std::vector<std::unique_ptr<OptionBaseAst>> m_options;
@@ -128,19 +130,19 @@ inline Argon::OptionAst::OptionAst(const Token& flagToken, const Token& valueTok
 inline void Argon::OptionAst::analyze(Parser& parser, Context& context) {
     IOption *iOption = context.getFlagOption(flag.value);
     if (!iOption) {
-        parser.addError(std::format("Unknown option: '{}'", flag.value), flag.pos, ErrorType::Analysis_UnknownFlag);
+        parser.addAnalysisError(std::format("Unknown option: '{}'", flag.value), flag.pos, ErrorType::Analysis_UnknownFlag);
         return;
     }
 
     auto *setValue = dynamic_cast<ISetValue*>(iOption);
     if (!setValue || !dynamic_cast<IsSingleOption*>(iOption)) {
-        parser.addError(std::format("Flag '{}' is not an option", flag.value), flag.pos, ErrorType::Analysis_IncorrectOptionType);
+        parser.addAnalysisError(std::format("Flag '{}' is not an option", flag.value), flag.pos, ErrorType::Analysis_IncorrectOptionType);
         return;
     }
 
     setValue->setValue(parser.getConfig(), flag.value, value.value);
     if (iOption->hasError()) {
-        parser.addError(iOption->getError(), value.pos, ErrorType::Analysis_ConversionError);
+        parser.addAnalysisError(iOption->getError(), value.pos, ErrorType::Analysis_ConversionError);
     }
 }
 
@@ -155,13 +157,13 @@ inline void Argon::MultiOptionAst::addValue(const Token& value) {
 inline void Argon::MultiOptionAst::analyze(Parser& parser, Context &context) {
     IOption *iOption = context.getFlagOption(flag.value);
     if (!iOption) {
-        parser.addError(std::format("Unknown multi-option: '{}'", flag.value), flag.pos, ErrorType::Analysis_UnknownFlag);
+        parser.addAnalysisError(std::format("Unknown multi-option: '{}'", flag.value), flag.pos, ErrorType::Analysis_UnknownFlag);
         return;
     }
 
     auto *setValue = dynamic_cast<ISetValue*>(iOption);
     if (!setValue || !dynamic_cast<IsMultiOption*>(iOption)) {
-        parser.addError(std::format("Flag '{}' is not a multi-option", flag.value),
+        parser.addAnalysisError(std::format("Flag '{}' is not a multi-option", flag.value),
             flag.pos, ErrorType::Analysis_IncorrectOptionType);
         return;
     }
@@ -169,7 +171,7 @@ inline void Argon::MultiOptionAst::analyze(Parser& parser, Context &context) {
     for (const auto&[value, pos] : m_values) {
         setValue->setValue(parser.getConfig(), flag.value, value);
         if (iOption->hasError()) {
-            parser.addError(iOption->getError(), pos, ErrorType::Analysis_ConversionError);
+            parser.addAnalysisError(iOption->getError(), pos, ErrorType::Analysis_ConversionError);
         }
     }
 }
@@ -183,7 +185,7 @@ inline Argon::PositionalAst::PositionalAst(const Token& flagToken) {
 inline void Argon::PositionalAst::analyze(Parser& parser, const Context& context, const size_t position) {
     IsPositional *opt = context.getPositional(position);
     if (!opt) {
-        parser.addError(std::format("Unexpected token: '{}'", value.value), value.pos, ErrorType::Analysis_UnexpectedToken);
+        parser.addAnalysisError(std::format("Unexpected token: '{}'", value.value), value.pos, ErrorType::Analysis_UnexpectedToken);
         return;
     }
 
@@ -193,7 +195,7 @@ inline void Argon::PositionalAst::analyze(Parser& parser, const Context& context
 
     setValue->setValue(parser.getConfig(), iOption->getInputHint(), value.value);
     if (iOption->hasError()) {
-        parser.addError(iOption->getError(), value.pos, ErrorType::Analysis_ConversionError);
+        parser.addAnalysisError(iOption->getError(), value.pos, ErrorType::Analysis_ConversionError);
     }
 }
 
@@ -220,14 +222,14 @@ inline void Argon::OptionGroupAst::analyze(Parser& parser, Context& context) {
     IOption *iOption = context.getFlagOption(flag.value);
     if (!iOption) {
         parser.removeErrorGroup(flag.pos);
-        parser.addError(std::format("Unknown option group: '{}'", flag.value), flag.pos, ErrorType::Analysis_UnknownFlag);
+        parser.addAnalysisError(std::format("Unknown option group: '{}'", flag.value), flag.pos, ErrorType::Analysis_UnknownFlag);
         return;
     }
 
     const auto optionGroup = dynamic_cast<OptionGroup*>(iOption);
     if (!optionGroup) {
         parser.removeErrorGroup(flag.pos);
-        parser.addError(std::format("Flag '{}' is not an option group", flag.value),
+        parser.addAnalysisError(std::format("Flag '{}' is not an option group", flag.value),
             flag.pos, ErrorType::Analysis_IncorrectOptionType);
         return;
     }
@@ -256,6 +258,50 @@ inline void Argon::StatementAst::addOption(std::unique_ptr<PositionalAst> option
         return;
     }
     m_positionals.push_back(std::move(option));
+}
+
+inline void Argon::StatementAst::checkPositionals(Parser& parser, const Context& context) const {
+    const auto policy =
+        context.getPositionalPolicy() != PositionalPolicy::None ?
+        context.getPositionalPolicy() : parser.getConfig().getPositionalPolicy();
+    switch (policy) {
+        case PositionalPolicy::None:
+            throw std::invalid_argument("Cannot validate PositionPolicy::None");
+        case PositionalPolicy::Interleaved:
+            break;
+        case PositionalPolicy::BeforeFlags: {
+            if (m_options.empty() || m_positionals.empty()) break;
+            size_t flagIndex = 0;
+            for (const auto& positional : m_positionals) {
+                while (flagIndex < m_options.size() && m_options[flagIndex]->flag.pos < positional->value.pos) {
+                    flagIndex++;
+                }
+                if (flagIndex > m_options.size()) break;
+                if (flagIndex == 0) continue;
+                parser.addSyntaxError(std::format(
+                    "Found positional value '{}' after flag '{}'. Positional values must occur before all flags.",
+                    positional->value.value, m_options[flagIndex - 1]->flag.value),
+                    positional->value.pos, ErrorType::Syntax_MisplacedPositional);
+            }
+            break;
+        }
+        case PositionalPolicy::AfterFlags: {
+            if (m_options.empty() || m_positionals.empty()) break;
+            size_t flagIndex = 0;
+            for (const auto& positional : m_positionals) {
+                while (flagIndex < m_options.size() && m_options[flagIndex]->flag.pos > positional->value.pos) {
+                    flagIndex++;
+                }
+                if (flagIndex > m_options.size()) break;
+                if (flagIndex == 0) continue;
+                parser.addSyntaxError(std::format(
+                    "Found positional value '{}' before flag '{}'. Positional values must occur after all flags.",
+                    positional->value.value, m_options[flagIndex - 1]->flag.value),
+                    positional->value.pos, ErrorType::Syntax_MisplacedPositional);
+                break;
+            }
+        }
+    }
 }
 
 inline void Argon::StatementAst::analyze(Parser& parser, Context& context) {

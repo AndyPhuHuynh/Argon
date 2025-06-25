@@ -117,8 +117,6 @@ namespace Argon {
     template<typename T> requires (!is_numeric_char_type<T>)
     class MultiOption<std::vector<T>> : public MultiOptionVectorBase<MultiOption<std::vector<T>>, T> {
         using ISetValue::setValue;
-        std::vector<T> m_values;
-        std::vector<T>* m_out = nullptr;
     public:
         MultiOption() = default;
 
@@ -138,8 +136,6 @@ namespace Argon {
         : public MultiOptionVectorBase<MultiOption<std::vector<T>>, T>,
           public OptionCharBase<MultiOption<std::vector<T>>> {
         using ISetValue::setValue;
-        std::vector<T> m_values;
-        std::vector<T>* m_out = nullptr;
     public:
         MultiOption() = default;
 
@@ -325,11 +321,7 @@ MultiOption<std::vector<T>>::MultiOption(std::vector<T>* out)
 
 template<typename T> requires (!is_numeric_char_type<T>)
 MultiOption<std::vector<T>>::MultiOption(const std::vector<T>& defaultValue, std::vector<T> *out)
-    : MultiOptionVectorBase<MultiOption, T>(defaultValue, out) {
-    if (m_out != nullptr) {
-        *m_out = m_values;
-    }
-}
+    : MultiOptionVectorBase<MultiOption, T>(defaultValue, out) {}
 
 template <typename T> requires (!is_numeric_char_type<T>)
 void MultiOption<std::vector<T>>::setValue(const ParserConfig& parserConfig,
@@ -349,11 +341,7 @@ MultiOption<std::vector<T>>::MultiOption(std::vector<T>* out)
 
 template<typename T> requires is_numeric_char_type<T>
 MultiOption<std::vector<T>>::MultiOption(const std::vector<T>& defaultValue, std::vector<T> *out)
-    : MultiOptionVectorBase<MultiOption, T>(defaultValue, out) {
-    if (m_out != nullptr) {
-        *m_out = m_values;
-    }
-}
+    : MultiOptionVectorBase<MultiOption, T>(defaultValue, out) {}
 
 template <typename T> requires is_numeric_char_type<T>
 void MultiOption<std::vector<T>>::setValue(const ParserConfig& parserConfig,

@@ -56,9 +56,11 @@ namespace Argon {
         template<typename T> requires DerivesFrom<T, IOption>
         auto addOption(T&& option) -> void;
 
-        auto addError(std::string_view error, int pos, ErrorType type) -> void;
+        auto addSyntaxError(std::string_view error, int pos, ErrorType type) -> void;
 
-        auto addErrorGroup(std::string_view groupName, int startPos, int endPos) -> void;
+        auto addAnalysisError(std::string_view error, int pos, ErrorType type) -> void;
+
+        auto addAnalysisErrorGroup(std::string_view groupName, int startPos, int endPos) -> void;
 
         auto removeErrorGroup(int startPos) -> void;
 
@@ -111,6 +113,8 @@ namespace Argon {
 
         auto getConfig() -> ParserConfig&;
 
+        auto getConfig() const -> const ParserConfig&;
+
         auto constraints() const -> Constraints&;
 
         auto setDefaultPrefixes(std::string_view shortPrefix, std::string_view longPrefix);
@@ -133,10 +137,10 @@ namespace Argon {
 
         auto parseOptionGroup(Context& context, const Token& flag) -> std::unique_ptr<OptionGroupAst>;
 
-        auto getNextValidFlag(const Context& context, bool printErrors = true) -> std::variant<std::monostate,
-            Token, std::unique_ptr<PositionalAst>>;
+        auto getNextValidFlag(Context& context, bool printErrors = true) ->
+            std::variant<std::monostate, Token, std::unique_ptr<PositionalAst>>;
 
-        auto skipToNextValidFlag(const Context& context) -> void;
+        auto skipToNextValidFlag(Context& context) -> void;
 
         auto getNextToken() -> Token;
 
@@ -178,11 +182,15 @@ inline auto Parser::operator=(const Parser& other) -> Parser& {
     return *this;
 }
 
-inline auto Parser::addError(const std::string_view error, const int pos, const ErrorType type) -> void {
+inline auto Parser::addSyntaxError(const std::string_view error, const int pos, const ErrorType type) -> void {
+    m_syntaxErrors.addErrorMessage(error, pos, type);
+}
+
+inline auto Parser::addAnalysisError(const std::string_view error, const int pos, const ErrorType type) -> void {
     m_analysisErrors.addErrorMessage(error, pos, type);
 }
 
-inline auto Parser::addErrorGroup(const std::string_view groupName, const int startPos, const int endPos) -> void {
+inline auto Parser::addAnalysisErrorGroup(const std::string_view groupName, const int startPos, const int endPos) -> void {
     m_analysisErrors.addErrorGroup(groupName, startPos, endPos);
 }
 
@@ -250,6 +258,7 @@ inline auto Parser::parse(const std::string_view str) -> bool {
     reset();
     m_scanner = Scanner(str);
     StatementAst ast = parseStatement();
+    ast.checkPositionals(*this, *m_context);
     if (m_syntaxErrors.hasErrors()) {
         return false;
     }
@@ -414,16 +423,31 @@ inline auto Parser::parseOptionGroup(Context& context, const Token& flag) -> std
     return optionGroupAst;
 }
 
-inline auto Parser::getNextValidFlag(const Context& context, const bool printErrors) ->
+inline auto Parser::getNextValidFlag(Context& context, const bool printErrors) ->
     std::variant<std::monostate, Token, std::unique_ptr<PositionalAst>> {
     Token flag = m_scanner.peekToken();
 
     const bool isIdentifier     = flag.kind == TokenKind::IDENTIFIER;
     const bool hasFlagPrefix    = flag.image.starts_with(m_shortPrefix) || flag.image.starts_with(m_longPrefix);
     const bool inContext        = context.containsLocalFlag(flag.image);
+    const bool isPositional     = isIdentifier && !hasFlagPrefix;
+
+    // auto positionalPolicy = context.getPositionalPolicy();
+    // if (positionalPolicy == PositionalPolicy::None) positionalPolicy = m_config.getPositionalPolicy();
+    //
+    // if (positionalPolicy == PositionalPolicy::BeforeFlags && isPositional && context.getFirstFlagEncountered()) {
+    //     m_syntaxErrors.addErrorMessage(std::format(
+    //         "Found positional argument '{}' after flag, positional arguments must be placed before all flags", flag.image),
+    //         flag.position, ErrorType::Syntax_MisplacedPositional);
+    // }
+    // if (positionalPolicy == PositionalPolicy::AfterFlags && hasFlagPrefix && context.getFirstPositionalEncountered()) {
+    //     m_syntaxErrors.addErrorMessage(std::format(
+    //         "Found flag '{}' after positional argument, positional arguments must be placed after all flags", flag.image),
+    //         flag.position, ErrorType::Syntax_MisplacedPositional);
+    // }
 
     // Is a positional arg
-    if (isIdentifier && !hasFlagPrefix) {
+    if (isPositional) {
         getNextToken();
         return std::make_unique<PositionalAst>(flag);
     }
@@ -480,7 +504,7 @@ inline auto Parser::getNextValidFlag(const Context& context, const bool printErr
     }
 }
 
-inline auto Parser::skipToNextValidFlag(const Context& context) -> void {
+inline auto Parser::skipToNextValidFlag(Context& context) -> void {
     getNextValidFlag(context, false);
     if (m_scanner.peekToken().kind != TokenKind::END) {
         rewindScanner(1);
@@ -544,6 +568,10 @@ auto Parser::getPositionalValue(const FlagPath& groupPath) const {
 }
 
 inline auto Parser::getConfig() -> ParserConfig& {
+    return m_config;
+}
+
+inline auto Parser::getConfig() const -> const ParserConfig& {
     return m_config;
 }
 

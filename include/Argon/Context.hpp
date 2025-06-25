@@ -11,6 +11,7 @@
 #include <vector>
 
 #include "Flag.hpp"
+#include "ParserConfig.hpp"
 #include "Traits.hpp"
 
 namespace Argon {
@@ -28,6 +29,8 @@ namespace Argon {
         std::vector<PositionalPtr> m_positionals;
         std::string m_name;
         Context *m_parent = nullptr;
+
+        PositionalPolicy m_positionalPolicy = PositionalPolicy::None;
     public:
         Context() = default;
         explicit Context(std::string name);
@@ -76,6 +79,8 @@ namespace Argon {
 
         auto applyPrefixes(std::string_view shortPrefix, std::string_view longPrefix) -> void;
 
+        [[nodiscard]] auto getPositionalPolicy() const -> PositionalPolicy;
+        auto setPositional(PositionalPolicy newPolicy) -> void;
     private:
         template <typename T> requires DerivesFrom<T, IsPositional>
         auto addPositionalOption(T&& option) -> void;
@@ -544,6 +549,14 @@ inline auto Context::applyPrefixes(const std::string_view shortPrefix,  // NOLIN
             groupPtr->getContext().applyPrefixes(shortPrefix, longPrefix);
         }
     }
+}
+
+inline auto Context::getPositionalPolicy() const -> PositionalPolicy {
+    return m_positionalPolicy;
+}
+
+inline auto Context::setPositional(const PositionalPolicy newPolicy) -> void {
+    m_positionalPolicy = newPolicy;
 }
 
 inline auto Context::collectAllFlags() const -> std::vector<const Flag*> {

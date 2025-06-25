@@ -15,13 +15,26 @@ namespace Argon {
         ExpectInteger,
     };
 
+    enum class PositionalPolicy {
+        None = 0,
+        Interleaved,
+        BeforeFlags,
+        AfterFlags,
+    };
+
     class ParserConfig {
         DefaultConversions m_defaultConversions;
-        CharMode m_defaultCharMode = CharMode::ExpectAscii;
+        CharMode m_defaultCharMode;
+        PositionalPolicy m_positionalPolicy;
 
     public:
+        ParserConfig();
+
         [[nodiscard]] auto getCharMode() const -> CharMode;
         auto setCharMode(CharMode newCharMode) -> ParserConfig&;
+
+        [[nodiscard]] auto getPositionalPolicy() const -> PositionalPolicy;
+        auto setPositionalPolicy(PositionalPolicy newPolicy) -> ParserConfig&;
 
         template <typename T>
         auto registerConversionFn(std::function<bool(std::string_view, T*)>conversionFn) -> void;
@@ -33,9 +46,13 @@ namespace Argon {
     };
 }
 
-// --------------------------------------------- Implementations -------------------------------------------------------
+//---------------------------------------------------Implementations----------------------------------------------------
 
 namespace Argon {
+inline ParserConfig::ParserConfig() {
+    m_defaultCharMode = CharMode::ExpectAscii;
+    m_positionalPolicy = PositionalPolicy::Interleaved;
+}
 
 inline auto ParserConfig::getCharMode() const -> CharMode {
     return m_defaultCharMode;
@@ -46,6 +63,18 @@ inline auto ParserConfig::setCharMode(const CharMode newCharMode) -> ParserConfi
         throw std::invalid_argument("Default char mode cannot be none");
     }
     m_defaultCharMode = newCharMode;
+    return *this;
+}
+
+inline auto ParserConfig::getPositionalPolicy() const -> PositionalPolicy {
+    return m_positionalPolicy;
+}
+
+inline auto ParserConfig::setPositionalPolicy(const PositionalPolicy newPolicy) -> ParserConfig& {
+    if (newPolicy == PositionalPolicy::None) {
+        throw std::invalid_argument("Default positional policy cannot be none");
+    }
+    m_positionalPolicy = newPolicy;
     return *this;
 }
 

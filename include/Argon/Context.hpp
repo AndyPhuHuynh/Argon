@@ -133,8 +133,9 @@ inline auto containsFlagPath(const OptionMap& map, const FlagPath& flag) -> cons
 #include <iomanip>
 #include <set>
 
-#include "Options/Option.hpp"
-#include "Options/MultiOption.hpp"
+#include "Argon/Options/Option.hpp"
+#include "Argon/Options/MultiOption.hpp"
+#include "Argon/Options/Positional.hpp"
 
 namespace Argon {
 

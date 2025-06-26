@@ -150,8 +150,15 @@ protected:
         }
 
         const CharMode charMode = optionConfig.charMode == CharMode::UseDefault ? parserConfig.getCharMode() : optionConfig.charMode;
-        if (is_numeric_char_type<T> && charMode == CharMode::ExpectAscii) {
-            ss << "expected ASCII character";
+        if constexpr (is_numeric_char_type<T>) {
+            if (charMode == CharMode::ExpectAscii) {
+                ss << "expected ASCII character";
+            } else {
+                ss << std::format(
+                    "expected integer between {} and {}",
+                    format_with_commas(std::numeric_limits<T>::min()),
+                    format_with_commas(std::numeric_limits<T>::max()));
+            }
         } else if constexpr (is_non_bool_integral<T>) {
             ss << std::format(
                 "expected integer between {} and {}",

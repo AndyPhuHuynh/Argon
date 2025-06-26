@@ -1,11 +1,7 @@
 ﻿#ifndef ARGON_OPTION_INCLUDE
 #define ARGON_OPTION_INCLUDE
 
-#include <charconv>
-#include <cstdlib>
-#include <functional>
 #include <memory>
-#include <string>
 
 #include "Argon/Flag.hpp"
 #include "Argon/Options/OptionCharBase.hpp"
@@ -76,60 +72,14 @@ namespace Argon {
 
         [[nodiscard]] auto getContext() const -> const Context&;
     };
-
-    class IsPositional {
-    protected:
-        IsPositional() = default;
-    public:
-        virtual ~IsPositional() = default;
-        [[nodiscard]] virtual auto cloneAsPositional() const -> std::unique_ptr<IsPositional> = 0;
-    };
-
-    template <typename T, typename Enable = void>
-    class Positional : public SetSingleValueImpl<Positional<T, Enable>, T>,
-                       public OptionComponent<Positional<T, Enable>>, public IsPositional {
-        using SetSingleValueImpl<Positional, T>::setValue;
-    public:
-        Positional() = default;
-
-        explicit Positional(T defaultValue);
-
-        explicit Positional(T *out);
-
-        Positional(T defaultValue, T *out);
-
-        [[nodiscard]] auto cloneAsPositional() const -> std::unique_ptr<IsPositional> override;
-    protected:
-        auto setValue(const ParserConfig& parserConfig, std::string_view flag, std::string_view value) -> void override;
-    };
-
-    template <typename T>
-    class Positional<T, std::enable_if_t<is_numeric_char_type<T>>>
-        : public SetSingleValueImpl<Positional<T>, T>, public OptionComponent<Positional<T>>,
-          public IsPositional, public OptionCharBase<Positional<T>> {
-        using SetSingleValueImpl<Positional, T>::setValue;
-    public:
-        Positional() = default;
-
-        explicit Positional(T defaultValue);
-
-        explicit Positional(T *out);
-
-        Positional(T defaultValue, T *out);
-
-        [[nodiscard]] auto cloneAsPositional() const -> std::unique_ptr<IsPositional> override;
-    protected:
-        auto setValue(const ParserConfig& parserConfig, std::string_view flag, std::string_view value) -> void override;
-    };
 }
 
 //------------------------------------------------------Includes--------------------------------------------------------
 
 #include "Argon/Context.hpp"
+#include "Argon/Parser.hpp"
 
 //---------------------------------------------------Implementations----------------------------------------------------
-
-#include "Argon/Parser.hpp"
 
 namespace Argon {
 
@@ -201,52 +151,6 @@ auto OptionGroup::operator+(T&& other) && -> OptionGroup {
 template<typename T> requires DerivesFrom<T, IOption>
 auto OptionGroup::addOption(T&& option) -> void {
     m_context->addOption(std::forward<T>(option));
-}
-
-template<typename T, typename Enable>
-void Positional<T, Enable>::setValue(const ParserConfig& parserConfig, std::string_view flag, std::string_view value) {
-    SetSingleValueImpl<Positional, T>::setValue(parserConfig, {}, flag, value);
-    this->m_error = this->getConversionError();
-    this->m_isSet = true;
-}
-
-template<typename T, typename Enable>
-Positional<T, Enable>::Positional(T defaultValue) : SetSingleValueImpl<Positional, T>(defaultValue) {}
-
-template<typename T, typename Enable>
-Positional<T, Enable>::Positional(T *out) : SetSingleValueImpl<Positional, T>(out) {}
-
-template<typename T, typename Enable>
-Positional<T, Enable>::Positional(T defaultValue, T *out) : SetSingleValueImpl<Positional, T>(defaultValue, out) {}
-
-template<typename T, typename Enable>
-auto Positional<T, Enable>::cloneAsPositional() const -> std::unique_ptr<IsPositional> {
-    return std::make_unique<Positional>(*this);
-}
-
-template<typename T>
-Positional<T, std::enable_if_t<is_numeric_char_type<T>>>::Positional(T defaultValue)
-    : SetSingleValueImpl<Positional, T>(defaultValue) {}
-
-template<typename T>
-Positional<T, std::enable_if_t<is_numeric_char_type<T>>>::Positional(T *out)
-    : SetSingleValueImpl<Positional, T>(out) {}
-
-template<typename T>
-Positional<T, std::enable_if_t<is_numeric_char_type<T>>>::Positional(T defaultValue, T *out)
-    : SetSingleValueImpl<Positional, T>(defaultValue, out) {}
-
-template<typename T>
-auto Positional<T, std::enable_if_t<is_numeric_char_type<T>>>::cloneAsPositional() const -> std::unique_ptr<IsPositional> {
-    return std::make_unique<Positional>(*this);
-}
-
-template<typename T>
-auto Positional<T, std::enable_if_t<is_numeric_char_type<T>>>::setValue(const ParserConfig& parserConfig,
-    std::string_view flag, std::string_view value) -> void {
-    SetSingleValueImpl<Positional, T>::setValue(parserConfig, { .charMode = this->m_charMode }, flag, value);
-    this->m_error = this->getConversionError();
-    this->m_isSet = true;
 }
 
 inline auto OptionGroup::getOption(std::string_view flag) -> IOption* { //NOLINT (function is not const)

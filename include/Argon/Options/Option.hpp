@@ -1,8 +1,6 @@
 ﻿#ifndef ARGON_OPTION_INCLUDE
 #define ARGON_OPTION_INCLUDE
 
-#include <memory>
-
 #include "Argon/Flag.hpp"
 #include "Argon/Options/OptionCharBase.hpp"
 #include "Argon/Options/OptionComponent.hpp"

@@ -41,7 +41,7 @@ public:
 //---------------------------------------------------Implementations----------------------------------------------------
 
 
-#include "Argon/Context.hpp"
+#include "Argon/Context.hpp" // NOLINT (misc-unused-include)
 
 namespace Argon {
 inline OptionGroup::OptionGroup() {

@@ -1,11 +1,9 @@
-﻿#include "../cmake-build-debug-msvc/_deps/catch2-src/src/catch2/matchers/catch_matchers_string.hpp"
-#include "Argon/Error.hpp"
-#include "../include/Argon/Options/Option.hpp"
+﻿#include "Argon/Error.hpp"
+#include "Argon/Options/Option.hpp"
 #include "Argon/Parser.hpp"
+
 #include "catch2/catch_test_macros.hpp"
-#include "catch2/matchers/catch_matchers.hpp"
 #include "catch2/matchers/catch_matchers_string.hpp"
-#include "catch2/matchers/catch_matchers_vector.hpp"
 
 inline auto RequireMsg(const Argon::ErrorVariant& var) {
     REQUIRE(std::holds_alternative<Argon::ErrorMessage>(var));
@@ -913,7 +911,6 @@ TEST_CASE("Positional policy", "[positional][errors]") {
     SECTION("Before flags test 1") {
         parser.getConfig().setPositionalPolicy(PositionalPolicy::BeforeFlags);
         parser.parse("--name1 John 100 --name2 Sammy 200 --name3 Joshua 300 Sam");
-        parser.printErrors();
         CHECK(parser.hasErrors());
         const auto& syntaxErrors = CheckGroup(parser.getSyntaxErrors(), "Syntax Errors", -1, -1, 4);
         CheckMessage(RequireMsg(syntaxErrors.getErrors()[0]), {"--name1", "100"}, 13, ErrorType::Syntax_MisplacedPositional);
@@ -925,12 +922,31 @@ TEST_CASE("Positional policy", "[positional][errors]") {
     SECTION("Before flags test 2") {
         parser.getConfig().setPositionalPolicy(PositionalPolicy::BeforeFlags);
         parser.parse("100 --name1 John --name2 Sammy 200 300 Sam --name3 Joshua");
-        parser.printErrors();
         CHECK(parser.hasErrors());
         const auto& syntaxErrors = CheckGroup(parser.getSyntaxErrors(), "Syntax Errors", -1, -1, 3);
         CheckMessage(RequireMsg(syntaxErrors.getErrors()[0]), {"--name2", "200"}, 31, ErrorType::Syntax_MisplacedPositional);
         CheckMessage(RequireMsg(syntaxErrors.getErrors()[1]), {"--name2", "300"}, 35, ErrorType::Syntax_MisplacedPositional);
         CheckMessage(RequireMsg(syntaxErrors.getErrors()[2]), {"--name2", "Sam"}, 39, ErrorType::Syntax_MisplacedPositional);
+    }
+
+    SECTION("Before flags test 3") {
+        parser.getConfig().setPositionalPolicy(PositionalPolicy::BeforeFlags);
+        parser.parse("100 200 --name2 Sammy Sam --name3 Joshua 300");
+        CHECK(parser.hasErrors());
+        const auto& syntaxErrors = CheckGroup(parser.getSyntaxErrors(), "Syntax Errors", -1, -1, 2);
+        CheckMessage(RequireMsg(syntaxErrors.getErrors()[0]), {"--name2", "Sam"}, 22, ErrorType::Syntax_MisplacedPositional);
+        CheckMessage(RequireMsg(syntaxErrors.getErrors()[1]), {"--name3", "300"}, 41, ErrorType::Syntax_MisplacedPositional);
+    }
+
+    SECTION("Before flags no errors") {
+        parser.getConfig().setPositionalPolicy(PositionalPolicy::BeforeFlags);
+        parser.parse("100 200 --name1 John --name2 Sammy --name3 Joshua ");
+        CHECK(!parser.hasErrors());
+        CHECK(parser.getOptionValue<std::string>("--name1") == "John");
+        CHECK(parser.getOptionValue<std::string>("--name2") == "Sammy");
+        CHECK(parser.getOptionValue<std::string>("--name3") == "Joshua");
+        CHECK(parser.getPositionalValue<int, 0>() == 100);
+        CHECK(parser.getPositionalValue<int, 1>() == 200);
     }
 
     // SECTION("After flags no syntax errors") {

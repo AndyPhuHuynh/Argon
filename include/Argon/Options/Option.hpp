@@ -11,159 +11,36 @@
 #include "Argon/Traits.hpp"
 
 namespace Argon {
-    class IOption;
-    template <typename T, typename Enable> class Option;
-    class OptionGroup;
-    class Context;
-    class Parser;
-    class ParserConfig;
+class IsSingleOption {};
 
-    class IsSingleOption {};
+template <typename T>
+class Option
+    : public IsSingleOption,
+      public HasFlag<Option<T>>,
+      public SetSingleValueImpl<Option<T>, T>,
+      public OptionComponent<Option<T>>,
+      public std::conditional_t<is_numeric_char_type<T>, OptionCharBase<Option<T>>, EmptyBase> {
+    using SetSingleValueImpl<Option, T>::setValue;
+public:
+    Option() = default;
 
-    template <typename T, typename Enable = void>
-    class Option : public HasFlag<Option<T, Enable>>, public SetSingleValueImpl<Option<T, Enable>, T>,
-                   public OptionComponent<Option<T, Enable>>, public IsSingleOption {
-        using SetSingleValueImpl<Option, T>::setValue;
-    public:
-        Option() = default;
-        explicit Option(T defaultValue);
-        explicit Option(T *out);
-        Option(T defaultValue, T *out);
-    protected:
-        auto setValue(const ParserConfig& parserConfig, std::string_view flag, std::string_view value) -> void override;
-    };
+    explicit Option(T defaultValue) : SetSingleValueImpl<Option, T>(defaultValue) {}
 
-    template <typename T>
-    class Option<T, std::enable_if_t<is_numeric_char_type<T>>>
-        : public HasFlag<Option<T>>, public SetSingleValueImpl<Option<T>, T>,
-          public OptionComponent<Option<T>>, public IsSingleOption, public OptionCharBase<Option<T>> {
-        using SetSingleValueImpl<Option, T>::setValue;
-    public:
-        Option() = default;
-        explicit Option(T defaultValue);
-        explicit Option(T *out);
-        Option(T defaultValue, T *out);
-    protected:
-        auto setValue(const ParserConfig& parserConfig, std::string_view flag, std::string_view value) -> void override;
-    };
+    explicit Option(T *out) : SetSingleValueImpl<Option, T>(out) {};
 
-    class OptionGroup : public HasFlag<OptionGroup>, public OptionComponent<OptionGroup>{
-        std::unique_ptr<Context> m_context;
-    public:
-        OptionGroup();
-        OptionGroup(const OptionGroup&);
-        auto operator=(const OptionGroup&) -> OptionGroup&;
-
-        OptionGroup(OptionGroup&&) = default;
-        auto operator=(OptionGroup&&) -> OptionGroup& = default;
-
-        template <typename T> requires DerivesFrom<T, IOption>
-        auto operator+(T&& other) & -> OptionGroup&;
-
-        template <typename T> requires DerivesFrom<T, IOption>
-        auto operator+(T&& other) && -> OptionGroup;
-
-        template <typename T> requires DerivesFrom<T, IOption>
-        auto addOption(T&& option) -> void;
-
-        auto getOption(std::string_view flag) -> IOption *;
-
-        auto getContext() -> Context&;
-
-        [[nodiscard]] auto getContext() const -> const Context&;
-    };
-}
-
-//------------------------------------------------------Includes--------------------------------------------------------
-
-#include "Argon/Context.hpp"
-#include "Argon/Parser.hpp"
-
-//---------------------------------------------------Implementations----------------------------------------------------
-
-namespace Argon {
-
-template<typename T, typename Enable>
-Option<T, Enable>::Option(T defaultValue) : SetSingleValueImpl<Option, T>(defaultValue) {}
-
-template<typename T, typename Enable>
-Option<T, Enable>::Option(T *out) : SetSingleValueImpl<Option, T>(out) {}
-
-template<typename T, typename Enable>
-Option<T, Enable>::Option(T defaultValue, T *out) : SetSingleValueImpl<Option, T>(defaultValue, out) {}
-
-template<typename T, typename Enable>
-void Option<T, Enable>::setValue(const ParserConfig& parserConfig, std::string_view flag, std::string_view value) {
-    SetSingleValueImpl<Option, T>::setValue(parserConfig, {}, flag, value);
-    this->m_error = this->getConversionError();
-    this->m_isSet = true;
-}
-
-template<typename T>
-Option<T, std::enable_if_t<is_numeric_char_type<T>>>::Option(T defaultValue) : SetSingleValueImpl<Option, T>(defaultValue) {}
-
-template<typename T>
-Option<T, std::enable_if_t<is_numeric_char_type<T>>>::Option(T *out) : SetSingleValueImpl<Option, T>(out) {}
-
-template<typename T>
-Option<T, std::enable_if_t<is_numeric_char_type<T>>>::Option(T defaultValue, T *out)
-    : SetSingleValueImpl<Option, T>(defaultValue, out) {}
-
-template<typename T>
-void Option<T, std::enable_if_t<is_numeric_char_type<T>>>::setValue(const ParserConfig& parserConfig,
-                                                                    std::string_view flag, std::string_view value) {
-    SetSingleValueImpl<Option, T>::setValue(parserConfig, { .charMode = this->m_charMode }, flag, value);
-    this->m_error = this->getConversionError();
-    this->m_isSet = true;
-}
-
-inline OptionGroup::OptionGroup() {
-    m_context = std::make_unique<Context>();
-}
-
-inline OptionGroup::OptionGroup(const OptionGroup &other)
-    : HasFlag(other), OptionComponent(other) {
-    m_context = std::make_unique<Context>(*other.m_context);
-}
-
-inline auto OptionGroup::operator=(const OptionGroup& other) -> OptionGroup& {
-    if (this == &other) {
-        return *this;
+    Option(T defaultValue, T *out) : SetSingleValueImpl<Option, T>(defaultValue, out) {};
+protected:
+    auto setValue(const ParserConfig& parserConfig, std::string_view flag, std::string_view value) -> void override {
+        OptionConfig optionConfig;
+        if constexpr (is_numeric_char_type<T>) {
+            optionConfig.charMode = this->m_charMode;
+        }
+        SetSingleValueImpl<Option, T>::setValue(parserConfig, optionConfig, flag, value);
+        this->m_error = this->getConversionError();
+        this->m_isSet = true;
     }
-    HasFlag::operator=(other);
-    OptionComponent::operator=(other);
-    m_context = std::make_unique<Context>(*other.m_context);
-    return *this;
-}
+};
 
-template<typename T> requires DerivesFrom<T, IOption>
-auto OptionGroup::operator+(T&& other) & -> OptionGroup& {
-    m_context->addOption(std::forward<T>(other));
-    return *this;
-}
-
-template <typename T> requires DerivesFrom<T, IOption>
-auto OptionGroup::operator+(T&& other) && -> OptionGroup {
-    m_context->addOption(std::forward<T>(other));
-    return *this;
-}
-
-template<typename T> requires DerivesFrom<T, IOption>
-auto OptionGroup::addOption(T&& option) -> void {
-    m_context->addOption(std::forward<T>(option));
-}
-
-inline auto OptionGroup::getOption(std::string_view flag) -> IOption* { //NOLINT (function is not const)
-    return m_context->getFlagOption(flag);
-}
-
-inline auto OptionGroup::getContext() -> Context& { //NOLINT (function is not const)
-    return *m_context;
-}
-
-inline auto OptionGroup::getContext() const -> const Context & {
-    return *m_context;
-}
 } // End namespace Argon
 
 #endif // ARGON_OPTION_INCLUDE

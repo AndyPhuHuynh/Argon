@@ -30,7 +30,7 @@ namespace Argon {
         std::string m_name;
         Context *m_parent = nullptr;
 
-        PositionalPolicy m_positionalPolicy = PositionalPolicy::None;
+        PositionalPolicy m_positionalPolicy = PositionalPolicy::UseDefault;
     public:
         Context() = default;
         explicit Context(std::string name);
@@ -133,8 +133,8 @@ inline auto containsFlagPath(const OptionMap& map, const FlagPath& flag) -> cons
 #include <iomanip>
 #include <set>
 
-#include "Option.hpp" // NOLINT (misc-unused-include)
-#include "MultiOption.hpp"
+#include "Options/Option.hpp"
+#include "Options/MultiOption.hpp"
 
 namespace Argon {
 

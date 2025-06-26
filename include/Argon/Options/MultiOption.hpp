@@ -1,7 +1,10 @@
 #ifndef ARGON_MULTIOPTION_INCLUDE
 #define ARGON_MULTIOPTION_INCLUDE
 
-#include "Option.hpp" // NOLINT (misc-unused-include)
+#include "Argon/Flag.hpp"
+#include "Argon/Options/OptionCharBase.hpp"
+#include "Argon/Options/OptionComponent.hpp"
+#include "Argon/Options/SetValue.hpp"
 
 // Template Specializations
 
@@ -51,29 +54,12 @@ namespace Argon {
                       std::string_view flag, std::string_view value) -> void override;
     };
 
-    // MultiOption with std::array<T, N> where T is not a char type
+    // MultiOption with std::array<T, N>
 
-    template<typename T, size_t N> requires (!is_numeric_char_type<T>)
-    class MultiOption<std::array<T, N>> : public MultiOptionArrayBase<MultiOption<std::array<T, N>>, T, N> {
-        using ISetValue::setValue;
-    public:
-        MultiOption() = default;
-
-        explicit MultiOption(const std::array<T, N>& defaultValue);
-
-        explicit MultiOption(std::array<T, N> *out);
-
-        MultiOption(const std::array<T, N>& defaultValue, const std::array<T, N> *out);
-
-        auto setValue(const ParserConfig& parserConfig, std::string_view flag, std::string_view value) -> void override;
-    };
-
-    // MultiOption with std::array<T, N> where T is a char type
-
-    template<typename T, size_t N> requires is_numeric_char_type<T>
+    template<typename T, size_t N>
     class MultiOption<std::array<T, N>>
         : public MultiOptionArrayBase<MultiOption<std::array<T, N>>, T, N>,
-          public OptionCharBase<MultiOption<std::array<T, N>>> {
+          public std::conditional_t<is_numeric_char_type<T>, OptionCharBase<MultiOption<std::array<T, N>>>, EmptyBase> {
         using ISetValue::setValue;
     public:
         MultiOption() = default;
@@ -112,29 +98,12 @@ namespace Argon {
                       std::string_view flag, std::string_view value) -> void override;
     };
 
-    // MultiOption with std::vector (where T is not numeric char)
+    // MultiOption with std::vector
 
-    template<typename T> requires (!is_numeric_char_type<T>)
-    class MultiOption<std::vector<T>> : public MultiOptionVectorBase<MultiOption<std::vector<T>>, T> {
-        using ISetValue::setValue;
-    public:
-        MultiOption() = default;
-
-        explicit MultiOption(const std::vector<T>& defaultValue);
-
-        explicit MultiOption(std::vector<T> *out);
-
-        MultiOption(const std::vector<T>& defaultValue, std::vector<T> *out);
-
-        auto setValue(const ParserConfig& parserConfig, std::string_view flag, std::string_view value) -> void override;
-    };
-
-    // MultiOption with std::vector (where T is numeric char)
-
-    template<typename T> requires is_numeric_char_type<T>
+    template<typename T>
     class MultiOption<std::vector<T>>
         : public MultiOptionVectorBase<MultiOption<std::vector<T>>, T>,
-          public OptionCharBase<MultiOption<std::vector<T>>> {
+          public std::conditional_t<is_numeric_char_type<T>, OptionCharBase<MultiOption<std::vector<T>>>,EmptyBase> {
         using ISetValue::setValue;
     public:
         MultiOption() = default;
@@ -229,42 +198,28 @@ auto MultiOptionArrayBase<Derived, T, N>::setValue(const ParserConfig& parserCon
     this->m_isSet = true;
 }
 
-// MultiOption with std::array (T is not numeric char)
+// MultiOption with std::array
 
-template<typename T, size_t N> requires (!is_numeric_char_type<T>)
+template<typename T, size_t N>
 MultiOption<std::array<T, N>>::MultiOption(const std::array<T, N>& defaultValue)
     : MultiOptionArrayBase<MultiOption, T, N>(defaultValue) {}
 
-template<typename T, size_t N> requires (!is_numeric_char_type<T>)
+template<typename T, size_t N>
 MultiOption<std::array<T, N>>::MultiOption(std::array<T, N> *out)
     : MultiOptionArrayBase<MultiOption, T, N>(out) {}
 
-template<typename T, size_t N> requires (!is_numeric_char_type<T>)
+template<typename T, size_t N>
 MultiOption<std::array<T, N>>::MultiOption(const std::array<T, N>& defaultValue, const std::array<T, N> *out)
     : MultiOptionArrayBase<MultiOption, T, N>(defaultValue, out) {}
 
-template<typename T, size_t N> requires (!is_numeric_char_type<T>)
+template<typename T, size_t N>
 auto MultiOption<std::array<T, N>>::setValue(const ParserConfig& parserConfig, std::string_view flag, std::string_view value) -> void {
-    MultiOptionArrayBase<MultiOption, T, N>::setValue(parserConfig, {}, flag, value);
-}
-
-// MultiOption with std::array (T is numeric char)
-
-template<typename T, size_t N> requires is_numeric_char_type<T>
-MultiOption<std::array<T, N>>::MultiOption(const std::array<T, N>& defaultValue)
-        : MultiOptionArrayBase<MultiOption, T, N>(defaultValue) {}
-
-template<typename T, size_t N> requires is_numeric_char_type<T>
-MultiOption<std::array<T, N>>::MultiOption(std::array<T, N> *out)
-        : MultiOptionArrayBase<MultiOption, T, N>(out) {}
-
-template<typename T, size_t N> requires is_numeric_char_type<T>
-MultiOption<std::array<T, N>>::MultiOption(const std::array<T, N>& defaultValue, const std::array<T, N> *out)
-        : MultiOptionArrayBase<MultiOption, T, N>(defaultValue, out) {}
-
-template<typename T, size_t N> requires is_numeric_char_type<T>
-auto MultiOption<std::array<T, N>>::setValue(const ParserConfig& parserConfig, std::string_view flag, std::string_view value) -> void {
-    MultiOptionArrayBase<MultiOption, T, N>::setValue(parserConfig, { .charMode = this->m_charMode }, flag, value);
+    OptionConfig optionConfig;
+    if constexpr (is_numeric_char_type<T>) {
+        optionConfig.charMode = this->m_charMode;
+    }
+    MultiOptionArrayBase<MultiOption, T, N>::setValue(parserConfig, optionConfig, flag, value);
+    this->m_isSet = true;
 }
 
 // MultiOptionVectorBase
@@ -311,42 +266,27 @@ auto MultiOptionVectorBase<Derived, T>::setValue(const ParserConfig& parserConfi
 
 // MultiOption with std::vector<T> (where T is a numeric char)
 
-template<typename T> requires (!is_numeric_char_type<T>)
+template<typename T>
 MultiOption<std::vector<T>>::MultiOption(const std::vector<T>& defaultValue)
     : MultiOptionVectorBase<MultiOption, T>(defaultValue) {}
 
-template <typename T> requires (!is_numeric_char_type<T>)
+template <typename T>
 MultiOption<std::vector<T>>::MultiOption(std::vector<T>* out)
     : MultiOptionVectorBase<MultiOption, T>(out) {}
 
-template<typename T> requires (!is_numeric_char_type<T>)
+template<typename T>
 MultiOption<std::vector<T>>::MultiOption(const std::vector<T>& defaultValue, std::vector<T> *out)
     : MultiOptionVectorBase<MultiOption, T>(defaultValue, out) {}
 
-template <typename T> requires (!is_numeric_char_type<T>)
+template <typename T>
 void MultiOption<std::vector<T>>::setValue(const ParserConfig& parserConfig,
     const std::string_view flag, const std::string_view value) {
-setValue(parserConfig, {}, flag, value);
-}
-
-// MultiOption with std::vector<T> (where T is a numeric char)
-
-template<typename T> requires is_numeric_char_type<T>
-MultiOption<std::vector<T>>::MultiOption(const std::vector<T>& defaultValue)
-    : MultiOptionVectorBase<MultiOption, T>(defaultValue) {}
-
-template <typename T> requires is_numeric_char_type<T>
-MultiOption<std::vector<T>>::MultiOption(std::vector<T>* out)
-    : MultiOptionVectorBase<MultiOption, T>(out) {}
-
-template<typename T> requires is_numeric_char_type<T>
-MultiOption<std::vector<T>>::MultiOption(const std::vector<T>& defaultValue, std::vector<T> *out)
-    : MultiOptionVectorBase<MultiOption, T>(defaultValue, out) {}
-
-template <typename T> requires is_numeric_char_type<T>
-void MultiOption<std::vector<T>>::setValue(const ParserConfig& parserConfig,
-    const std::string_view flag, const std::string_view value) {
-    setValue(parserConfig, { .charMode = this->m_charMode }, flag, value);
+    OptionConfig optionConfig;
+    if constexpr (is_numeric_char_type<T>) {
+        optionConfig.charMode = this->m_charMode;
+    }
+    MultiOptionVectorBase<MultiOption, T>::setValue(parserConfig, optionConfig, flag, value);
+    this->m_isSet = true;
 }
 
 } // End namespace Argon

@@ -10,13 +10,13 @@ namespace Argon {
     using DefaultConversions  = std::unordered_map<std::type_index, DefaultConversionFn>;
 
     enum class CharMode {
-        None = 0,
+        UseDefault = 0,
         ExpectAscii,
         ExpectInteger,
     };
 
     enum class PositionalPolicy {
-        None = 0,
+        UseDefault = 0,
         Interleaved,
         BeforeFlags,
         AfterFlags,
@@ -42,7 +42,7 @@ namespace Argon {
     };
 
     struct OptionConfig {
-        CharMode charMode = CharMode::None;
+        CharMode charMode = CharMode::UseDefault;
     };
 }
 
@@ -59,8 +59,8 @@ inline auto ParserConfig::getCharMode() const -> CharMode {
 }
 
 inline auto ParserConfig::setCharMode(const CharMode newCharMode) -> ParserConfig& {
-    if (newCharMode == CharMode::None) {
-        throw std::invalid_argument("Default char mode cannot be none");
+    if (newCharMode == CharMode::UseDefault) {
+        throw std::invalid_argument("Default char mode cannot be UseDefault");
     }
     m_defaultCharMode = newCharMode;
     return *this;
@@ -71,8 +71,8 @@ inline auto ParserConfig::getPositionalPolicy() const -> PositionalPolicy {
 }
 
 inline auto ParserConfig::setPositionalPolicy(const PositionalPolicy newPolicy) -> ParserConfig& {
-    if (newPolicy == PositionalPolicy::None) {
-        throw std::invalid_argument("Default positional policy cannot be none");
+    if (newPolicy == PositionalPolicy::UseDefault) {
+        throw std::invalid_argument("Default positional policy cannot be UseDefault");
     }
     m_positionalPolicy = newPolicy;
     return *this;

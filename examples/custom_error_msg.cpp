@@ -2,7 +2,7 @@
 
 #include <iostream>
 
-#include "Argon/Option.hpp"
+#include "../include/Argon/Options/Option.hpp"
 #include "Argon/Parser.hpp"
 
 int main() {
@@ -11,7 +11,7 @@ int main() {
         int age = 0;
     };
 
-    auto studentConversionFn = [](const std::string& str, Student& out) -> bool {
+    auto studentConversionFn = [](const std::string_view str, Student& out) -> bool {
         if (str == "1") {
             out = { .name = "Josh", .age = 1 };
             return true;
@@ -22,13 +22,15 @@ int main() {
         return false;
     };
 
-    auto studentErrorFn = [](const std::string& flag, const std::string& invalidArg) -> std::string {
+    auto studentErrorFn = [](const std::string_view flag, const std::string_view invalidArg) -> std::string {
         return std::format("Invalid value for flag '{}': expected either '1' or '2', got '{}'", flag, invalidArg);
     };
 
     Student student1, student2;
-    auto parser = Argon::Option<Student>(&student1, studentConversionFn, studentErrorFn)["--first"]
-                | Argon::Option<Student>(&student2, studentConversionFn, studentErrorFn)["--second"];
+    auto parser = Argon::Option(&student1)["--first"]
+                    .withConversionFn(studentConversionFn).withErrorMsgFn(studentErrorFn)
+                | Argon::Option(&student2)["--second"]
+                    .withConversionFn(studentConversionFn).withErrorMsgFn(studentErrorFn);
 
     const std::string input = "--first 1 --second 3";
     parser.parse(input);

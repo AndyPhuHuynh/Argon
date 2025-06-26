@@ -3,6 +3,7 @@
 
 #include <algorithm>
 #include <numeric>
+#include <sstream>
 #include <stdexcept>
 #include <string>
 #include <utility>
@@ -65,6 +66,37 @@ class InvalidFlagPathException : public std::runtime_error {
 public:
     explicit InvalidFlagPathException(const FlagPath& flagPath);
 };
+
+class IFlag {
+protected:
+    Flag m_flag;
+public:
+    IFlag() = default;
+    ~IFlag() = default;
+
+    IFlag(const IFlag&) = default;
+    IFlag& operator=(const IFlag&) = default;
+
+    IFlag(IFlag&&) = default;
+    IFlag& operator=(IFlag&&) = default;
+
+    [[nodiscard]] auto getFlag() const -> const Flag&;
+
+    auto applyPrefixes(std::string_view shortPrefix, std::string_view longPrefix) -> void;
+};
+
+template <typename Derived>
+class HasFlag : public IFlag{
+    auto applySetFlag(std::string_view flag) -> void;
+    auto applySetFlag(std::initializer_list<std::string_view> flags) -> void;
+public:
+    auto operator[](std::string_view flag) & -> Derived&;
+    auto operator[](std::string_view flag) && -> Derived;
+
+    auto operator[](std::initializer_list<std::string_view> flags) & -> Derived&;
+    auto operator[](std::initializer_list<std::string_view> flags) && -> Derived;
+};
+
 } // End namespace Argon
 
 //-------------------------------------------------------Hashes---------------------------------------------------------
@@ -232,6 +264,61 @@ inline InvalidFlagPathException::InvalidFlagPathException(const FlagPath& flagPa
         "Invalid flag path: {}. Check to see if the specified path and templated type are correct.",
         flagPath.getString())) {
 }
+
+inline auto IFlag::getFlag() const -> const Flag& {
+    return m_flag;
+}
+
+inline auto IFlag::applyPrefixes(const std::string_view shortPrefix, const std::string_view longPrefix) -> void {
+    m_flag.applyPrefixes(shortPrefix, longPrefix);
+}
+
+template<typename Derived>
+auto HasFlag<Derived>::applySetFlag(std::string_view flag) -> void {
+    if (flag.empty()) {
+        throw std::invalid_argument("Flag has to be at least one character long");
+    }
+    if (m_flag.mainFlag.empty()) {
+        m_flag.mainFlag = flag;
+    } else {
+        m_flag.aliases.emplace_back(flag);
+    }
+}
+
+template<typename Derived>
+auto HasFlag<Derived>::applySetFlag(const std::initializer_list<std::string_view> flags) -> void {
+    if (flags.size() <= 0) {
+        throw std::invalid_argument("Operator [] expects at least one flag");
+    }
+    for (const auto& flag : flags) {
+        applySetFlag(flag);
+    }
+}
+
+template <typename Derived>
+auto HasFlag<Derived>::operator[](const std::string_view flag) & -> Derived& {
+    applySetFlag(flag);
+    return static_cast<Derived&>(*this);
+}
+
+template<typename Derived>
+auto HasFlag<Derived>::operator[](const std::string_view flag) && -> Derived {
+    applySetFlag(flag);
+    return static_cast<Derived&>(*this);
+}
+
+template<typename Derived>
+auto HasFlag<Derived>::operator[](const std::initializer_list<std::string_view> flags) & -> Derived& {
+    applySetFlag(flags);
+    return static_cast<Derived&>(*this);
+}
+
+template<typename Derived>
+auto HasFlag<Derived>::operator[](const std::initializer_list<std::string_view> flags) && -> Derived {
+    applySetFlag(flags);
+    return static_cast<Derived&>(*this);
+}
+
 
 } // End namespace Argon
 

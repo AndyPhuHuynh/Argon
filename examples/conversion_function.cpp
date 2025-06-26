@@ -2,7 +2,7 @@
 
 #include <iostream>
 
-#include "Argon/Option.hpp"
+#include "../include/Argon/Options/Option.hpp"
 #include "Argon/Parser.hpp"
 
 int main() {
@@ -11,7 +11,7 @@ int main() {
         int age = 0;
     };
 
-    auto studentConversionFn = [](const std::string& str, Student& out) -> bool {
+    auto studentConversionFn = [](const std::string_view str, Student& out) -> bool {
         if (str == "1") {
             out = { .name = "Josh", .age = 1 };
             return true;
@@ -23,8 +23,8 @@ int main() {
     };
 
     Student student1, student2;
-    auto parser = Argon::Option<Student>(&student1, studentConversionFn)["--first"]
-                | Argon::Option<Student>(&student2, studentConversionFn)["--second"];
+    auto parser = Argon::Option(&student1)["--first"].withConversionFn(studentConversionFn)
+                | Argon::Option(&student2)["--second"].withConversionFn(studentConversionFn);
 
     const std::string input = "--first 1 --second 3";
     parser.parse(input);

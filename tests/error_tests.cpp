@@ -1,6 +1,6 @@
 ﻿#include "../cmake-build-debug-msvc/_deps/catch2-src/src/catch2/matchers/catch_matchers_string.hpp"
 #include "Argon/Error.hpp"
-#include "Argon/Option.hpp"
+#include "../include/Argon/Options/Option.hpp"
 #include "Argon/Parser.hpp"
 #include "catch2/catch_test_macros.hpp"
 #include "catch2/matchers/catch_matchers.hpp"
@@ -928,9 +928,9 @@ TEST_CASE("Positional policy", "[positional][errors]") {
         parser.printErrors();
         CHECK(parser.hasErrors());
         const auto& syntaxErrors = CheckGroup(parser.getSyntaxErrors(), "Syntax Errors", -1, -1, 3);
-        CheckMessage(RequireMsg(syntaxErrors.getErrors()[1]), {"--name2", "200"}, 31, ErrorType::Syntax_MisplacedPositional);
-        CheckMessage(RequireMsg(syntaxErrors.getErrors()[2]), {"--name2", "300"}, 35, ErrorType::Syntax_MisplacedPositional);
-        CheckMessage(RequireMsg(syntaxErrors.getErrors()[3]), {"--name2", "Sam"}, 39, ErrorType::Syntax_MisplacedPositional);
+        CheckMessage(RequireMsg(syntaxErrors.getErrors()[0]), {"--name2", "200"}, 31, ErrorType::Syntax_MisplacedPositional);
+        CheckMessage(RequireMsg(syntaxErrors.getErrors()[1]), {"--name2", "300"}, 35, ErrorType::Syntax_MisplacedPositional);
+        CheckMessage(RequireMsg(syntaxErrors.getErrors()[2]), {"--name2", "Sam"}, 39, ErrorType::Syntax_MisplacedPositional);
     }
 
     // SECTION("After flags no syntax errors") {

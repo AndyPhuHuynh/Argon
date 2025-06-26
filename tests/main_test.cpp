@@ -1,7 +1,7 @@
 #include <chrono>
 #include <iostream>
 
-#include "Argon/Option.hpp"
+#include "../include/Argon/Options/Option.hpp"
 #include "Argon/Parser.hpp"
 
 // static void UnknownGroup() {

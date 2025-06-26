@@ -112,9 +112,9 @@ namespace Argon {
 #include <utility>
 
 #include "Context.hpp"
-#include "Option.hpp" // NOLINT (unused include)
+#include "Options/Option.hpp"
 #include "Parser.hpp" // NOLINT (unused include)
-#include "MultiOption.hpp"
+#include "Options/MultiOption.hpp"
 
 inline Argon::OptionBaseAst::OptionBaseAst(const Token& flagToken) {
     flag = { .value = flagToken.image, .pos = flagToken.position };
@@ -262,10 +262,10 @@ inline void Argon::StatementAst::addOption(std::unique_ptr<PositionalAst> option
 
 inline void Argon::StatementAst::checkPositionals(Parser& parser, const Context& context) const {
     const auto policy =
-        context.getPositionalPolicy() != PositionalPolicy::None ?
+        context.getPositionalPolicy() != PositionalPolicy::UseDefault ?
         context.getPositionalPolicy() : parser.getConfig().getPositionalPolicy();
     switch (policy) {
-        case PositionalPolicy::None:
+        case PositionalPolicy::UseDefault:
             throw std::invalid_argument("Cannot validate PositionPolicy::None");
         case PositionalPolicy::Interleaved:
             break;

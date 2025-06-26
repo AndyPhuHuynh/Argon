@@ -6,6 +6,8 @@
 #include <istream>
 
 namespace Argon {
+    class EmptyBase {};
+
     template<typename T, typename = void>
     struct has_stream_extraction : std::false_type {};
 

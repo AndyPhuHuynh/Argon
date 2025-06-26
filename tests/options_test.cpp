@@ -2,7 +2,7 @@
 #include "catch2/catch_test_macros.hpp"
 
 #include "Argon/Parser.hpp"
-#include "Argon/Option.hpp"
+#include "../include/Argon/Options/Option.hpp"
 
 using namespace Argon;
 

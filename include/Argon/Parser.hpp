@@ -159,7 +159,7 @@ namespace Argon {
 
 #include "Ast.hpp"
 #include "Attributes.hpp"
-#include "MultiOption.hpp"
+#include "Options/MultiOption.hpp"
 
 namespace Argon {
 template<typename T> requires DerivesFrom<T, IOption>

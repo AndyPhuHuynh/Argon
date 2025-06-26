@@ -2,7 +2,7 @@
 
 #include <iostream>
 
-#include "Argon/Option.hpp"
+#include "../include/Argon/Options/Option.hpp"
 #include "Argon/Parser.hpp"
 
 int main() {

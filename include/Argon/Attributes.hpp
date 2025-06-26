@@ -87,7 +87,7 @@ namespace Argon {
 //---------------------------------------------------Implementations----------------------------------------------------
 
 #include "Context.hpp"
-#include "Option.hpp" //NOLINT (unused include)
+#include "Options/Option.hpp"
 
 namespace Argon {
 inline Requirement::Requirement(const FlagPath& flagPath) : flagPath(flagPath) {}

@@ -149,7 +149,7 @@ protected:
             ss << std::format("Invalid value for '{}': ", optionName);
         }
 
-        const CharMode charMode = optionConfig.charMode == CharMode::UseDefault ? parserConfig.getCharMode() : optionConfig.charMode;
+        const CharMode charMode = optionConfig.charMode == CharMode::UseDefault ? parserConfig.getDefaultCharMode() : optionConfig.charMode;
         if constexpr (is_numeric_char_type<T>) {
             if (charMode == CharMode::ExpectAscii) {
                 ss << "expected ASCII character";
@@ -192,7 +192,7 @@ public:
         // Parse as a character
         else if constexpr (is_numeric_char_type<T>) {
             success = parseNumericChar<T>(value, outValue,
-                optionConfig.charMode == CharMode::UseDefault ? parserConfig.getCharMode() : optionConfig.charMode);
+                optionConfig.charMode == CharMode::UseDefault ? parserConfig.getDefaultCharMode() : optionConfig.charMode);
         }
         // Parse as a floating point
         else if constexpr (std::is_floating_point_v<T>) {

@@ -30,11 +30,11 @@ namespace Argon {
     public:
         ParserConfig();
 
-        [[nodiscard]] auto getCharMode() const -> CharMode;
-        auto setCharMode(CharMode newCharMode) -> ParserConfig&;
+        [[nodiscard]] auto getDefaultCharMode() const -> CharMode;
+        auto setDefaultCharMode(CharMode newCharMode) -> ParserConfig&;
 
-        [[nodiscard]] auto getPositionalPolicy() const -> PositionalPolicy;
-        auto setPositionalPolicy(PositionalPolicy newPolicy) -> ParserConfig&;
+        [[nodiscard]] auto getDefaultPositionalPolicy() const -> PositionalPolicy;
+        auto setDefaultPositionalPolicy(PositionalPolicy newPolicy) -> ParserConfig&;
 
         template <typename T>
         auto registerConversionFn(std::function<bool(std::string_view, T*)>conversionFn) -> void;
@@ -54,11 +54,11 @@ inline ParserConfig::ParserConfig() {
     m_positionalPolicy = PositionalPolicy::Interleaved;
 }
 
-inline auto ParserConfig::getCharMode() const -> CharMode {
+inline auto ParserConfig::getDefaultCharMode() const -> CharMode {
     return m_defaultCharMode;
 }
 
-inline auto ParserConfig::setCharMode(const CharMode newCharMode) -> ParserConfig& {
+inline auto ParserConfig::setDefaultCharMode(const CharMode newCharMode) -> ParserConfig& {
     if (newCharMode == CharMode::UseDefault) {
         throw std::invalid_argument("Default char mode cannot be UseDefault");
     }
@@ -66,11 +66,11 @@ inline auto ParserConfig::setCharMode(const CharMode newCharMode) -> ParserConfi
     return *this;
 }
 
-inline auto ParserConfig::getPositionalPolicy() const -> PositionalPolicy {
+inline auto ParserConfig::getDefaultPositionalPolicy() const -> PositionalPolicy {
     return m_positionalPolicy;
 }
 
-inline auto ParserConfig::setPositionalPolicy(const PositionalPolicy newPolicy) -> ParserConfig& {
+inline auto ParserConfig::setDefaultPositionalPolicy(const PositionalPolicy newPolicy) -> ParserConfig& {
     if (newPolicy == PositionalPolicy::UseDefault) {
         throw std::invalid_argument("Default positional policy cannot be UseDefault");
     }

@@ -10,10 +10,13 @@
 namespace Argon {
 class Context;
 
-class OptionGroup : public HasFlag<OptionGroup>, public OptionComponent<OptionGroup>{
+class OptionGroup
+    : public HasFlag<OptionGroup>,
+      public OptionComponent<OptionGroup> {
     std::unique_ptr<Context> m_context;
 public:
     OptionGroup();
+
     OptionGroup(const OptionGroup&);
     auto operator=(const OptionGroup&) -> OptionGroup&;
 
@@ -29,11 +32,15 @@ public:
     template <typename T> requires DerivesFrom<T, IOption>
     auto addOption(T&& option) -> void;
 
-    auto getOption(std::string_view flag) -> IOption *;
+    [[nodiscard]] auto getOption(std::string_view flag) -> IOption *;
 
-    auto getContext() -> Context&;
+    [[nodiscard]] auto getContext() -> Context&;
 
     [[nodiscard]] auto getContext() const -> const Context&;
+
+    auto withPositionalPolicy(PositionalPolicy policy) & -> OptionGroup&;
+
+    auto withPositionalPolicy(PositionalPolicy policy) && -> OptionGroup&&;
 };
 
 } // End namespace Argon
@@ -88,8 +95,18 @@ inline auto OptionGroup::getContext() -> Context& { //NOLINT (function is not co
     return *m_context;
 }
 
-inline auto OptionGroup::getContext() const -> const Context & {
+inline auto OptionGroup::getContext() const -> const Context& {
     return *m_context;
+}
+
+inline auto OptionGroup::withPositionalPolicy(const PositionalPolicy policy) & -> OptionGroup& {
+    m_context->setPositionalPolicy(policy);
+    return *this;
+}
+
+inline auto OptionGroup::withPositionalPolicy(const PositionalPolicy policy) && -> OptionGroup&& {
+    m_context->setPositionalPolicy(policy);
+    return static_cast<OptionGroup&&>(*this);
 }
 
 } // End namespace Argon

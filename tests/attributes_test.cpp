@@ -39,7 +39,7 @@ TEST_CASE("Attributes test 2", "[attributes]") {
             return msg;
         });
     parser.parse("-x 10 -y 2 -z 30 -w 1 2 3");
-    parser.printErrors();
+    // parser.printErrors();
 }
 
 TEST_CASE("Duplicate flags") {
@@ -86,7 +86,7 @@ TEST_CASE("Add default dashes") {
     parser.parse("--main 1 -m 2 --main2 3 -m2 4");
 
     CHECK(!parser.hasErrors());
-    parser.printErrors();
+    // parser.printErrors();
     CHECK(x == 2);
     CHECK(y == 4);
 }
@@ -127,5 +127,5 @@ TEST_CASE("Help message 2") {
         )
         | MultiOption<std::vector<int>>()["--courseids"]("<ids...>", "Specify a list of course ids ");
     const auto msg = parser.getHelpMessage();
-    std::cout << msg << "\n\n\n";
+    // std::cout << msg << "\n\n\n";
 }

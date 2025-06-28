@@ -80,7 +80,7 @@ namespace Argon {
         auto applyPrefixes(std::string_view shortPrefix, std::string_view longPrefix) -> void;
 
         [[nodiscard]] auto getPositionalPolicy() const -> PositionalPolicy;
-        auto setPositional(PositionalPolicy newPolicy) -> void;
+        auto setPositionalPolicy(PositionalPolicy newPolicy) -> void;
     private:
         template <typename T> requires DerivesFrom<T, IsPositional>
         auto addPositionalOption(T&& option) -> void;
@@ -557,7 +557,7 @@ inline auto Context::getPositionalPolicy() const -> PositionalPolicy {
     return m_positionalPolicy;
 }
 
-inline auto Context::setPositional(const PositionalPolicy newPolicy) -> void {
+inline auto Context::setPositionalPolicy(const PositionalPolicy newPolicy) -> void {
     m_positionalPolicy = newPolicy;
 }
 

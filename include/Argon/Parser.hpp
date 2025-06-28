@@ -113,11 +113,13 @@ namespace Argon {
 
         auto getConfig() -> ParserConfig&;
 
-        auto getConfig() const -> const ParserConfig&;
+        [[nodiscard]] auto getConfig() const -> const ParserConfig&;
 
-        auto constraints() const -> Constraints&;
+        [[nodiscard]] auto constraints() const -> Constraints&;
 
         auto setDefaultPrefixes(std::string_view shortPrefix, std::string_view longPrefix);
+
+        auto withPositionalPolicy(PositionalPolicy policy) & -> Parser&;
 
     private:
         auto copyFrom(const Parser& other) -> void;
@@ -137,10 +139,10 @@ namespace Argon {
 
         auto parseOptionGroup(Context& context, const Token& flag) -> std::unique_ptr<OptionGroupAst>;
 
-        auto getNextValidFlag(Context& context, bool printErrors = true) ->
+        auto getNextValidFlag(const Context& context, bool printErrors = true) ->
             std::variant<std::monostate, Token, std::unique_ptr<PositionalAst>>;
 
-        auto skipToNextValidFlag(Context& context) -> void;
+        auto skipToNextValidFlag(const Context& context) -> void;
 
         auto getNextToken() -> Token;
 
@@ -375,7 +377,7 @@ inline auto Parser::parseMultiOption(const Context& context,
     }
 }
 
-inline auto Parser::parseGroupContents(OptionGroupAst& optionGroupAst, Context& nextContext) -> void { // NOLINT(misc-no-recursion)
+inline auto Parser::parseGroupContents(OptionGroupAst& optionGroupAst, Context& nextContext) -> void { //NOLINT (misc-no-recursion)
     while (true) {
         const Token nextToken = m_scanner.peekToken();
 
@@ -403,7 +405,7 @@ inline auto Parser::parseGroupContents(OptionGroupAst& optionGroupAst, Context& 
     }
 }
 
-inline auto Parser::parseOptionGroup(Context& context, const Token& flag) -> std::unique_ptr<OptionGroupAst> { // NOLINT(misc-no-recursion)
+inline auto Parser::parseOptionGroup(Context& context, const Token& flag) -> std::unique_ptr<OptionGroupAst> { //NOLINT (misc-no-recursion)
     const Token lbrack = m_scanner.peekToken();
     if (lbrack.kind != TokenKind::LBRACK) {
         m_syntaxErrors.addErrorMessage(
@@ -423,7 +425,7 @@ inline auto Parser::parseOptionGroup(Context& context, const Token& flag) -> std
     return optionGroupAst;
 }
 
-inline auto Parser::getNextValidFlag(Context& context, const bool printErrors) ->
+inline auto Parser::getNextValidFlag(const Context& context, const bool printErrors) ->
     std::variant<std::monostate, Token, std::unique_ptr<PositionalAst>> {
     Token flag = m_scanner.peekToken();
 
@@ -504,7 +506,7 @@ inline auto Parser::getNextValidFlag(Context& context, const bool printErrors) -
     }
 }
 
-inline auto Parser::skipToNextValidFlag(Context& context) -> void {
+inline auto Parser::skipToNextValidFlag(const Context& context) -> void {
     getNextValidFlag(context, false);
     if (m_scanner.peekToken().kind != TokenKind::END) {
         rewindScanner(1);
@@ -582,6 +584,11 @@ inline auto Parser::constraints() const -> Constraints& {
 inline auto Parser::setDefaultPrefixes(const std::string_view shortPrefix, const std::string_view longPrefix) {
     m_shortPrefix = shortPrefix;
     m_longPrefix = longPrefix;
+}
+
+inline auto Parser::withPositionalPolicy(const PositionalPolicy policy) & -> Parser& {
+    m_context->setPositionalPolicy(policy);
+    return *this;
 }
 
 inline auto Parser::copyFrom(const Parser& other) -> void {

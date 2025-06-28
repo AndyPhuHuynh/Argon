@@ -780,7 +780,7 @@ TEST_CASE("Ascii CharMode", "[options][char]") {
     auto parser = Option(&c)["-c"]
                 | Option(&sc)["-sc"]
                 | Option(&uc)["-uc"];
-    parser.getConfig().setCharMode(CharMode::ExpectAscii);
+    parser.getConfig().setDefaultCharMode(CharMode::ExpectAscii);
 
     SECTION("Test 1") {
         parser.parse("-c a -sc b -uc c");
@@ -811,7 +811,7 @@ TEST_CASE("CharMode with MultiOption array", "[options][multi][char][array]") {
                 | MultiOption(&signedChars)["--signed"]
                 | MultiOption(&unsignedChars)["--unsigned"];
     SECTION("Expect ASCII") {
-        parser.getConfig().setCharMode(CharMode::ExpectAscii);
+        parser.getConfig().setDefaultCharMode(CharMode::ExpectAscii);
         parser.parse("--chars a b c --signed d e f --unsigned g h i");
         CHECK(!parser.hasErrors());
         CHECK(chars[0]         == 'a'); CHECK(chars[1]         == 'b'); CHECK(chars[2]         == 'c');
@@ -820,7 +820,7 @@ TEST_CASE("CharMode with MultiOption array", "[options][multi][char][array]") {
     }
 
     SECTION("Expect integers") {
-        parser.getConfig().setCharMode(CharMode::ExpectInteger);
+        parser.getConfig().setDefaultCharMode(CharMode::ExpectInteger);
         parser.parse("--chars 10 20 30 --signed 40 50 60 --unsigned 70 80 90");
         CHECK(!parser.hasErrors());
         CHECK(chars[0]         == 10); CHECK(chars[1]         == 20); CHECK(chars[2]         == 30);
@@ -839,7 +839,7 @@ TEST_CASE("CharMode with MultiOption vector", "[options][multi][char][vector]") 
                 | MultiOption(&signedChars)["--signed"]
                 | MultiOption(&unsignedChars)["--unsigned"];
     SECTION("Expect ASCII") {
-        parser.getConfig().setCharMode(CharMode::ExpectAscii);
+        parser.getConfig().setDefaultCharMode(CharMode::ExpectAscii);
         parser.parse("--chars a b c --signed d e f --unsigned g h i");
         CHECK(!parser.hasErrors());
         REQUIRE(chars.size() == 3); REQUIRE(signedChars.size() == 3); REQUIRE(unsignedChars.size() == 3);
@@ -849,7 +849,7 @@ TEST_CASE("CharMode with MultiOption vector", "[options][multi][char][vector]") 
     }
 
     SECTION("Expect integers") {
-        parser.getConfig().setCharMode(CharMode::ExpectInteger);
+        parser.getConfig().setDefaultCharMode(CharMode::ExpectInteger);
         parser.parse("--chars 10 20 30 --signed 40 50 60 --unsigned 70 80 90");
         CHECK(!parser.hasErrors());
         REQUIRE(chars.size() == 3); REQUIRE(signedChars.size() == 3); REQUIRE(unsignedChars.size() == 3);
@@ -870,7 +870,7 @@ TEST_CASE("Parsing setCharMode", "[options][positional][char]") {
                 | Positional(&scPos)
                 | Positional(&ucPos);
     SECTION("Ascii correct") {
-        parser.getConfig().setCharMode(CharMode::ExpectAscii);
+        parser.getConfig().setDefaultCharMode(CharMode::ExpectAscii);
         parser.parse("a -c  a "
                      "b -sc b "
                      "c -uc c");
@@ -879,7 +879,7 @@ TEST_CASE("Parsing setCharMode", "[options][positional][char]") {
         CHECK(cPos == 'a'); CHECK(scPos == 'b'); CHECK(ucPos == 'c');
     }
     SECTION("Integer correct") {
-        parser.getConfig().setCharMode(CharMode::ExpectInteger);
+        parser.getConfig().setDefaultCharMode(CharMode::ExpectInteger);
         parser.parse("1 -c  2 "
                      "3 -sc 4 "
                      "5 -uc 6");

@@ -53,7 +53,7 @@ struct FlagPath {
 
     explicit FlagPath(std::string_view flag);
 
-    FlagPath(std::initializer_list<std::string> flags);
+    FlagPath(std::initializer_list<std::string_view> flags);
 
     auto operator<=>(const FlagPath&) const = default;
 
@@ -228,7 +228,7 @@ inline auto FlagPathWithAlias::getString() const -> std::string {
 
 inline FlagPath::FlagPath(const std::string_view flag) : flag(flag) {}
 
-inline FlagPath::FlagPath(const std::initializer_list<std::string> flags) {
+inline FlagPath::FlagPath(const std::initializer_list<std::string_view> flags) {
     if (flags.size() == 0) {
         throw std::invalid_argument("FlagPath must contain at least one flag.");
     }

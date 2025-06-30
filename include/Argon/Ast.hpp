@@ -19,8 +19,14 @@ namespace Argon {
 
     class Ast {
     public:
-        virtual void analyze(Parser& parser, Context& context) = 0;
+        [[nodiscard]] virtual auto getGroupPath() const -> std::string;
+
+        auto setParent(OptionGroupAst *parent) -> void;
+
+        virtual auto analyze(Parser& parser, Context& context) -> void = 0;
     protected:
+        OptionGroupAst *m_parent = nullptr;
+
         virtual ~Ast() = default;
     };
 
@@ -54,11 +60,13 @@ namespace Argon {
         void analyze(Parser& parser, Context& context) override;
     };
 
-    class PositionalAst {
+    class PositionalAst : public Ast {
     public:
         Value value;
 
         explicit PositionalAst(const Token& flagToken);
+
+        void analyze(Parser& parser, Context& context) override;
 
         void analyze(Parser& parser, const Context& context, size_t position);
     };
@@ -77,10 +85,12 @@ namespace Argon {
 
         ~OptionGroupAst() override = default;
 
+        [[nodiscard]] auto getGroupPath() const -> std::string override;
         void addOption(std::unique_ptr<OptionBaseAst> option);
         void addOption(std::unique_ptr<PositionalAst> option);
         void checkPositionals(Parser& parser, Context& context) const;
         void analyze(Parser& parser, Context& context) override;
+
     private:
         std::vector<std::unique_ptr<OptionBaseAst>> m_options;
         std::vector<std::unique_ptr<PositionalAst>> m_positionals;
@@ -119,10 +129,12 @@ namespace Argon {
 
 namespace Argon {
 
-inline auto checkPositionals(Parser& parser, const Context& context,
-    const std::vector<std::unique_ptr<OptionBaseAst>>& options,
-    const std::vector<std::unique_ptr<PositionalAst>>& positionals) {
-    const std::string contextPath = context.getPath();
+inline auto checkPositionals(const Ast& thisAst,
+                             Parser& parser,
+                             const Context& context,
+                             const std::vector<std::unique_ptr<OptionBaseAst>>& options,
+                             const std::vector<std::unique_ptr<PositionalAst>>& positionals) {
+    const std::string contextPath = thisAst.getGroupPath();
     const auto policy =
         context.getPositionalPolicy() != PositionalPolicy::UseDefault ?
         context.getPositionalPolicy() : parser.getConfig().getDefaultPositionalPolicy();
@@ -183,6 +195,14 @@ inline auto checkPositionals(Parser& parser, const Context& context,
 }
 
 // --------------------------------------------- Implementations -------------------------------------------------------
+
+inline std::string Argon::Ast::getGroupPath() const {
+    return "";
+}
+
+inline auto Argon::Ast::setParent(OptionGroupAst *parent) -> void {
+    m_parent = parent;
+}
 
 inline Argon::OptionBaseAst::OptionBaseAst(const Token& flagToken) {
     flag = { .value = flagToken.image, .pos = flagToken.position };
@@ -250,6 +270,8 @@ inline Argon::PositionalAst::PositionalAst(const Token& flagToken) {
     value = { .value = flagToken.image, .pos = flagToken.position };
 }
 
+inline void Argon::PositionalAst::analyze(Parser&, Context&) {}
+
 inline void Argon::PositionalAst::analyze(Parser& parser, const Context& context, const size_t position) {
     IsPositional *opt = context.getPositional(position);
     if (!opt) {
@@ -272,11 +294,28 @@ inline void Argon::PositionalAst::analyze(Parser& parser, const Context& context
 inline Argon::OptionGroupAst::OptionGroupAst(const Token& flagToken)
     : OptionBaseAst(flagToken) {}
 
+inline std::string Argon::OptionGroupAst::getGroupPath() const {
+    std::vector<const std::string*> names;
+
+    const auto *current = this;
+    while (current != nullptr) {
+        names.push_back(&current->flag.value);
+        current = current->m_parent;
+    }
+
+    std::ranges::reverse(names);
+    return std::accumulate(std::next(names.begin()), names.end(), *(names[0]),
+        [] (const std::string& name1, const std::string *name2) {
+            return name1 + " > " + *name2;
+    });
+}
+
 inline void Argon::OptionGroupAst::addOption(std::unique_ptr<OptionBaseAst> option) {
     if (option == nullptr) {
         return;
     }
     m_options.push_back(std::move(option));
+    m_options.back()->setParent(this);
 }
 
 inline void Argon::OptionGroupAst::addOption(std::unique_ptr<PositionalAst> option) {
@@ -284,10 +323,11 @@ inline void Argon::OptionGroupAst::addOption(std::unique_ptr<PositionalAst> opti
         return;
     }
     m_positionals.push_back(std::move(option));
+    m_positionals.back()->setParent(this);
 }
 
 inline void Argon::OptionGroupAst::checkPositionals(Parser& parser, Context& context) const { //NOLINT (misc-recursion)
-    Argon::checkPositionals(parser, context, m_options, m_positionals);
+    Argon::checkPositionals(*this, parser, context, m_options, m_positionals);
     for (const auto& optionAst : m_options) {
         if (const auto groupAst = dynamic_cast<OptionGroupAst*>(optionAst.get())) {
             const auto iOption = context.getFlagOption(groupAst->flag.value);
@@ -341,7 +381,7 @@ inline void Argon::StatementAst::addOption(std::unique_ptr<PositionalAst> option
 }
 
 inline void Argon::StatementAst::checkPositionals(Parser& parser, Context& context) const {
-    Argon::checkPositionals(parser, context, m_options, m_positionals);
+    Argon::checkPositionals(*this, parser, context, m_options, m_positionals);
     for (const auto& optionAst : m_options) {
         if (const auto groupAst = dynamic_cast<OptionGroupAst*>(optionAst.get())) {
             const auto iOption = context.getFlagOption(groupAst->flag.value);

@@ -2,7 +2,6 @@
 #define ARGON_CONTEXT_INCLUDE
 
 #include <memory>
-#include <numeric>
 #include <ranges>
 #include <string>
 #include <string_view>
@@ -16,6 +15,7 @@
 
 namespace Argon {
     class IOption;
+    class OptionHolder;
     class IsPositional;
 
     template <typename T>
@@ -27,13 +27,10 @@ namespace Argon {
     class Context {
         std::vector<OptionPtr> m_options;
         std::vector<PositionalPtr> m_positionals;
-        std::string m_name;
-        Context *m_parent = nullptr;
 
         PositionalPolicy m_positionalPolicy = PositionalPolicy::UseDefault;
     public:
         Context() = default;
-        explicit Context(std::string name);
 
         Context(const Context&);
         auto operator=(const Context&) -> Context&;
@@ -52,10 +49,6 @@ namespace Argon {
 
         template <typename T>
         auto getOptionDynamic(std::string_view flag) -> T *;
-
-        auto setName(std::string_view name) -> void;
-
-        [[nodiscard]] auto getPath() const -> std::string;
 
         [[nodiscard]] auto containsLocalFlag(std::string_view flag) const -> bool;
 
@@ -136,12 +129,11 @@ inline auto containsFlagPath(const OptionMap& map, const FlagPath& flag) -> cons
 
 #include "Argon/Options/Option.hpp"
 #include "Argon/Options/OptionGroup.hpp"
+#include "Argon/Options/OptionHolder.hpp"
 #include "Argon/Options/MultiOption.hpp"
 #include "Argon/Options/Positional.hpp"
 
 namespace Argon {
-
-inline Context::Context(std::string name) : m_name(std::move(name)) {}
 
 inline Context::Context(const Context& other) {
     for (const auto& option : other.m_options) {
@@ -152,10 +144,6 @@ inline Context::Context(const Context& other) {
                 m_options.emplace_back(opt->clone());
             }
         }, option);
-
-        if (auto *optionGroup = dynamic_cast<OptionGroup*>(getRawPointer(m_options.back()))) {
-            optionGroup->getContext().m_parent = this;
-        }
     }
     for (const auto& option : other.m_positionals) {
         std::visit([&]<typename T>(const T& opt) -> void {
@@ -166,8 +154,6 @@ inline Context::Context(const Context& other) {
             }
         }, option);
     }
-    m_name = other.m_name;
-    m_parent = other.m_parent;
 }
 
 inline auto Context::operator=(const Context& other) -> Context& {
@@ -184,10 +170,6 @@ inline auto Context::operator=(const Context& other) -> Context& {
                 m_options.emplace_back(opt->clone());
             }
         }, option);
-
-        if (auto *optionGroup = dynamic_cast<OptionGroup*>(getRawPointer(m_options.back()))) {
-            optionGroup->getContext().m_parent = this;
-        }
     }
     for (const auto& option : other.m_positionals) {
         std::visit([&]<typename T>(const T& opt) -> void {
@@ -198,8 +180,6 @@ inline auto Context::operator=(const Context& other) -> Context& {
             }
         }, option);
     }
-    m_name = other.m_name;
-    m_parent = other.m_parent;
     return *this;
 }
 
@@ -240,10 +220,6 @@ auto Context::addNonPositionalOption(T&& option) -> void {
         if (flag->getFlag().isEmpty()) {
             throw std::invalid_argument("All non positional options must have at least one flag");
         }
-    }
-
-    if (const auto optionGroup = dynamic_cast<OptionGroup*>(optPtr); optionGroup != nullptr) {
-        optionGroup->getContext().m_parent = this;
     }
 }
 
@@ -319,32 +295,6 @@ auto Context::getPositionalValue(const FlagPath& groupPath) -> const ValueType& 
         throw std::invalid_argument(std::format("Given flag path is not an Option Group: {}", groupPath.getString()));
     }
     return groupPtr->getContext().getPositionalValue<ValueType, Pos>();
-}
-
-inline auto Context::setName(const std::string_view name) -> void {
-    m_name = name;
-}
-
-inline auto Context::getPath() const -> std::string {
-    if (m_parent == nullptr) {
-        return "";
-    }
-
-    std::vector<const std::string*> names;
-
-    const auto *current = this;
-    while (current != nullptr) {
-        if (!current->m_name.empty()) {
-            names.push_back(&current->m_name);
-        }
-        current = current->m_parent;
-    }
-
-    std::ranges::reverse(names);
-    return std::accumulate(std::next(names.begin()), names.end(), *(names[0]),
-        [] (const std::string& name1, const std::string *name2) {
-            return name1 + " > " + *name2;
-    });
 }
 
 inline auto Context::containsLocalFlag(const std::string_view flag) const -> bool {

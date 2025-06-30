@@ -12,6 +12,7 @@
 #include "Traits.hpp"
 
 namespace Argon {
+    class Ast;
     class StatementAst;
     class OptionAst;
     class MultiOptionAst;
@@ -128,21 +129,21 @@ namespace Argon {
 
         auto parseStatement() -> StatementAst;
 
-        auto parseOptionBundle(Context& context) ->
+        auto parseOptionBundle(const Ast& parentAst, Context& context) ->
             std::variant<std::monostate, std::unique_ptr<OptionBaseAst>, std::unique_ptr<PositionalAst>>;
 
-        auto parseSingleOption(Context& context, const Token& flag) -> std::unique_ptr<OptionAst>;
+        auto parseSingleOption(const Ast& parentAst, Context& context, const Token& flag) -> std::unique_ptr<OptionAst>;
 
         auto parseMultiOption(const Context& context, const Token& flag) -> std::unique_ptr<MultiOptionAst>;
 
         auto parseGroupContents(OptionGroupAst& optionGroupAst, Context& nextContext) -> void;
 
-        auto parseOptionGroup(Context& context, const Token& flag) -> std::unique_ptr<OptionGroupAst>;
+        auto parseOptionGroup(const Ast& parentAst, Context& context, const Token& flag) -> std::unique_ptr<OptionGroupAst>;
 
-        auto getNextValidFlag(const Context& context, bool printErrors = true) ->
+        auto getNextValidFlag(const Ast& parentAst, const Context& context, bool printErrors = true) ->
             std::variant<std::monostate, Token, std::unique_ptr<PositionalAst>>;
 
-        auto skipToNextValidFlag(const Context& context) -> void;
+        auto skipToNextValidFlag(const Ast& parentAst, const Context& context) -> void;
 
         auto getNextToken() -> Token;
 
@@ -278,7 +279,7 @@ inline auto Parser::parseStatement() -> StatementAst {
             getNextToken();
             continue;
         }
-        auto parsed = parseOptionBundle(*m_context);
+        auto parsed = parseOptionBundle(statement, *m_context);
         std::visit([&statement]<typename T>(T& opt) {
             if constexpr (std::is_same_v<T, std::monostate>) {}
             else {statement.addOption(std::move(opt));}
@@ -287,22 +288,22 @@ inline auto Parser::parseStatement() -> StatementAst {
     return statement;
 }
 
-inline auto Parser::parseOptionBundle(Context& context) -> // NOLINT(misc-no-recursion)
+inline auto Parser::parseOptionBundle(const Ast& parentAst, Context& context) -> // NOLINT(misc-no-recursion)
     std::variant<std::monostate, std::unique_ptr<OptionBaseAst>, std::unique_ptr<PositionalAst>> {
-    auto var = getNextValidFlag(context);
+    auto var = getNextValidFlag(parentAst, context);
     if (std::holds_alternative<std::monostate>(var)) { return std::monostate{}; }
     if (std::holds_alternative<Token>(var)) {
         const auto& flagToken = std::get<Token>(var);
 
         IOption *iOption = context.getFlagOption(flagToken.image);
         if (dynamic_cast<IsSingleOption *>(iOption)) {
-            return parseSingleOption(context, flagToken);
+            return parseSingleOption(parentAst, context, flagToken);
         }
         if (dynamic_cast<IsMultiOption *>(iOption)) {
             return parseMultiOption(context, flagToken);
         }
         if (dynamic_cast<OptionGroup *>(iOption)) {
-            return parseOptionGroup(context, flagToken);
+            return parseOptionGroup(parentAst, context, flagToken);
         }
 
         return std::monostate{};
@@ -313,7 +314,8 @@ inline auto Parser::parseOptionBundle(Context& context) -> // NOLINT(misc-no-rec
     return std::monostate{};
 }
 
-inline auto Parser::parseSingleOption(Context& context, const Token& flag) -> std::unique_ptr<OptionAst> {
+inline auto Parser::parseSingleOption(const Ast& parentAst, Context& context, const Token& flag)
+    -> std::unique_ptr<OptionAst> {
     Token value = m_scanner.peekToken();
 
     // Boolean flag with no explicit value
@@ -334,7 +336,7 @@ inline auto Parser::parseSingleOption(Context& context, const Token& flag) -> st
         m_syntaxErrors.addErrorMessage(
             std::format("Expected flag value, got '{}' at position {}", value.image, value.position),
             value.position, ErrorType::Syntax_MissingValue);
-        skipToNextValidFlag(context);
+        skipToNextValidFlag(parentAst, context);
         return nullptr;
     }
 
@@ -348,7 +350,7 @@ inline auto Parser::parseSingleOption(Context& context, const Token& flag) -> st
         } else {
             m_syntaxErrors.addErrorMessage(
                 std::format("No value provided for flag '{}' inside group '{}' at position {}", flag.image,
-                            context.getPath(), flag.position),
+                            parentAst.getGroupPath(), flag.position),
                 value.position, ErrorType::Syntax_MissingValue
             );
         }
@@ -397,7 +399,7 @@ inline auto Parser::parseGroupContents(OptionGroupAst& optionGroupAst, Context& 
                 nextToken.position, ErrorType::Syntax_MissingRightBracket);
             return;
         }
-        auto parsed = parseOptionBundle(nextContext);
+        auto parsed = parseOptionBundle(optionGroupAst, nextContext);
         std::visit([&optionGroupAst]<typename T>(T& opt) {
             if constexpr (std::is_same_v<T, std::monostate>) {}
             else {optionGroupAst.addOption(std::move(opt));}
@@ -405,27 +407,26 @@ inline auto Parser::parseGroupContents(OptionGroupAst& optionGroupAst, Context& 
     }
 }
 
-inline auto Parser::parseOptionGroup(Context& context, const Token& flag) -> std::unique_ptr<OptionGroupAst> { //NOLINT (misc-no-recursion)
+inline auto Parser::parseOptionGroup(const Ast& parentAst, Context& context, const Token& flag) -> std::unique_ptr<OptionGroupAst> { //NOLINT (misc-no-recursion)
     const Token lbrack = m_scanner.peekToken();
     if (lbrack.kind != TokenKind::LBRACK) {
         m_syntaxErrors.addErrorMessage(
             std::format("Expected '[', got '{}' at position {}", lbrack.image, lbrack.position),
             lbrack.position, ErrorType::Syntax_MissingLeftBracket);
-        skipToNextValidFlag(context);
+        skipToNextValidFlag(parentAst, context);
         return nullptr;
     }
     getNextToken();
 
     const auto optionGroup = context.getOptionDynamic<OptionGroup>(flag.image);
     auto& nextContext = optionGroup->getContext();
-    nextContext.setName(flag.image);
 
     auto optionGroupAst = std::make_unique<OptionGroupAst>(flag);
     parseGroupContents(*optionGroupAst, nextContext);
     return optionGroupAst;
 }
 
-inline auto Parser::getNextValidFlag(const Context& context, const bool printErrors) ->
+inline auto Parser::getNextValidFlag(const Ast& parentAst, const Context& context, const bool printErrors) ->
     std::variant<std::monostate, Token, std::unique_ptr<PositionalAst>> {
     Token flag = m_scanner.peekToken();
 
@@ -433,20 +434,6 @@ inline auto Parser::getNextValidFlag(const Context& context, const bool printErr
     const bool hasFlagPrefix    = flag.image.starts_with(m_shortPrefix) || flag.image.starts_with(m_longPrefix);
     const bool inContext        = context.containsLocalFlag(flag.image);
     const bool isPositional     = isIdentifier && !hasFlagPrefix;
-
-    // auto positionalPolicy = context.getPositionalPolicy();
-    // if (positionalPolicy == PositionalPolicy::None) positionalPolicy = m_config.getPositionalPolicy();
-    //
-    // if (positionalPolicy == PositionalPolicy::BeforeFlags && isPositional && context.getFirstFlagEncountered()) {
-    //     m_syntaxErrors.addErrorMessage(std::format(
-    //         "Found positional argument '{}' after flag, positional arguments must be placed before all flags", flag.image),
-    //         flag.position, ErrorType::Syntax_MisplacedPositional);
-    // }
-    // if (positionalPolicy == PositionalPolicy::AfterFlags && hasFlagPrefix && context.getFirstPositionalEncountered()) {
-    //     m_syntaxErrors.addErrorMessage(std::format(
-    //         "Found flag '{}' after positional argument, positional arguments must be placed after all flags", flag.image),
-    //         flag.position, ErrorType::Syntax_MisplacedPositional);
-    // }
 
     // Is a positional arg
     if (isPositional) {
@@ -473,7 +460,7 @@ inline auto Parser::getNextValidFlag(const Context& context, const bool printErr
             );
         } else {
             m_syntaxErrors.addErrorMessage(
-                std::format("Unknown flag '{}' inside group '{}' at position {}", flag.image, context.getPath(),
+                std::format("Unknown flag '{}' inside group '{}' at position {}", flag.image, parentAst.getGroupPath(),
                             flag.position),
                 flag.position, ErrorType::Syntax_UnknownFlag
             );
@@ -506,8 +493,8 @@ inline auto Parser::getNextValidFlag(const Context& context, const bool printErr
     }
 }
 
-inline auto Parser::skipToNextValidFlag(const Context& context) -> void {
-    getNextValidFlag(context, false);
+inline auto Parser::skipToNextValidFlag(const Ast& parentAst, const Context& context) -> void {
+    getNextValidFlag(parentAst, context, false);
     if (m_scanner.peekToken().kind != TokenKind::END) {
         rewindScanner(1);
     }

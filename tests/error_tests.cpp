@@ -998,48 +998,76 @@ TEST_CASE("Positional policy with parser config", "[positional][errors]") {
 
         CHECK(parser.getOptionValue<int>({"--school", "--teachers", "--classroom1"}) == 10);
         CHECK(parser.getOptionValue<int>({"--school", "--teachers", "--classroom2"}) == 20);
-        CHECK(parser.getPositionalValue<std::string, 0>(FlagPath{"--school", "--teachers"}) == "Mr.Smith");
-        CHECK(parser.getPositionalValue<std::string, 1>(FlagPath{"--school", "--teachers"}) == "Mrs.Smith");
+        CHECK(parser.getPositionalValue<std::string, 0>({"--school", "--teachers"}) == "Mr.Smith");
+        CHECK(parser.getPositionalValue<std::string, 1>({"--school", "--teachers"}) == "Mrs.Smith");
     }
 
     SECTION("After flags test 1") {
         parser.getConfig().setDefaultPositionalPolicy(PositionalPolicy::AfterFlags);
-        parser.parse("--name1 John 100 --name2 Sammy 200 --name3 Joshua 300 Sam");
+        parser.parse("--name1 John 100 --name2 Sammy 200 --name3 Joshua 300 Sam --address [400 --street Jam 500] "
+                     "--school [History --homeroom 026 --teachers [--classroom1 10 Mr.Smith --classroom2 20 Mrs.Smith] English]");
         CHECK(parser.hasErrors());
-        const auto& syntaxErrors = CheckGroup(parser.getSyntaxErrors(), "Syntax Errors", -1, -1, 2);
+        const auto& syntaxErrors = CheckGroup(parser.getSyntaxErrors(), "Syntax Errors", -1, -1, 7);
         CheckMessage(RequireMsg(syntaxErrors.getErrors()[0]), {"--name2", "100"}, 13, ErrorType::Syntax_MisplacedPositional);
         CheckMessage(RequireMsg(syntaxErrors.getErrors()[1]), {"--name3", "200"}, 31, ErrorType::Syntax_MisplacedPositional);
+        CheckMessage(RequireMsg(syntaxErrors.getErrors()[2]), {"--address", "300"}, 50, ErrorType::Syntax_MisplacedPositional);
+        CheckMessage(RequireMsg(syntaxErrors.getErrors()[3]), {"--address", "Sam"}, 54, ErrorType::Syntax_MisplacedPositional);
+        CheckMessage(RequireMsg(syntaxErrors.getErrors()[4]), {"--street", "400", "--address"}, 69, ErrorType::Syntax_MisplacedPositional);
+        CheckMessage(RequireMsg(syntaxErrors.getErrors()[5]), {"--homeroom", "History", "--school"}, 101, ErrorType::Syntax_MisplacedPositional);
+        CheckMessage(RequireMsg(syntaxErrors.getErrors()[6]), {"--classroom2", "Mr.Smith", "--school > --teachers"}, 152, ErrorType::Syntax_MisplacedPositional);
     }
 
     SECTION("After flags test 2") {
         parser.getConfig().setDefaultPositionalPolicy(PositionalPolicy::AfterFlags);
-        parser.parse("100 --name1 John --name2 Sammy 200 300 Sam --name3 Joshua");
+        parser.parse("100 --name1 John --name2 Sammy 200 300 Sam --name3 Joshua --address [--street Jam 400 500] "
+                     "--school [--homeroom 026 History --teachers [--classroom1 10 --classroom2 20 Mr.Smith Mrs.Smith] English]");
         CHECK(parser.hasErrors());
-        const auto& syntaxErrors = CheckGroup(parser.getSyntaxErrors(), "Syntax Errors", -1, -1, 4);
+        const auto& syntaxErrors = CheckGroup(parser.getSyntaxErrors(), "Syntax Errors", -1, -1, 5);
         CheckMessage(RequireMsg(syntaxErrors.getErrors()[0]), {"--name1", "100"}, 0,  ErrorType::Syntax_MisplacedPositional);
         CheckMessage(RequireMsg(syntaxErrors.getErrors()[1]), {"--name3", "200"}, 31, ErrorType::Syntax_MisplacedPositional);
         CheckMessage(RequireMsg(syntaxErrors.getErrors()[2]), {"--name3", "300"}, 35, ErrorType::Syntax_MisplacedPositional);
         CheckMessage(RequireMsg(syntaxErrors.getErrors()[3]), {"--name3", "Sam"}, 39, ErrorType::Syntax_MisplacedPositional);
+        CheckMessage(RequireMsg(syntaxErrors.getErrors()[4]), {"--teachers", "History", "--school"}, 116, ErrorType::Syntax_MisplacedPositional);
     }
 
     SECTION("After flags test 3") {
         parser.getConfig().setDefaultPositionalPolicy(PositionalPolicy::AfterFlags);
-        parser.parse("100 200 --name2 Sammy Sam --name3 Joshua 300");
+        parser.parse("100 200 --name2 Sammy --school [--teachers [--classroom1 10 Mr.Smith Mrs.Smith --classroom2 20] "
+                     "English --homeroom 026 History] Sam --name3 Joshua --address [400 500 --street Jam] 300");
         CHECK(parser.hasErrors());
-        const auto& syntaxErrors = CheckGroup(parser.getSyntaxErrors(), "Syntax Errors", -1, -1, 3);
+        const auto& syntaxErrors = CheckGroup(parser.getSyntaxErrors(), "Syntax Errors", -1, -1, 8);
         CheckMessage(RequireMsg(syntaxErrors.getErrors()[0]), {"--name2", "100"}, 0,  ErrorType::Syntax_MisplacedPositional);
         CheckMessage(RequireMsg(syntaxErrors.getErrors()[1]), {"--name2", "200"}, 4,  ErrorType::Syntax_MisplacedPositional);
-        CheckMessage(RequireMsg(syntaxErrors.getErrors()[2]), {"--name3", "Sam"}, 22, ErrorType::Syntax_MisplacedPositional);
+        CheckMessage(RequireMsg(syntaxErrors.getErrors()[2]), {"--classroom2", "Mr.Smith",  "--school > --teachers"}, 60,  ErrorType::Syntax_MisplacedPositional);
+        CheckMessage(RequireMsg(syntaxErrors.getErrors()[3]), {"--classroom2", "Mrs.Smith", "--school > --teachers"}, 69,  ErrorType::Syntax_MisplacedPositional);
+        CheckMessage(RequireMsg(syntaxErrors.getErrors()[4]), {"--homeroom", "English", "--school"}, 96,  ErrorType::Syntax_MisplacedPositional);
+        CheckMessage(RequireMsg(syntaxErrors.getErrors()[5]), {"--name3", "Sam"}, 128,  ErrorType::Syntax_MisplacedPositional);
+        CheckMessage(RequireMsg(syntaxErrors.getErrors()[6]), {"--street", "400", "--address"}, 158,  ErrorType::Syntax_MisplacedPositional);
+        CheckMessage(RequireMsg(syntaxErrors.getErrors()[7]), {"--street", "500", "--address"}, 162,  ErrorType::Syntax_MisplacedPositional);
     }
 
     SECTION("After flags no errors") {
         parser.getConfig().setDefaultPositionalPolicy(PositionalPolicy::AfterFlags);
-        parser.parse("--name1 John --name2 Sammy --name3 Joshua 100 200");
+        parser.parse("--name1 John --name2 Sammy --name3 Joshua --school [--homeroom 26 --teachers [--classroom1 10 "
+                     "--classroom2 20 Mr.Smith Mrs.Smith] History English] --address [--street Jam 300 400] 100 200");
         CHECK(!parser.hasErrors());
         CHECK(parser.getOptionValue<std::string>("--name1") == "John");
         CHECK(parser.getOptionValue<std::string>("--name2") == "Sammy");
         CHECK(parser.getOptionValue<std::string>("--name3") == "Joshua");
         CHECK(parser.getPositionalValue<int, 0>() == 100);
         CHECK(parser.getPositionalValue<int, 1>() == 200);
+
+        CHECK(parser.getOptionValue<std::string>({"--address", "--street"}) == "Jam");
+        CHECK(parser.getPositionalValue<int, 0>("--address") == 300);
+        CHECK(parser.getPositionalValue<int, 1>("--address") == 400);
+
+        CHECK(parser.getOptionValue<int>({"--school", "--homeroom"}) == 26);
+        CHECK(parser.getPositionalValue<std::string, 0>("--school") == "History");
+        CHECK(parser.getPositionalValue<std::string, 1>("--school") == "English");
+
+        CHECK(parser.getOptionValue<int>({"--school", "--teachers", "--classroom1"}) == 10);
+        CHECK(parser.getOptionValue<int>({"--school", "--teachers", "--classroom2"}) == 20);
+        CHECK(parser.getPositionalValue<std::string, 0>({"--school", "--teachers"}) == "Mr.Smith");
+        CHECK(parser.getPositionalValue<std::string, 1>({"--school", "--teachers"}) == "Mrs.Smith");
     }
 }

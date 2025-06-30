@@ -413,9 +413,9 @@ TEST_CASE("Parser getValue nested", "[options][getValue][option-group]") {
     parser.parse(input);
 
     const auto& one      = parser.getOptionValue<std::string>("--one");
-    const auto& two      = parser.getOptionValue<std::string>(FlagPath{"--g1", "--two"});
-    const auto& three    = parser.getOptionValue<std::string>(FlagPath{"--g1", "--g2", "--three"});
-    const auto& four     = parser.getOptionValue<std::string>(FlagPath{"--g1", "--g2", "--g3", "--four"});
+    const auto& two      = parser.getOptionValue<std::string>({"--g1", "--two"});
+    const auto& three    = parser.getOptionValue<std::string>({"--g1", "--g2", "--three"});
+    const auto& four     = parser.getOptionValue<std::string>({"--g1", "--g2", "--g3", "--four"});
 
     CHECK(!parser.hasErrors());
 

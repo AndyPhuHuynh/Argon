@@ -14,7 +14,15 @@ set(INCLUDE_FILES
     ${CMAKE_SOURCE_DIR}/include/Argon/Error.hpp
     ${CMAKE_SOURCE_DIR}/include/Argon/Flag.hpp
     ${CMAKE_SOURCE_DIR}/include/Argon/MultiOption.hpp
-    ${CMAKE_SOURCE_DIR}/include/Argon/Option.hpp
+    ${CMAKE_SOURCE_DIR}/include/Argon/Options/IOption.hpp
+    ${CMAKE_SOURCE_DIR}/include/Argon/Options/MultiOption.hpp
+    ${CMAKE_SOURCE_DIR}/include/Argon/Options/Option.hpp
+    ${CMAKE_SOURCE_DIR}/include/Argon/Options/OptionCharBase.hpp
+    ${CMAKE_SOURCE_DIR}/include/Argon/Options/OptionComponent.hpp
+    ${CMAKE_SOURCE_DIR}/include/Argon/Options/OptionGroup.hpp
+    ${CMAKE_SOURCE_DIR}/include/Argon/Options/OptionHolder.hpp
+    ${CMAKE_SOURCE_DIR}/include/Argon/Options/Positional.hpp
+    ${CMAKE_SOURCE_DIR}/include/Argon/Options/SetValue.hpp
     ${CMAKE_SOURCE_DIR}/include/Argon/Parser.hpp
     ${CMAKE_SOURCE_DIR}/include/Argon/ParserConfig.hpp
     ${CMAKE_SOURCE_DIR}/include/Argon/Scanner.hpp

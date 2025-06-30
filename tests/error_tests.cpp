@@ -5,6 +5,8 @@
 #include "catch2/catch_test_macros.hpp"
 #include "catch2/matchers/catch_matchers_string.hpp"
 
+using namespace Argon;
+
 inline auto RequireMsg(const Argon::ErrorVariant& var) {
     REQUIRE(std::holds_alternative<Argon::ErrorMessage>(var));
     return std::get<Argon::ErrorMessage>(var);
@@ -905,30 +907,32 @@ TEST_CASE("Positional policy with parser config", "[positional][errors]") {
     std::string teacher1, teacher2;
     int classroom1, classroom2;
 
+    auto teachersGroup = OptionGroup()["--teachers"]
+        + Positional<std::string>("Teacher", &teacher1)("Teacher 1", "Teacher 1")
+        + Positional<std::string>("Teacher", &teacher2)("Teacher 2", "Teacher 2")
+        + Option(0, &classroom1)["--classroom1"]
+        + Option(0, &classroom2)["--classroom2"];
+
+    auto schoolGroup = OptionGroup()["--school"]
+        + Positional<std::string>("Class", &class1)("Class 1", "Class 1")
+        + Positional<std::string>("Class", &class2)("Class 2", "Class 2")
+        + Option(026, &homeroom)["--homeroom"]
+        + teachersGroup;
+
+    auto addressGroup = OptionGroup()["--address"]
+        + Positional(30, &input2)("Input2", "Input2 count")
+        + Positional(40, &output2)("Output2", "Output2 count")
+        + Option<std::string>("Street", &street)["--street"]
+        + Option(123, &zipcode)["--zipcode"];
+
+
     auto parser = Positional(10, &input)("Input", "Input count")
                 | Positional(20, &output)("Output", "Output count")
                 | Option<std::string>("Sally", &name)["--name1"]
                 | Option<std::string>("Sally", &name)["--name2"]
                 | Option<std::string>("Sally", &name)["--name3"]
-                | (
-                    OptionGroup()["--address"]
-                    + Positional(30, &input2)("Input2", "Input2 count")
-                    + Positional(40, &output2)("Output2", "Output2 count")
-                    + Option<std::string>("Street", &street)["--street"]
-                    + Option(123, &zipcode)["--zipcode"]
-                ) | (
-                    OptionGroup()["--school"]
-                    + Positional<std::string>("Class", &class1)("Class 1", "Class 1")
-                    + Positional<std::string>("Class", &class2)("Class 2", "Class 2")
-                    + Option(026, &homeroom)["--homeroom"]
-                    + (
-                        OptionGroup()["--teachers"]
-                        + Positional<std::string>("Teacher", &teacher1)("Teacher 1", "Teacher 1")
-                        + Positional<std::string>("Teacher", &teacher2)("Teacher 2", "Teacher 2")
-                        + Option(0, &classroom1)["--classroom1"]
-                        + Option(0, &classroom2)["--classroom2"]
-                    )
-                );
+                | addressGroup
+                | schoolGroup;
 
     SECTION("Before flags test 1") {
         parser.getConfig().setDefaultPositionalPolicy(PositionalPolicy::BeforeFlags);
@@ -1070,4 +1074,15 @@ TEST_CASE("Positional policy with parser config", "[positional][errors]") {
         CHECK(parser.getPositionalValue<std::string, 0>({"--school", "--teachers"}) == "Mr.Smith");
         CHECK(parser.getPositionalValue<std::string, 1>({"--school", "--teachers"}) == "Mrs.Smith");
     }
+
+    SECTION("Mixed policy test 1") {
+
+    }
+}
+
+TEST_CASE("Copy", "[copy]") {
+    auto group = OptionGroup{}["--group"].withPositionalPolicy(PositionalPolicy::AfterFlags);
+    auto copy = group;
+    CHECK(copy.getContext().getPositionalPolicy() == group.getContext().getPositionalPolicy());
+    CHECK(copy.getContext().getPositionalPolicy() == PositionalPolicy::AfterFlags);
 }

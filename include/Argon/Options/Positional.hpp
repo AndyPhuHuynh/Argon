@@ -12,7 +12,6 @@ protected:
     IsPositional() = default;
 public:
     virtual ~IsPositional() = default;
-    [[nodiscard]] virtual auto cloneAsPositional() const -> std::unique_ptr<IsPositional> = 0;
 };
 
 template <typename T>
@@ -31,9 +30,6 @@ public:
 
     Positional(T defaultValue, T *out) : SetSingleValueImpl<Positional, T>(defaultValue, out) {}
 
-    [[nodiscard]] auto cloneAsPositional() const -> std::unique_ptr<IsPositional> override {
-        return std::make_unique<Positional>(*this);
-    }
 protected:
     auto setValue(const ParserConfig& parserConfig, std::string_view flag, std::string_view value) -> void override {
         OptionConfig optionConfig;

@@ -1,12 +1,10 @@
 ﻿#ifndef ARGON_CONTEXT_INCLUDE
 #define ARGON_CONTEXT_INCLUDE
 
-#include <memory>
 #include <ranges>
 #include <string>
 #include <string_view>
 #include <type_traits>
-#include <variant>
 #include <vector>
 
 #include "Flag.hpp"
@@ -18,7 +16,7 @@ namespace Argon {
     template <typename OptionType> class OptionHolder;
     class IsPositional;
 
-    using OptionMap     = std::unordered_map<FlagPathWithAlias, const IOption*>;
+    using OptionMap = std::unordered_map<FlagPathWithAlias, const IOption*>;
 
     class Context {
         std::vector<OptionHolder<IOption>> m_options;

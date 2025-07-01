@@ -11,7 +11,7 @@
 namespace Argon {
     class IOption;
     class Context;
-    using OptionMap = std::unordered_map<FlagPathWithAlias, IOption*>;
+    using OptionMap = std::unordered_map<FlagPathWithAlias, const IOption*>;
     using GenerateConstraintErrorMsgFn = std::function<std::string(std::vector<std::string>)>;
 
     struct Requirement {
@@ -173,7 +173,7 @@ inline auto Constraints::validate(Context& rootContext, std::vector<std::string>
 
 inline auto Constraints::checkMultiOptionStdArray(const OptionMap& setOptions, std::vector<std::string>& errorMsgs) -> void {
     for (const auto& [flag, option] : setOptions) {
-        const auto multiOption = dynamic_cast<IArrayCapacity*>(option);
+        const auto multiOption = dynamic_cast<const IArrayCapacity*>(option);
         if (multiOption == nullptr) continue;
 
         if (!multiOption->isAtMaxCapacity()) {

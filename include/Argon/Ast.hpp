@@ -68,7 +68,7 @@ namespace Argon {
 
         void analyze(Parser& parser, Context& context) override;
 
-        void analyze(Parser& parser, const Context& context, size_t position);
+        void analyze(Parser& parser, Context& context, size_t position);
     };
 
     class OptionGroupAst : public OptionBaseAst {
@@ -272,7 +272,7 @@ inline Argon::PositionalAst::PositionalAst(const Token& flagToken) {
 
 inline void Argon::PositionalAst::analyze(Parser&, Context&) {}
 
-inline void Argon::PositionalAst::analyze(Parser& parser, const Context& context, const size_t position) {
+inline void Argon::PositionalAst::analyze(Parser& parser, Context& context, const size_t position) {
     IsPositional *opt = context.getPositional(position);
     if (!opt) {
         parser.addAnalysisError(std::format("Unexpected token: '{}'", value.value), value.pos, ErrorType::Analysis_UnexpectedToken);

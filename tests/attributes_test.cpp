@@ -79,16 +79,16 @@ TEST_CASE() {
 }
 
 TEST_CASE("Add default dashes") {
-    int x, y;
-    auto parser = Option(&x)["main"]["m"]
-                | Option(&y)["--main2"]["-m2"];
-
-    parser.parse("--main 1 -m 2 --main2 3 -m2 4");
-
-    CHECK(!parser.hasErrors());
-    // parser.printErrors();
-    CHECK(x == 2);
-    CHECK(y == 4);
+    // int x, y;
+    // auto parser = Option(&x)["main"]["m"]
+    //             | Option(&y)["--main2"]["-m2"];
+    //
+    // parser.parse("--main 1 -m 2 --main2 3 -m2 4");
+    //
+    // CHECK(!parser.hasErrors());
+    // // parser.printErrors();
+    // CHECK(x == 2);
+    // CHECK(y == 4);
 }
 
 TEST_CASE("Help message") {

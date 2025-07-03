@@ -28,7 +28,7 @@ namespace Argon {
         std::unique_ptr<Context> m_context = std::make_unique<Context>();
         Scanner m_scanner;
 
-        std::vector<std::string> m_contextValidationErrors;
+        ErrorGroup m_validationErrors = ErrorGroup("Validation Errors", -1, -1);
         ErrorGroup m_syntaxErrors = ErrorGroup("Syntax Errors", -1, -1);
         ErrorGroup m_analysisErrors = ErrorGroup("Analysis Errors", -1, -1);
         std::vector<std::string> m_constraintErrors;
@@ -210,8 +210,10 @@ inline auto Parser::getAnalysisErrors() const -> const ErrorGroup& {
 }
 
 inline auto Parser::hasErrors() const -> bool {
-    return !m_contextValidationErrors.empty() || m_syntaxErrors.hasErrors() ||
-            m_analysisErrors.hasErrors() || !m_constraintErrors.empty();
+    return m_validationErrors.hasErrors() ||
+           m_syntaxErrors.hasErrors() ||
+           m_analysisErrors.hasErrors() ||
+           !m_constraintErrors.empty();
 }
 
 inline auto Parser::getHelpMessage() const -> std::string {
@@ -219,11 +221,10 @@ inline auto Parser::getHelpMessage() const -> std::string {
 }
 
 inline auto Parser::printErrors() const -> void {
-    if (!m_contextValidationErrors.empty()) {
-        std::cout << "Parser is in an invalid state:\n";
-        for (const auto& err : m_contextValidationErrors) {
-            std::cout << " - " << err << "\n";
-        }
+    if (m_validationErrors.hasErrors()) {
+        std::cerr << "Argon::Parser is in an invalid state. "
+                     "Please fix the following errors in order for the library to function: \n";
+        m_validationErrors.printErrors();
         return;
     }
     if (m_syntaxErrors.hasErrors()) {
@@ -251,10 +252,11 @@ inline auto Parser::parse(const int argc, const char **argv) -> bool {
 }
 
 inline auto Parser::parse(const std::string_view str) -> bool {
-    m_context->applyPrefixes(m_shortPrefix, m_longPrefix);
-
-    m_context->validate(m_contextValidationErrors);
-    if (!m_contextValidationErrors.empty()) {
+    m_context->validate(m_validationErrors, m_shortPrefix, m_longPrefix);
+    if (m_validationErrors.hasErrors()) {
+        std::cerr << "Argon::Parser is in an invalid state. "
+                     "Please fix the following errors in order for the library to function: \n";
+        m_validationErrors.printErrors();
         return false;
     }
 
@@ -582,7 +584,7 @@ inline auto Parser::copyFrom(const Parser& other) -> void {
     m_context = std::make_unique<Context>(*other.m_context);
     m_scanner = other.m_scanner;
 
-    m_contextValidationErrors   = other.m_contextValidationErrors;
+    m_validationErrors          = other.m_validationErrors;
     m_syntaxErrors              = other.m_syntaxErrors;
     m_analysisErrors            = other.m_analysisErrors;
     m_constraintErrors          = other.m_constraintErrors;
@@ -599,7 +601,7 @@ inline auto Parser::copyFrom(const Parser& other) -> void {
 }
 
 inline auto Parser::reset() -> void {
-    m_contextValidationErrors.clear();
+    m_validationErrors.clear();
     m_syntaxErrors.clear();
     m_analysisErrors.clear();
     m_constraintErrors.clear();

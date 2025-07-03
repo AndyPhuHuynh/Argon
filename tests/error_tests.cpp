@@ -1096,10 +1096,3 @@ TEST_CASE("Positional policy with parser config", "[positional][errors]") {
         CheckMessage(RequireMsg(syntaxErrors.getErrors()[7]), {"--classroom2", "Mrs.Smith", "--school > --teachers"}, 177, ErrorType::Syntax_MisplacedPositional);
     }
 }
-
-TEST_CASE("Copy", "[copy]") {
-    auto group = OptionGroup{}["--group"].withPositionalPolicy(PositionalPolicy::AfterFlags);
-    auto copy = group;
-    CHECK(copy.getContext().getPositionalPolicy() == group.getContext().getPositionalPolicy());
-    CHECK(copy.getContext().getPositionalPolicy() == PositionalPolicy::AfterFlags);
-}

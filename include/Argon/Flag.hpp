@@ -81,8 +81,6 @@ public:
     IFlag& operator=(IFlag&&) = default;
 
     [[nodiscard]] auto getFlag() const -> const Flag&;
-
-    auto applyPrefixes(std::string_view shortPrefix, std::string_view longPrefix) -> void;
 };
 
 template <typename Derived>
@@ -159,18 +157,6 @@ inline auto operator==(const FlagPath& flagPath, const FlagPathWithAlias& flagPa
     return flagPathWithAlias.flag.containsFlag(flagPath.flag);
 }
 
-inline auto addPrefixToString(std::string& flag,
-    const std::string_view shortPrefix, const std::string_view longPrefix) -> void {
-    if (flag.empty()) {
-        throw std::invalid_argument("Flag has to be at least one character long");
-    }
-
-    if (flag.starts_with(shortPrefix) || flag.starts_with(longPrefix)) return;
-
-    flag.length() == 1 ?
-        flag.insert(0, shortPrefix) :
-        flag.insert(0, longPrefix);
-}
 } // End namespace Argon
 
 //---------------------------------------------------Implementations----------------------------------------------------
@@ -193,13 +179,6 @@ inline auto Flag::getString() const -> std::string {
 
 inline auto Flag::isEmpty() const -> bool {
     return mainFlag.empty() && aliases.empty();
-}
-
-inline auto Flag::applyPrefixes(const std::string_view shortPrefix, const std::string_view longPrefix) {
-    addPrefixToString(mainFlag, shortPrefix, longPrefix);
-    for (auto& alias : aliases) {
-        addPrefixToString(alias, shortPrefix, longPrefix);
-    }
 }
 
 inline FlagPathWithAlias::FlagPathWithAlias(std::vector<Flag> path, Flag flag) : groupPath(std::move(path)), flag(std::move(flag)) {}
@@ -267,10 +246,6 @@ inline InvalidFlagPathException::InvalidFlagPathException(const FlagPath& flagPa
 
 inline auto IFlag::getFlag() const -> const Flag& {
     return m_flag;
-}
-
-inline auto IFlag::applyPrefixes(const std::string_view shortPrefix, const std::string_view longPrefix) -> void {
-    m_flag.applyPrefixes(shortPrefix, longPrefix);
 }
 
 template<typename Derived>

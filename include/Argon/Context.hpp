@@ -7,6 +7,7 @@
 #include <type_traits>
 #include <vector>
 
+#include "Error.hpp"
 #include "Flag.hpp"
 #include "ParserConfig.hpp"
 #include "Traits.hpp"
@@ -62,9 +63,7 @@ namespace Argon {
 
         [[nodiscard]] auto collectAllSetOptions() const -> OptionMap;
 
-        auto validate(std::vector<std::string>& errorMsgs) const -> void;
-
-        auto applyPrefixes(std::string_view shortPrefix, std::string_view longPrefix) -> void;
+        auto validate(ErrorGroup& errorGroup, std::string_view shortPrefix, std::string_view longPrefix) const -> void;
 
         [[nodiscard]] auto getPositionalPolicy() const -> PositionalPolicy;
 
@@ -86,7 +85,9 @@ namespace Argon {
 
         auto collectAllSetOptions(OptionMap& map, const std::vector<Flag>& pathSoFar) const -> void;
 
-        auto validate(const FlagPath& pathSoFar, std::vector<std::string>& errorMsgs) const -> void;
+        auto validate(const FlagPath& pathSoFar, ErrorGroup& validationErrors, std::string_view shortPrefix, std::string_view longPrefix) const -> void;
+
+        static auto checkPrefixes(const std::vector<const Flag *>& flags, ErrorGroup& validationErrors, std::string_view shortPrefix, std::string_view longPrefix) -> void;
     };
 }
 
@@ -100,6 +101,13 @@ inline auto containsFlagPath(const OptionMap& map, const FlagPath& flag) -> cons
     }
     return nullptr;
 }
+
+inline auto startsWithAny(const std::string_view str, const std::initializer_list<std::string_view> prefixes) -> bool {
+    return std::ranges::any_of(prefixes, [str](const std::string_view prefix) {
+        return str.starts_with(prefix);
+    });
+}
+
 } // End namespace Argon
 
 //---------------------------------------------------Implementations----------------------------------------------------
@@ -355,12 +363,19 @@ inline auto Context::collectAllSetOptions(OptionMap& map, //NOLINT (recursion)
     }
 }
 
-inline auto Context::validate(std::vector<std::string>& errorMsgs) const -> void {
-    validate(FlagPath(), errorMsgs);
+inline auto Context::validate(
+    ErrorGroup& errorGroup,
+    const std::string_view shortPrefix, const std::string_view longPrefix
+) const -> void {
+    validate(FlagPath(), errorGroup, shortPrefix, longPrefix);
 }
 
-inline auto Context::validate(const FlagPath& pathSoFar, std::vector<std::string>& errorMsgs) const -> void { //NOLINT (recursion)
+inline auto Context::validate( // NOLINT (misc-no-recursion)
+    const FlagPath& pathSoFar, ErrorGroup& validationErrors,
+    const std::string_view shortPrefix, const std::string_view longPrefix
+) const -> void {
     const auto allFlags = collectAllFlags();
+    checkPrefixes(allFlags, validationErrors, shortPrefix, longPrefix);
     std::set<std::string> flags;
     std::set<std::string> duplicateFlags;
     for (const auto& flag : allFlags) {
@@ -381,11 +396,13 @@ inline auto Context::validate(const FlagPath& pathSoFar, std::vector<std::string
 
     for (const auto& flag : duplicateFlags) {
         if (pathSoFar.flag.empty()) {
-            errorMsgs.emplace_back(std::format("Multiple flags found with the value of '{}'", flag));
+            validationErrors.addErrorMessage(
+                std::format("Multiple flags found with the value of '{}'", flag),
+                -1, ErrorType::Validation_DuplicateFlag);
         } else {
-            errorMsgs.emplace_back(std::format(
-                "Multiple flags found with the value of '{}' within group '{}'",
-                flag, pathSoFar.getString()));
+            validationErrors.addErrorMessage(std::format(
+                "Multiple flags found with the value of '{}' within group '{}'", flag, pathSoFar.getString()),
+                -1, ErrorType::Validation_DuplicateFlag);
         }
     }
 
@@ -399,21 +416,27 @@ inline auto Context::validate(const FlagPath& pathSoFar, std::vector<std::string
         if (const auto groupPtr = dynamic_cast<const OptionGroup*>(ptr); groupPtr != nullptr) {
             FlagPath newPath = pathSoFar;
             newPath.extendPath(groupPtr->getFlag().mainFlag);
-            groupPtr->getContext().validate(newPath, errorMsgs);
+            groupPtr->getContext().validate(newPath, validationErrors, shortPrefix, longPrefix);
         }
     }
 }
 
-inline auto Context::applyPrefixes(const std::string_view shortPrefix,  // NOLINT (const)
-                                   const std::string_view longPrefix) -> void {
-    for (auto& holder : m_options) {
-        IOption *ptr = holder.getPtr();
-        if (!dynamic_cast<const IFlag*>(ptr)) {
-            throw std::invalid_argument("Unsupported option type");
+inline auto Context::checkPrefixes(
+    const std::vector<const Flag *>& flags, ErrorGroup& validationErrors,
+    const std::string_view shortPrefix, const std::string_view longPrefix
+) -> void {
+    for (const auto& flag : flags) {
+        if (!startsWithAny(flag->mainFlag, {shortPrefix, longPrefix})) {
+            validationErrors.addErrorMessage(
+                std::format("Flag '{}' does not start with a flag prefix", flag->mainFlag),
+                -1, ErrorType::Validation_NoPrefix);
         }
-        dynamic_cast<IFlag*>(ptr)->applyPrefixes(shortPrefix, longPrefix);
-        if (const auto groupPtr = dynamic_cast<OptionGroup*>(ptr); groupPtr != nullptr) {
-            groupPtr->getContext().applyPrefixes(shortPrefix, longPrefix);
+        for (const auto& alias : flag->aliases) {
+            if (!startsWithAny(alias, {shortPrefix, longPrefix})) {
+                validationErrors.addErrorMessage(
+                std::format("Flag '{}' does not start with a flag prefix", alias),
+                -1, ErrorType::Validation_NoPrefix);
+            }
         }
     }
 }
@@ -431,7 +454,7 @@ inline auto Context::collectAllFlags() const -> std::vector<const Flag*> {
     for (const auto& holder : m_options) {
         const IOption *ptr = holder.getPtr();
         if (!dynamic_cast<const IFlag*>(ptr)) {
-            throw std::invalid_argument("Unsupported option type");
+            throw std::invalid_argument("Argon internal error: option without flag in m_options");
         }
         result.emplace_back(&dynamic_cast<const IFlag*>(ptr)->getFlag());
     }

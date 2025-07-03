@@ -154,13 +154,14 @@ inline auto checkPositionals(const Ast& thisAst,
                 if (flagIndex == 0) continue;
                 if (contextPath.empty()) {
                     parser.addSyntaxError(std::format(
-                        "Found positional value '{}' after flag '{}'. Positional values must occur before all flags.",
+                        "Found positional value '{}' after flag '{}'. Positional values must occur before all flags at top level.",
                         positional->value.value, options[flagIndex - 1]->flag.value),
                         positional->value.pos, ErrorType::Syntax_MisplacedPositional);
                 } else {
                     parser.addSyntaxError(std::format(
-                        "Found positional value '{}' after flag '{}' inside group '{}'. Positional values must occur before all flags.",
-                        positional->value.value, options[flagIndex - 1]->flag.value, contextPath),
+                        "Found positional value '{}' after flag '{}' inside group '{}'. "
+                        "Positional values must occur before all flags inside group '{}'.",
+                        positional->value.value, options[flagIndex - 1]->flag.value, contextPath, contextPath),
                         positional->value.pos, ErrorType::Syntax_MisplacedPositional);
                 }
             }
@@ -177,13 +178,14 @@ inline auto checkPositionals(const Ast& thisAst,
                 if (flagIndex >= options.size()) break;
                 if (contextPath.empty()) {
                     parser.addSyntaxError(std::format(
-                        "Found positional value '{}' before flag '{}'. Positional values must occur after all flags.",
+                        "Found positional value '{}' before flag '{}'. Positional values must occur after all flags at top level.",
                         positional->value.value, options[flagIndex]->flag.value),
                         positional->value.pos, ErrorType::Syntax_MisplacedPositional);
                 } else {
                     parser.addSyntaxError(std::format(
-                        "Found positional value '{}' before flag '{}' inside group '{}'. Positional values must occur after all flags.",
-                        positional->value.value, options[flagIndex]->flag.value, contextPath),
+                        "Found positional value '{}' before flag '{}' inside group '{}'. "
+                        "Positional values must occur after all flags inside group '{}'.",
+                        positional->value.value, options[flagIndex]->flag.value, contextPath, contextPath),
                         positional->value.pos, ErrorType::Syntax_MisplacedPositional);
                 }
             }

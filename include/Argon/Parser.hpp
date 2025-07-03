@@ -512,7 +512,7 @@ auto Parser::getOptionValue(const std::string_view flag) -> const ValueType& {
 }
 
 template<typename ValueType>
-auto Parser::getOptionValue(std::initializer_list<std::string_view> flagPath) -> const ValueType& {
+auto Parser::getOptionValue(const std::initializer_list<std::string_view> flagPath) -> const ValueType& {
     return m_context->getOptionValue<ValueType>(flagPath);
 }
 
@@ -527,7 +527,7 @@ auto Parser::getMultiValue(const std::string_view flag) -> const Container& {
 }
 
 template<typename Container>
-auto Parser::getMultiValue(std::initializer_list<std::string_view> flagPath) -> const Container& {
+auto Parser::getMultiValue(const std::initializer_list<std::string_view> flagPath) -> const Container& {
     return m_context->getMultiValue<Container>(flagPath);
 }
 

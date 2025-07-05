@@ -186,7 +186,7 @@ inline auto Constraints::checkMultiOptionStdArray(const OptionMap& setOptions, s
 
 inline auto Constraints::checkRequiredFlags(const OptionMap& setOptions, std::vector<std::string>& errorMsgs) const -> void {
     for (const auto& requirement : m_requiredFlags) {
-        if (containsFlagPath(setOptions, requirement.flagPath)) {
+        if (detail::containsFlagPath(setOptions, requirement.flagPath)) {
             continue;
         }
         if (requirement.errorMsg.empty()) {
@@ -203,15 +203,15 @@ inline auto Constraints::checkMutuallyExclusive(const OptionMap& setOptions, std
     std::vector<std::string> errorFlags;
     for (auto& [flagToCheck, exclusiveFlags, customErr, genMsg] : m_mutuallyExclusiveFlags) {
         errorFlags.clear();
-        const FlagPathWithAlias *flag = containsFlagPath(setOptions, flagToCheck);
+        const FlagPathWithAlias *flag = detail::containsFlagPath(setOptions, flagToCheck);
         // Flag to check is not set
         if (flag == nullptr) continue;
 
         // Check the exclusive flags list
         for (const auto& errorFlag : exclusiveFlags) {
-            const FlagPathWithAlias *errorFlagAlias = containsFlagPath(setOptions, errorFlag);
             // If error flag is set
-            if (errorFlagAlias != nullptr) {
+            if (const FlagPathWithAlias *errorFlagAlias = detail::containsFlagPath(setOptions, errorFlag);
+                errorFlagAlias != nullptr) {
                 errorFlags.push_back(errorFlag.getString());
             }
         }
@@ -239,15 +239,15 @@ inline auto Constraints::checkDependentFlags(const OptionMap& setOptions, std::v
     std::vector<std::string> errorFlags;
     for (auto& [flagToCheck, dependentFlags, customErr, genMsg] : m_dependentFlags) {
         errorFlags.clear();
-        const FlagPathWithAlias *flag = containsFlagPath(setOptions, flagToCheck);
+        const FlagPathWithAlias *flag = detail::containsFlagPath(setOptions, flagToCheck);
         // Flag to check is not set
         if (flag == nullptr) continue;
 
         // Check the exclusive flags list
         for (const auto& errorFlag : dependentFlags) {
-            const FlagPathWithAlias *errorFlagAlias = containsFlagPath(setOptions, errorFlag);
             // If error flag is not set
-            if (errorFlagAlias == nullptr) {
+            if (const FlagPathWithAlias *errorFlagAlias = detail::containsFlagPath(setOptions, errorFlag);
+                errorFlagAlias == nullptr) {
                 errorFlags.push_back(errorFlag.getString());
             }
         }

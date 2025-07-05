@@ -54,12 +54,14 @@ public:
     }
 
     [[nodiscard]] auto getRef() -> IOption& {
-        assert(m_ownedOption || m_externalOption);
+        assert((m_ownedOption != nullptr || m_externalOption != nullptr)
+            && "Attempting to get use getRef without a valid reference");
         return m_ownedOption ? *m_ownedOption : *m_externalOption;
     }
 
     [[nodiscard]] auto getRef() const -> const IOption& {
-        assert(m_ownedOption || m_externalOption);
+        assert((m_ownedOption != nullptr || m_externalOption != nullptr)
+            && "Attempting to get use getRef without a valid reference");
         return m_ownedOption ? *m_ownedOption : *m_externalOption;
     }
 

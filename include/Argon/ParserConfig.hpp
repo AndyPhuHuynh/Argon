@@ -1,6 +1,7 @@
 #ifndef ARGON_PARSERCONFIG_INCLUDE
 #define ARGON_PARSERCONFIG_INCLUDE
 
+#include <cassert>
 #include <functional>
 #include <string_view>
 #include <typeindex>
@@ -45,6 +46,19 @@ namespace Argon {
         CharMode charMode = CharMode::UseDefault;
     };
 }
+
+//---------------------------------------------------Free Functions-----------------------------------------------------
+
+namespace Argon::detail {
+
+inline auto resolvePositionalPolicy(
+    const PositionalPolicy defaultPolicy, const PositionalPolicy contextPolicy
+) -> PositionalPolicy {
+    assert(defaultPolicy != PositionalPolicy::UseDefault && "Default positional policy must be not use defaults");
+    return contextPolicy == PositionalPolicy::UseDefault ? defaultPolicy : contextPolicy;
+}
+
+} // End namespace Argon::detail
 
 //---------------------------------------------------Implementations----------------------------------------------------
 

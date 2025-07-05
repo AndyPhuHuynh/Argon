@@ -47,7 +47,7 @@ namespace Argon {
 
         [[nodiscard]] auto containsLocalFlag(std::string_view flag) const -> bool;
 
-        [[nodiscard]] auto getHelpMessage(size_t maxLineWidth = 120) const -> std::string;
+        [[nodiscard]] auto getHelpMessage(size_t maxLineWidth, PositionalPolicy defaultPolicy) const -> std::string;
 
         template<typename ValueType>
         auto getOptionValue(const FlagPath& flagPath) -> const ValueType&;
@@ -62,6 +62,10 @@ namespace Argon {
         auto getPositionalValue(const FlagPath& groupPath) -> const ValueType&;
 
         [[nodiscard]] auto collectAllSetOptions() const -> OptionMap;
+
+        [[nodiscard]] auto getOptionsVector() const -> const std::vector<OptionHolder<IOption>>&;
+
+        [[nodiscard]] auto getPositionalsVector() const -> const std::vector<OptionHolder<IOption>>&;
 
         auto validate(ErrorGroup& errorGroup, std::string_view shortPrefix, std::string_view longPrefix) const -> void;
 
@@ -79,9 +83,9 @@ namespace Argon {
 
         auto resolveFlagGroup(const FlagPath& flagPath) -> Context&;
 
-        auto getHelpMessage(std::stringstream& ss, size_t leadingSpaces, size_t maxLineWidth) const -> void;
+        auto getHelpMessage(std::stringstream& ss, size_t leadingSpaces, size_t maxLineWidth, PositionalPolicy defaultPolicy) const -> void;
 
-        static auto getHelpMessage(std::stringstream& ss, size_t leadingSpaces, size_t maxLineWidth, const IOption *option) -> void;
+        static auto getHelpMessageForOption(std::stringstream& ss, size_t leadingSpaces, size_t maxLineWidth, const IOption *option, PositionalPolicy defaultPolicy) -> void;
 
         auto collectAllSetOptions(OptionMap& map, const std::vector<Flag>& pathSoFar) const -> void;
 
@@ -93,7 +97,17 @@ namespace Argon {
 
 //---------------------------------------------------Free Functions-----------------------------------------------------
 
-namespace Argon {
+#include <algorithm>
+#include <iomanip>
+#include <set>
+
+#include "Argon/Options/Option.hpp"
+#include "Argon/Options/OptionGroup.hpp"
+#include "Argon/Options/OptionHolder.hpp"
+#include "Argon/Options/MultiOption.hpp"
+#include "Argon/Options/Positional.hpp"
+
+namespace Argon::detail {
 
 inline auto containsFlagPath(const OptionMap& map, const FlagPath& flag) -> const FlagPathWithAlias * {
     for (const auto& flagWithAlias : map | std::views::keys) {
@@ -108,19 +122,71 @@ inline auto startsWithAny(const std::string_view str, const std::initializer_lis
     });
 }
 
-} // End namespace Argon
+auto assertHasFlag(const auto *opt) -> void {
+    assert(dynamic_cast<const IFlag*>(opt) != nullptr && "Argon internal error: option does not have a flag");
+}
+
+inline auto getIFlag(OptionHolder<IOption>& holder) -> IFlag * {
+    const auto iFlag = dynamic_cast<IFlag *>(holder.getPtr());
+    assert(iFlag != nullptr && "Argon internal error: option without flag in m_options");
+    return iFlag;
+}
+
+inline auto getIFlag(const OptionHolder<IOption>& holder) -> const IFlag * {
+    const auto iFlag = dynamic_cast<const IFlag *>(holder.getPtr());
+    assert(iFlag != nullptr && "Argon internal error: option without flag in m_options");
+    return iFlag;
+}
+
+inline auto getNameAndInputHint(const IOption *option, const PositionalPolicy defaultPositionalPolicy) -> std::string {
+    auto concatPositionals = [](std::stringstream& ss, const std::vector<OptionHolder<IOption>>& positionals) {
+        if (positionals.empty()) return;
+        ss << ' ';
+        for (size_t i = 0; i < positionals.size(); ++i) {
+            ss << positionals[i].getRef().getInputHint();
+            if (i < positionals.size() - 1) {
+                ss << ' ';
+            }
+        }
+    };
+
+    auto concatTypeHint = [](std::stringstream& ss, const IOption *opt) {
+        if (const auto& typeHint = opt->getInputHint(); !typeHint.empty()) {
+            ss << ' ' << typeHint;
+        }
+    };
+
+    std::stringstream name;
+
+    if (const auto flag = dynamic_cast<const IFlag *>(option)) {
+        name << flag->getFlag().getString();
+        if (const auto group = dynamic_cast<const OptionGroup *>(option); group != nullptr) {
+            const auto positionals = group->getContext().getPositionalsVector();
+            const auto policy = resolvePositionalPolicy(defaultPositionalPolicy, group->getContext().getPositionalPolicy());
+            switch (policy) {
+                case PositionalPolicy::BeforeFlags:
+                    concatPositionals(name, positionals);
+                    concatTypeHint(name, option);
+                    break;
+                case PositionalPolicy::Interleaved:
+                case PositionalPolicy::AfterFlags:
+                    concatTypeHint(name, option);
+                    concatPositionals(name, positionals);
+                    break;
+                case PositionalPolicy::UseDefault:
+                    std::unreachable();
+            };
+        }
+    } else if (dynamic_cast<const IsPositional *>(option)) {
+        concatTypeHint(name, option);
+    }
+    name << ':';
+    return name.str();
+}
+
+} // End namespace Argon::detail
 
 //---------------------------------------------------Implementations----------------------------------------------------
-
-#include <algorithm>
-#include <iomanip>
-#include <set>
-
-#include "Argon/Options/Option.hpp"
-#include "Argon/Options/OptionGroup.hpp"
-#include "Argon/Options/OptionHolder.hpp"
-#include "Argon/Options/MultiOption.hpp"
-#include "Argon/Options/Positional.hpp"
 
 namespace Argon {
 
@@ -145,11 +211,8 @@ auto Context::addNonPositionalOption(T&& option) -> void {
 
 inline auto Context::getFlagOption(const std::string_view flag) -> IOption * {
     const auto it = std::ranges::find_if(m_options, [&flag](const OptionHolder<IOption>& holder) {
-        const auto optPtr = holder.getPtr();
-        if (!dynamic_cast<const IFlag*>(optPtr)) {
-            throw std::invalid_argument("Unsupported option type");
-        }
-        return dynamic_cast<const IFlag*>(optPtr)->getFlag().containsFlag(flag);
+        const auto iFlag = detail::getIFlag(holder);
+        return iFlag->getFlag().containsFlag(flag);
     });
 
     return it == m_options.end() ? nullptr : it->getPtr();
@@ -214,7 +277,7 @@ auto Context::getPositionalValue(const FlagPath& groupPath) -> const ValueType& 
     }
     const auto groupPtr = dynamic_cast<OptionGroup*>(iOption);
     if (groupPtr == nullptr) {
-        throw std::invalid_argument(std::format("Given flag path is not an Option Group: {}", groupPath.getString()));
+        throw InvalidFlagPathException(std::format("Given flag path is not an Option Group: '{}'", groupPath.getString()));
     }
     return groupPtr->getContext().getPositionalValue<ValueType, Pos>();
 }
@@ -226,64 +289,75 @@ inline auto Context::containsLocalFlag(const std::string_view flag) const -> boo
     });
 }
 
-inline auto Context::getHelpMessage(const size_t maxLineWidth) const -> std::string {
+inline auto Context::getHelpMessage(const size_t maxLineWidth, const PositionalPolicy defaultPolicy) const -> std::string {
     std::stringstream ss;
     ss << "Usage: [options]\n\n" << "Options:\n" << std::string(maxLineWidth, '-') << "\n";
-    getHelpMessage(ss, 0, maxLineWidth);
+    getHelpMessage(ss, 0, maxLineWidth, defaultPolicy);
     return ss.str();
 }
 
-inline auto Context::getHelpMessage(std::stringstream& ss, const size_t leadingSpaces, const size_t maxLineWidth) const -> void { //NOLINT (recursion)
+inline auto Context::getHelpMessage( // NOLINT (misc-no-recursion)
+    std::stringstream& ss, const size_t leadingSpaces, const size_t maxLineWidth, const PositionalPolicy defaultPolicy
+) const -> void {
     std::vector<const OptionGroup*> groups;
+    auto leading = std::string(leadingSpaces, ' ');
+    bool sectionBeforeSet = false;
 
+    if (!m_options.empty()) {
+        ss << leading << "Options:\n";
+        sectionBeforeSet = true;
+    }
     for (const auto& holder : m_options) {
         const auto optPtr = holder.getPtr();
-
-        if (!dynamic_cast<const IFlag*>(optPtr)) {
-            throw std::invalid_argument("Unsupported option type");
-        }
-
+        detail::assertHasFlag(optPtr);
         if (const auto groupPtr = dynamic_cast<const OptionGroup*>(optPtr); groupPtr != nullptr) {
             groups.push_back(groupPtr);
             continue;
         }
-        getHelpMessage(ss, leadingSpaces, maxLineWidth, optPtr);
+        getHelpMessageForOption(ss, leadingSpaces, maxLineWidth, optPtr, defaultPolicy);
     }
 
-    // Print top level group help messages
-    for (const auto& group: groups) {
-        getHelpMessage(ss, leadingSpaces, maxLineWidth, group);
+    if (!m_positionals.empty()) {
+        if (sectionBeforeSet) ss << "\n";
+        ss << leading << "Positionals:\n";
+        sectionBeforeSet = true;
+    }
+    for (const auto& holder : m_positionals) {
+        getHelpMessageForOption(ss, leadingSpaces, maxLineWidth, holder.getPtr(), defaultPolicy);
     }
 
-    // Print nested group messages
-    const auto leading = std::string(leadingSpaces + 4, ' ');
+    // Print group messages
+    if (!groups.empty()) {
+        if (sectionBeforeSet) ss << "\n";
+        ss << leading << "Groups:\n";
+        leading += "    ";
+    }
     for (const auto& group : groups) {
+        getHelpMessageForOption(ss, leadingSpaces, maxLineWidth, group, defaultPolicy);
         ss << "\n" << leading;
+
         if (const auto& inputHint = group->getInputHint(); !inputHint.empty()) {
             ss << inputHint;
         } else {
             ss << std::format("[{}]", group->getFlag().getString());
         }
+
         ss << "\n" << leading << std::string(maxLineWidth - leadingSpaces - 4, '-') << "\n";
-        group->getContext().getHelpMessage(ss, leadingSpaces + 4, maxLineWidth);
+        group->getContext().getHelpMessage(ss, leadingSpaces + 4, maxLineWidth, defaultPolicy);
     }
 }
 
-inline auto Context::getHelpMessage(std::stringstream& ss, const size_t leadingSpaces,
-                                    const size_t maxLineWidth, const IOption *option) -> void {
-    if (!dynamic_cast<const IFlag*>(option)) {
-        throw std::invalid_argument("Unsupported option type");
-    }
-    // Print flag
+inline auto Context::getHelpMessageForOption(
+    std::stringstream& ss, const size_t leadingSpaces, const size_t maxLineWidth, const IOption *option,
+    const PositionalPolicy defaultPolicy
+) -> void {
     ss << std::string(leadingSpaces, ' ');
     constexpr size_t maxFlagWidth = 32;
-    std::string flag = dynamic_cast<const IFlag*>(option)->getFlag().getString();
-    if (const auto& typeHint = option->getInputHint(); !typeHint.empty()) {
-        flag += ' ';
-        flag += typeHint;
-    }
-    flag += ':';
-    ss << std::left << std::setw(maxFlagWidth) << flag;
+
+    // Print name
+    const auto name = detail::getNameAndInputHint(option, defaultPolicy);
+
+    ss << "  " << std::left << std::setw(maxFlagWidth) << name;
 
     // Print description with line wrapping
     const std::string& description = option->getDescription();
@@ -321,7 +395,7 @@ inline auto Context::getHelpMessage(std::stringstream& ss, const size_t leadingS
         sectionStart = breakPoint;
     }
 
-    if (flag.length() > maxFlagWidth) {
+    if (name.length() > maxFlagWidth) {
         ss << "\n" << std::string(leadingSpaces + maxFlagWidth, ' ') << sections[0];
     } else {
         ss << sections[0];
@@ -338,6 +412,14 @@ inline auto Context::collectAllSetOptions() const -> OptionMap {
     OptionMap result;
     collectAllSetOptions(result, std::vector<Flag>());
     return result;
+}
+
+inline auto Context::getOptionsVector() const -> const std::vector<OptionHolder<IOption>>& {
+    return m_options;
+}
+
+inline auto Context::getPositionalsVector() const -> const std::vector<OptionHolder<IOption>>& {
+    return m_positionals;
 }
 
 inline auto Context::collectAllSetOptions(OptionMap& map, //NOLINT (recursion)
@@ -407,13 +489,8 @@ inline auto Context::validate( // NOLINT (misc-no-recursion)
     }
 
     for (const auto& holder : m_options) {
-        const IOption *ptr = holder.getPtr();
-
-        if (!dynamic_cast<const IFlag*>(ptr)) {
-            throw std::invalid_argument("Unsupported option type");
-        }
-
-        if (const auto groupPtr = dynamic_cast<const OptionGroup*>(ptr); groupPtr != nullptr) {
+        const IOption& ref = holder.getRef();
+        if (const auto groupPtr = dynamic_cast<const OptionGroup*>(&ref); groupPtr != nullptr) {
             FlagPath newPath = pathSoFar;
             newPath.extendPath(groupPtr->getFlag().mainFlag);
             groupPtr->getContext().validate(newPath, validationErrors, shortPrefix, longPrefix);
@@ -426,13 +503,13 @@ inline auto Context::checkPrefixes(
     const std::string_view shortPrefix, const std::string_view longPrefix
 ) -> void {
     for (const auto& flag : flags) {
-        if (!startsWithAny(flag->mainFlag, {shortPrefix, longPrefix})) {
+        if (!detail::startsWithAny(flag->mainFlag, {shortPrefix, longPrefix})) {
             validationErrors.addErrorMessage(
                 std::format("Flag '{}' does not start with a flag prefix", flag->mainFlag),
                 -1, ErrorType::Validation_NoPrefix);
         }
         for (const auto& alias : flag->aliases) {
-            if (!startsWithAny(alias, {shortPrefix, longPrefix})) {
+            if (!detail::startsWithAny(alias, {shortPrefix, longPrefix})) {
                 validationErrors.addErrorMessage(
                 std::format("Flag '{}' does not start with a flag prefix", alias),
                 -1, ErrorType::Validation_NoPrefix);
@@ -452,11 +529,8 @@ inline auto Context::setPositionalPolicy(const PositionalPolicy newPolicy) -> vo
 inline auto Context::collectAllFlags() const -> std::vector<const Flag*> {
     std::vector<const Flag*> result;
     for (const auto& holder : m_options) {
-        const IOption *ptr = holder.getPtr();
-        if (!dynamic_cast<const IFlag*>(ptr)) {
-            throw std::invalid_argument("Argon internal error: option without flag in m_options");
-        }
-        result.emplace_back(&dynamic_cast<const IFlag*>(ptr)->getFlag());
+        const auto iFlag = detail::getIFlag(holder);
+        result.emplace_back(&iFlag->getFlag());
     }
     return result;
 }

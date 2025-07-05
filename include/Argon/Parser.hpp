@@ -71,7 +71,7 @@ namespace Argon {
 
         [[nodiscard]] auto hasErrors() const -> bool;
 
-        [[nodiscard]] auto getHelpMessage() const -> std::string;
+        [[nodiscard]] auto getHelpMessage(size_t maxLineWidth = 120) const -> std::string;
 
         auto printErrors() const -> void;
 
@@ -216,8 +216,8 @@ inline auto Parser::hasErrors() const -> bool {
            !m_constraintErrors.empty();
 }
 
-inline auto Parser::getHelpMessage() const -> std::string {
-    return m_context->getHelpMessage();
+inline auto Parser::getHelpMessage(const size_t maxLineWidth) const -> std::string {
+    return m_context->getHelpMessage(maxLineWidth, m_config.getDefaultPositionalPolicy());
 }
 
 inline auto Parser::printErrors() const -> void {

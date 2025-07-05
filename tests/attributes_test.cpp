@@ -127,5 +127,24 @@ TEST_CASE("Help message 2") {
         )
         | MultiOption<std::vector<int>>()["--courseids"]("<ids...>", "Specify a list of course ids ");
     const auto msg = parser.getHelpMessage();
-    // std::cout << msg << "\n\n\n";
+    std::cout << msg << "\n\n\n";
+}
+
+TEST_CASE("Positional help message", "[help][positional]") {
+    const auto parser =
+        Option<int>()["--xcoord"]["-x"]("<int>", "x coordinate of the location.")
+        | Option<int>()["--ycoord"]["-y"]("<int>", "y coordinate of the location.")
+        | Option<int>()["--zcoord"]["-z"]("<int>", "z coordinate of the location")
+        | Option<int>()["--region"]("The region the game takes place in.")
+        | MultiOption<std::vector<int>>()["--courseids"]("<ids...>", "Specify a list of course ids.")
+        | Positional<int>()("<positionalname>", "Test description.")
+        | Positional<int>()("<secondpositional>", "Second test description.")
+        | (
+            OptionGroup()["--student"]("Specify information about the main character")
+            + Option<int>()["--name"]("The name of the student")
+            + Option<int>()["--age"]("The age of the student")
+            + Positional<int>()("<positionalname>", "Test description.")
+            + Positional<int>()("<secondpositional>", "Second test description.")
+        );
+    std::cout << parser.getHelpMessage();
 }

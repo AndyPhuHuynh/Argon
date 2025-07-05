@@ -65,6 +65,7 @@ struct FlagPath {
 class InvalidFlagPathException : public std::runtime_error {
 public:
     explicit InvalidFlagPathException(const FlagPath& flagPath);
+    explicit InvalidFlagPathException(std::string_view msg);
 };
 
 class IFlag {
@@ -242,6 +243,10 @@ inline InvalidFlagPathException::InvalidFlagPathException(const FlagPath& flagPa
     : std::runtime_error(std::format(
         "Invalid flag path: {}. Check to see if the specified path and templated type are correct.",
         flagPath.getString())) {
+}
+
+inline InvalidFlagPathException::InvalidFlagPathException(const std::string_view msg)
+    : std::runtime_error(std::string(msg)) {
 }
 
 inline auto IFlag::getFlag() const -> const Flag& {

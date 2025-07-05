@@ -153,6 +153,8 @@ inline auto getNameAndInputHint(const IOption *option, const PositionalPolicy de
     auto concatTypeHint = [](std::stringstream& ss, const IOption *opt) {
         if (const auto& typeHint = opt->getInputHint(); !typeHint.empty()) {
             ss << ' ' << typeHint;
+        } else if (const auto group = dynamic_cast<const OptionGroup *>(opt); group != nullptr) {
+            ss << " [" << group->getFlag().mainFlag << "]";
         }
     };
 
@@ -355,9 +357,9 @@ inline auto Context::getHelpMessageForOption(
     constexpr size_t maxFlagWidth = 32;
 
     // Print name
-    const auto name = detail::getNameAndInputHint(option, defaultPolicy);
+    const auto name = std::string(2, ' ') + detail::getNameAndInputHint(option, defaultPolicy);
 
-    ss << "  " << std::left << std::setw(maxFlagWidth) << name;
+    ss << std::left << std::setw(maxFlagWidth) << name;
 
     // Print description with line wrapping
     const std::string& description = option->getDescription();

@@ -595,6 +595,54 @@ TEST_CASE("Booleans options", "[options]") {
         CHECK(nestedVerbose == true);
         CHECK(y             == 20);
     }
+
+    SECTION("True/False") {
+        parser.parse("--debug=true --verbose=false");
+        CHECK(debug     == true);
+        CHECK(verbose   == false);
+    }
+
+    SECTION("1/0") {
+        parser.parse("--debug=1 --verbose=0");
+        CHECK(debug     == true);
+        CHECK(verbose   == false);
+    }
+
+    SECTION("Yes/No") {
+        parser.parse("--debug=yes --verbose=no");
+        CHECK(debug     == true);
+        CHECK(verbose   == false);
+    }
+
+    SECTION("On/Off") {
+        parser.parse("--debug=on --verbose=off");
+        CHECK(debug     == true);
+        CHECK(verbose   == false);
+    }
+
+    SECTION("y/n") {
+        parser.parse("--debug=y --verbose=n");
+        CHECK(debug     == true);
+        CHECK(verbose   == false);
+    }
+
+    SECTION("t/f") {
+        parser.parse("--debug=t --verbose=f");
+        CHECK(debug     == true);
+        CHECK(verbose   == false);
+    }
+
+    SECTION("Enable/Disable") {
+        parser.parse("--debug=enable --verbose=disable");
+        CHECK(debug     == true);
+        CHECK(verbose   == false);
+    }
+
+    SECTION("Enabled/Disabled") {
+        parser.parse("--debug=ENABLED --verbose=DISABLED");
+        CHECK(debug     == true);
+        CHECK(verbose   == false);
+    }
 }
 
 TEST_CASE("Repeated flags", "[options]") {

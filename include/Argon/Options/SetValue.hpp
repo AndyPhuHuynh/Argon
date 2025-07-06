@@ -67,13 +67,15 @@ auto parseIntegralType(const std::string_view arg, T& out) -> bool {
 }
 
 inline auto parseBool(const std::string_view arg, bool& out) -> bool {
-    auto boolStr = std::string(arg);
-    detail::to_lower(boolStr);
-    if (boolStr == "true") {
+    using namespace detail;
+    if (iequals(arg, "true") || iequals(arg, "1") || iequals(arg, "yes")    || iequals(arg, "on") ||
+        iequals(arg, "y")    || iequals(arg, "t") || iequals(arg, "enable") || iequals(arg, "enabled")) {
         out = true;
         return true;
     }
-    if (boolStr == "false") {
+
+    if (iequals(arg, "false") || iequals(arg, "0") || iequals(arg, "no")      || iequals(arg, "off") ||
+        iequals(arg, "n")     || iequals(arg, "f") || iequals(arg, "disable") || iequals(arg, "disabled")) {
         out = false;
         return true;
     }

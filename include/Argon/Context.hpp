@@ -419,21 +419,14 @@ inline auto Context::collectAllSetOptions(OptionMap& map, //NOLINT (recursion)
                                           const std::vector<Flag>& pathSoFar) const -> void {
     for (const auto& holder : m_options) {
         const IOption *optPtr = holder.getPtr();
-
-        auto *flagPtr = dynamic_cast<const IFlag*>(optPtr);
-        if (!flagPtr) {
-            throw std::invalid_argument("Unsupported option type");
-        }
-
+        auto *flagPtr = detail::getIFlag(holder);
         if (const auto groupPtr = dynamic_cast<const OptionGroup*>(optPtr); groupPtr != nullptr) {
             auto newVec = pathSoFar;
             newVec.emplace_back(flagPtr->getFlag());
             groupPtr->getContext().collectAllSetOptions(map, newVec);
             continue;
         }
-
         if (!optPtr->isSet()) continue;
-
         map[FlagPathWithAlias(pathSoFar, flagPtr->getFlag())] = optPtr;
     }
 }

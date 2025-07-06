@@ -50,6 +50,16 @@ inline void to_upper(std::string& str) {
         [](const unsigned char c) { return static_cast<char>(std::toupper(c)); });
 }
 
+inline auto iequals(std::string_view a, std::string_view b) -> bool {
+    return a.size() == b.size() &&
+       std::ranges::equal(a, b,
+           [](const char one, const char two) {
+              return std::tolower(static_cast<unsigned char>(one)) ==
+                     std::tolower(static_cast<unsigned char>(two));
+          });
+}
+
+
 inline auto wrapString(const std::string_view str, const size_t lineLength) -> std::vector<std::string> {
     std::vector<std::string> sections;
     size_t sectionStart = 0;

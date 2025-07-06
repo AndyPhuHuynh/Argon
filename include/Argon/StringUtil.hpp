@@ -4,7 +4,7 @@
 #include <algorithm>
 #include <string>
 
-namespace Argon {
+namespace Argon::detail {
 
 template<typename T> requires std::is_integral_v<T>
 std::string format_with_commas(const T value) {
@@ -50,6 +50,38 @@ inline void to_upper(std::string& str) {
         [](const unsigned char c) { return static_cast<char>(std::toupper(c)); });
 }
 
-} // End namespace Argon::StringUtil
+inline auto wrapString(const std::string_view str, const size_t lineLength) -> std::vector<std::string> {
+    std::vector<std::string> sections;
+    size_t sectionStart = 0;
+    while (sectionStart < str.length()) {
+        // Skip any leading whitespace
+        while (sectionStart < str.length() && str[sectionStart] == ' ') {
+            ++sectionStart;
+        }
+        if (sectionStart >= str.length()) break;
+
+        // Determine the maximum end index
+        const size_t end = sectionStart + lineLength;
+        if (end >= str.length()) {
+            // Add the final section
+            sections.emplace_back(str.substr(sectionStart, str.length() - sectionStart));
+            break;
+        }
+
+        // Find the last space within the range
+        size_t breakPoint = str.rfind(' ', end);
+        if (breakPoint == std::string::npos || breakPoint <= sectionStart) {
+            // No space found, or the space is before sectionStart
+            breakPoint = end;
+        }
+
+        const size_t length = breakPoint - sectionStart;
+        sections.emplace_back(str.substr(sectionStart, length));
+        sectionStart = breakPoint;
+    }
+    return sections;
+}
+
+} // End namespace Argon
 
 #endif // ARGON_STRINGUTIL_INCLUDE

@@ -68,7 +68,7 @@ auto parseIntegralType(const std::string_view arg, T& out) -> bool {
 
 inline auto parseBool(const std::string_view arg, bool& out) -> bool {
     auto boolStr = std::string(arg);
-    to_lower(boolStr);
+    detail::to_lower(boolStr);
     if (boolStr == "true") {
         out = true;
         return true;
@@ -156,14 +156,14 @@ protected:
             } else {
                 ss << std::format(
                     "expected integer between {} and {}",
-                    format_with_commas(std::numeric_limits<T>::min()),
-                    format_with_commas(std::numeric_limits<T>::max()));
+                    detail::format_with_commas(std::numeric_limits<T>::min()),
+                    detail::format_with_commas(std::numeric_limits<T>::max()));
             }
         } else if constexpr (is_non_bool_integral<T>) {
             ss << std::format(
                 "expected integer between {} and {}",
-                format_with_commas(std::numeric_limits<T>::min()),
-                format_with_commas(std::numeric_limits<T>::max()));
+                detail::format_with_commas(std::numeric_limits<T>::min()),
+                detail::format_with_commas(std::numeric_limits<T>::max()));
         } else if constexpr (std::is_same_v<T, bool>) {
             ss << "expected boolean (true or false)";
         } else {

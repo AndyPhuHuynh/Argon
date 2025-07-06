@@ -145,6 +145,12 @@ TEST_CASE("Positional help message", "[help][positional]") {
             + Option<int>()["--age"]("The age of the student")
             + Positional<int>()("<positionalname>", "Test description.")
             + Positional<int>()("<secondpositional>", "Second test description.")
+            + Positional<int>()("<thirdpositional>", "Second test description.")
+            + Positional<int>()("<fourthpositional>", "Second test description.")
+            + Positional<int>()("<fourthpositional>", "Second test description.")
+            + Positional<int>()("<fourthpositional>", "Second test description.")
+            + Positional<int>()("<fourthpositional>", "Second test description.")
+            + Positional<int>()("<fourthpositional>", "Second test description.")
         );
     std::cout << parser.getHelpMessage();
 }

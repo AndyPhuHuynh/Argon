@@ -138,7 +138,14 @@ inline auto getIFlag(const OptionHolder<IOption>& holder) -> const IFlag * {
     return iFlag;
 }
 
-inline auto getNameAndInputHint(const IOption *option, const PositionalPolicy defaultPositionalPolicy) -> std::string {
+inline auto getOptionName(const IOption *option) -> std::string {
+    if (const auto flag = dynamic_cast<const IFlag *>(option)) {
+        return flag->getFlag().getString();
+    }
+    return option->getInputHint();
+}
+
+inline auto getFullInputHint(const IOption *option, const PositionalPolicy defaultPositionalPolicy) -> std::string {
     auto concatPositionals = [](std::stringstream& ss, const std::vector<OptionHolder<IOption>>& positionals) {
         if (positionals.empty()) return;
         ss << ' ';
@@ -160,29 +167,25 @@ inline auto getNameAndInputHint(const IOption *option, const PositionalPolicy de
 
     std::stringstream name;
 
-    if (const auto flag = dynamic_cast<const IFlag *>(option)) {
-        name << flag->getFlag().getString();
-        if (const auto group = dynamic_cast<const OptionGroup *>(option); group != nullptr) {
-            const auto positionals = group->getContext().getPositionalsVector();
-            const auto policy = resolvePositionalPolicy(defaultPositionalPolicy, group->getContext().getPositionalPolicy());
-            switch (policy) {
-                case PositionalPolicy::BeforeFlags:
-                    concatPositionals(name, positionals);
-                    concatTypeHint(name, option);
-                    break;
-                case PositionalPolicy::Interleaved:
-                case PositionalPolicy::AfterFlags:
-                    concatTypeHint(name, option);
-                    concatPositionals(name, positionals);
-                    break;
-                case PositionalPolicy::UseDefault:
-                    std::unreachable();
-            };
-        }
-    } else if (dynamic_cast<const IsPositional *>(option)) {
+    if (const auto group = dynamic_cast<const OptionGroup *>(option); group != nullptr) {
+        const auto positionals = group->getContext().getPositionalsVector();
+        const auto policy = resolvePositionalPolicy(defaultPositionalPolicy, group->getContext().getPositionalPolicy());
+        switch (policy) {
+            case PositionalPolicy::BeforeFlags:
+                concatPositionals(name, positionals);
+                concatTypeHint(name, option);
+                break;
+            case PositionalPolicy::Interleaved:
+            case PositionalPolicy::AfterFlags:
+                concatTypeHint(name, option);
+                concatPositionals(name, positionals);
+                break;
+            case PositionalPolicy::UseDefault:
+                std::unreachable();
+        };
+    } else if (dynamic_cast<const IFlag *>(option)) {
         concatTypeHint(name, option);
     }
-    name << ':';
     return name.str();
 }
 
@@ -350,55 +353,43 @@ inline auto Context::getHelpMessage( // NOLINT (misc-no-recursion)
 }
 
 inline auto Context::getHelpMessageForOption(
-    std::stringstream& ss, const size_t leadingSpaces, const size_t maxLineWidth, const IOption *option,
+    std::stringstream& ss, size_t leadingSpaces, const size_t maxLineWidth, const IOption *option,
     const PositionalPolicy defaultPolicy
 ) -> void {
-    ss << std::string(leadingSpaces, ' ');
-    constexpr size_t maxFlagWidth = 32;
+    leadingSpaces += 2;
+    constexpr size_t maxFlagWidthBeforeWrapping = 32;
 
     // Print name
-    const auto name = std::string(2, ' ') + detail::getNameAndInputHint(option, defaultPolicy);
-
-    ss << std::left << std::setw(maxFlagWidth) << name;
+    const auto namePadding = std::string(leadingSpaces, ' ');
+    const auto name = detail::getOptionName(option);
+    const auto inputPadding = std::string(leadingSpaces + name.length(), ' ');
+    const auto inputHint = detail::getFullInputHint(option, defaultPolicy);
+    const auto inputSections = detail::wrapString(inputHint, maxLineWidth - inputPadding.length());
+    ss << namePadding << name;
+    if (inputSections.empty()) {
+        const auto width = static_cast<std::streamsize>(maxFlagWidthBeforeWrapping - name.length());
+        ss << std::left << std::setw(width) << ':';
+    } else {
+        for (size_t i = 0; i < inputSections.size(); i++) {
+            const auto width = static_cast<std::streamsize>(maxFlagWidthBeforeWrapping - name.length());
+            std::string buffer = " " + inputSections[i];
+            buffer += i == inputSections.size() - 1 ? ':' : '\n';
+            if (i != 0) {
+                ss << inputPadding;
+            }
+            ss << std::left << std::setw(width) << buffer;
+        }
+    }
 
     // Print description with line wrapping
     const std::string& description = option->getDescription();
-    std::vector<std::string_view> sections;
 
-    const size_t maxDescLength = maxLineWidth - maxFlagWidth;
-    size_t sectionStart = 0;
-    while (sectionStart < description.length()) {
-        // Skip any leading whitespace
-        while (sectionStart < description.length() && description[sectionStart] == ' ') {
-            ++sectionStart;
-        }
+    const size_t maxDescLength = maxLineWidth - maxFlagWidthBeforeWrapping;
+    const std::vector<std::string> sections = detail::wrapString(description, maxDescLength);
 
-        if (sectionStart >= description.length()) {
-            break;
-        }
-
-        // Determine the maximum end index
-        const size_t end = sectionStart + maxDescLength;
-        if (end >= description.length()) {
-            // Add the final section
-            sections.emplace_back(&description[sectionStart], description.length() - sectionStart);
-            break;
-        }
-
-        // Find the last space within the range
-        size_t breakPoint = description.rfind(' ', end);
-        if (breakPoint == std::string::npos || breakPoint <= sectionStart) {
-            // No space found, or the space is before sectionStart – hard break
-            breakPoint = end;
-        }
-
-        size_t length = breakPoint - sectionStart;
-        sections.emplace_back(&description[sectionStart], length);
-        sectionStart = breakPoint;
-    }
-
-    if (name.length() > maxFlagWidth) {
-        ss << "\n" << std::string(leadingSpaces + maxFlagWidth, ' ') << sections[0];
+    // +1 in flag length is for the semicolon
+    if (const auto flagLength = name.length() + inputHint.length() + 1; flagLength > maxFlagWidthBeforeWrapping) {
+        ss << "\n" << std::string(leadingSpaces + maxFlagWidthBeforeWrapping, ' ') << sections[0];
     } else {
         ss << sections[0];
     }
@@ -406,7 +397,7 @@ inline auto Context::getHelpMessageForOption(
 
     for (size_t i = 1; i < sections.size(); i++) {
         if (sections[i].empty()) continue;
-        ss << std::string(leadingSpaces + maxFlagWidth, ' ') << sections[i] << "\n";
+        ss << std::string(leadingSpaces + maxFlagWidthBeforeWrapping, ' ') << sections[i] << "\n";
     }
 }
 

@@ -2,114 +2,9 @@
 #include "Argon/Options/Option.hpp"
 #include "Argon/Parser.hpp"
 
-#include "catch2/catch_test_macros.hpp"
-#include "catch2/matchers/catch_matchers_string.hpp"
+#include "ErrorTestFunctions.hpp"
 
 using namespace Argon;
-
-inline auto RequireMsg(const Argon::ErrorVariant& var) {
-    REQUIRE(std::holds_alternative<Argon::ErrorMessage>(var));
-    return std::get<Argon::ErrorMessage>(var);
-}
-
-inline auto RequireGroup(const Argon::ErrorVariant& var) {
-    REQUIRE(std::holds_alternative<Argon::ErrorGroup>(var));
-    return std::get<Argon::ErrorGroup>(var);
-}
-
-inline auto CheckMessage(const Argon::ErrorMessage& error, const std::string_view msg, const int pos, Argon::ErrorType type) {
-    CAPTURE(msg, pos, type);
-    CAPTURE(error.msg, error.pos, error.type);
-    CHECK(error.msg == msg);
-    CHECK(error.pos == pos);
-    CHECK(error.type == type);
-}
-
-inline auto CheckMessage(const Argon::ErrorMessage& error, const int pos, Argon::ErrorType type) {
-    CAPTURE(pos, type);
-    CAPTURE(error.msg, error.pos, error.type);
-    CHECK(error.pos == pos);
-    CHECK(error.type == type);
-}
-
-inline auto CheckMessage(const Argon::ErrorMessage& error, const std::initializer_list<std::string_view> expectedMsgs,
-                         const int pos, Argon::ErrorType type) {
-    CAPTURE(expectedMsgs, pos, type);
-    CAPTURE(error.msg, error.pos, error.type);
-    CHECK(error.pos == pos);
-    CHECK(error.type == type);
-
-    for (const auto& msg : expectedMsgs) {
-        CHECK_THAT(error.msg, Catch::Matchers::ContainsSubstring(std::string(msg)));
-    }
-}
-
-
-inline auto CheckGroup(const Argon::ErrorGroup& group, const std::string_view groupName,
-    const int start, const int end, const size_t errorCount) -> const Argon::ErrorGroup& {
-    CAPTURE(groupName, start, end, errorCount);
-    CAPTURE(group.getGroupName(), group.getStartPosition(), group.getEndPosition());
-
-    CHECK(group.getGroupName() == groupName);
-    CHECK(group.getStartPosition() == start);
-    CHECK(group.getEndPosition() == end);
-
-    const auto& errors = group.getErrors();
-    CAPTURE(errors.size());
-    REQUIRE(errors.size() == errorCount);
-
-    return group;
-}
-
-static auto DigitToString(const int i) {
-    if (i == 0) return "zero";
-    if (i == 1) return "one";
-    if (i == 2) return "two";
-    if (i == 3) return "three";
-    if (i == 4) return "four";
-    if (i == 5) return "five";
-    if (i == 6) return "six";
-    if (i == 7) return "seven";
-    if (i == 8) return "eight";
-    if (i == 9) return "nine";
-    return "none";
-}
-
-static void SyntaxError1() {
-    using namespace Argon;
-    int test = 0;
-    auto parser = static_cast<Parser>(Option(&test)["--test"]);
-
-    const std::string input = "[[[[[[[[[ --test ] 2";
-    parser.parse(input);
-
-    std::cout << "Test: " << test << "\n";
-}
-
-void runErrorTests() {
-    SyntaxError1();
-}
-
-TEST_CASE("Errors test 1", "[errors]") {
-    using namespace Argon;
-    auto parser = Option<int>()["--integer"]
-                | Option<bool>()["--bool"]
-                | Positional<char>()("CharPos", "Description")
-                | (
-                    OptionGroup()["--g"]
-                    + Option<int>()["--integer"]
-                    + Option<bool>()["--bool"]
-                    + (
-                        OptionGroup()["--g2"]
-                        + Option<int>()["--nestedint"]
-                        + Option<bool>()["--nestedbool"]
-                        + Positional<int>()("[PositionalInt]", "Description")
-                    )
-                );
-    const std::string input = "--integer asdf charpos invalidpositional --g [--integer what --g2 [--nestedbool bool --nestedint int position ? huh] --bool dddd]  --bool 2";
-    parser.parse(input);
-    // parser.printErrors();
-}
 
 TEST_CASE("Error message basic sorting", "[errors]") {
     using namespace Argon;
@@ -1084,7 +979,6 @@ TEST_CASE("Positional policy with parser config", "[positional][errors]") {
                      "--school [History --homeroom 026 --teachers [--classroom1 10 Mr.Smith --classroom2 20 Mrs.Smith] English]");
         CHECK(parser.hasErrors());
         const auto& syntaxErrors = CheckGroup(parser.getSyntaxErrors(), "Syntax Errors", -1, -1, 8);
-        parser.printErrors();
         // Top level
         CheckMessage(RequireMsg(syntaxErrors.getErrors()[0]), {"--name2", "100"}, 13, ErrorType::Syntax_MisplacedPositional);
         CheckMessage(RequireMsg(syntaxErrors.getErrors()[1]), {"--name3", "200"}, 31, ErrorType::Syntax_MisplacedPositional);

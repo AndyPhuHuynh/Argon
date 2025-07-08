@@ -50,8 +50,7 @@ namespace Argon {
     public:
         auto getValue() const -> const std::array<T, N>&;
     protected:
-        auto setValue(const ParserConfig& parserConfig, const OptionConfig& optionConfig,
-                      std::string_view flag, std::string_view value) -> void override;
+        auto setValue(const IOptionConfig& optionConfig, std::string_view flag, std::string_view value) -> void override;
     };
 
     // MultiOption with std::array<T, N>
@@ -59,7 +58,7 @@ namespace Argon {
     template<typename T, size_t N>
     class MultiOption<std::array<T, N>>
         : public MultiOptionArrayBase<MultiOption<std::array<T, N>>, T, N>,
-          public std::conditional_t<is_numeric_char_type<T>, OptionCharBase<MultiOption<std::array<T, N>>>, EmptyBase> {
+          public OptionTypeExtensions<MultiOption<std::array<T, N>>, T> {
         using ISetValue::setValue;
     public:
         MultiOption() = default;
@@ -94,8 +93,7 @@ namespace Argon {
     public:
         auto getValue() const -> const std::vector<T>&;
     protected:
-        auto setValue(const ParserConfig& parserConfig, const OptionConfig& optionConfig,
-                      std::string_view flag, std::string_view value) -> void override;
+        auto setValue(const IOptionConfig& optionConfig, std::string_view flag, std::string_view value) -> void override;
     };
 
     // MultiOption with std::vector
@@ -103,7 +101,7 @@ namespace Argon {
     template<typename T>
     class MultiOption<std::vector<T>>
         : public MultiOptionVectorBase<MultiOption<std::vector<T>>, T>,
-          public std::conditional_t<is_numeric_char_type<T>, OptionCharBase<MultiOption<std::vector<T>>>,EmptyBase> {
+          public OptionTypeExtensions<MultiOption<std::vector<T>>, T> {
         using ISetValue::setValue;
     public:
         MultiOption() = default;
@@ -173,8 +171,9 @@ auto MultiOptionArrayBase<Derived, T, N>::getValue() const -> const std::array<T
 }
 
 template<typename Derived, typename T, size_t N>
-auto MultiOptionArrayBase<Derived, T, N>::setValue(const ParserConfig& parserConfig, const OptionConfig& optionConfig,
-    std::string_view flag, std::string_view value) -> void {
+auto MultiOptionArrayBase<Derived, T, N>::setValue(
+        const IOptionConfig& optionConfig, std::string_view flag, std::string_view value
+    ) -> void {
     if (this->m_maxCapacityError) {
         this->m_error.clear();
         return;
@@ -186,7 +185,7 @@ auto MultiOptionArrayBase<Derived, T, N>::setValue(const ParserConfig& parserCon
         return;
     }
 
-    this->convert(parserConfig, optionConfig, flag, value, m_values[m_nextIndex]);
+    this->convert(static_cast<const OptionConfig<T>&>(optionConfig), flag, value, m_values[m_nextIndex]);
     if (this->hasConversionError()) {
         this->m_error = this->getConversionError();
         return;
@@ -214,11 +213,8 @@ MultiOption<std::array<T, N>>::MultiOption(const std::array<T, N>& defaultValue,
 
 template<typename T, size_t N>
 auto MultiOption<std::array<T, N>>::setValue(const ParserConfig& parserConfig, std::string_view flag, std::string_view value) -> void {
-    OptionConfig optionConfig;
-    if constexpr (is_numeric_char_type<T>) {
-        optionConfig.charMode = this->m_charMode;
-    }
-    MultiOptionArrayBase<MultiOption, T, N>::setValue(parserConfig, optionConfig, flag, value);
+    OptionConfig<T> optionConfig = detail::getOptionConfig<MultiOption, T>(parserConfig, this);
+    MultiOptionArrayBase<MultiOption, T, N>::setValue(optionConfig, flag, value);
     this->m_isSet = true;
 }
 
@@ -246,10 +242,11 @@ auto MultiOptionVectorBase<Derived, T>::getValue() const -> const std::vector<T>
 }
 
 template<typename Derived, typename T>
-auto MultiOptionVectorBase<Derived, T>::setValue(const ParserConfig& parserConfig, const OptionConfig& optionConfig,
-    std::string_view flag, std::string_view value) -> void {
+auto MultiOptionVectorBase<Derived, T>::setValue(
+        const IOptionConfig& optionConfig, std::string_view flag, std::string_view value
+    ) -> void {
     T temp;
-    this->convert(parserConfig, optionConfig, flag, value, temp);
+    this->convert(static_cast<const OptionConfig<T>&>(optionConfig), flag, value, temp);
     if (this->hasConversionError()) {
         this->m_error = this->getConversionError();
         return;
@@ -281,11 +278,8 @@ MultiOption<std::vector<T>>::MultiOption(const std::vector<T>& defaultValue, std
 template <typename T>
 void MultiOption<std::vector<T>>::setValue(const ParserConfig& parserConfig,
     const std::string_view flag, const std::string_view value) {
-    OptionConfig optionConfig;
-    if constexpr (is_numeric_char_type<T>) {
-        optionConfig.charMode = this->m_charMode;
-    }
-    MultiOptionVectorBase<MultiOption, T>::setValue(parserConfig, optionConfig, flag, value);
+    OptionConfig<T> optionConfig = detail::getOptionConfig<MultiOption, T>(parserConfig, this);
+    MultiOptionVectorBase<MultiOption, T>::setValue(optionConfig, flag, value);
     this->m_isSet = true;
 }
 

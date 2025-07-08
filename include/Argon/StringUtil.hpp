@@ -23,23 +23,31 @@ std::string format_with_commas(const T value) {
     return num;
 }
 
-template<typename T> requires std::is_integral_v<T>
-std::string format_with_underscores(const T value) {
+template<typename T>
+requires std::is_floating_point_v<T>
+std::string format_with_commas(const T value) {
     std::string num = std::to_string(value);
 
-    if (num.length() <= 3) return num;
+    // Handle special case for "infinity", "nan", etc.
+    if (num == "inf" || num == "-inf" || num == "nan") {
+        return num;
+    }
 
-    size_t insertPosition = num.length() - 3;
-    while (insertPosition > 0 && num[(insertPosition) - 1] != '-') {
-        num.insert(insertPosition, "_");
-        if (insertPosition <= 3) {
-            break;
-        }
+    const auto dotPos = num.find('.');
+    std::string intPart = num.substr(0, dotPos);
+    if (intPart.length() <= 3) return num;
+    const std::string fracPart = dotPos != std::string::npos ? num.substr(dotPos) : "";
+
+    // Format the integer part
+    size_t insertPosition = intPart.length() - 3;
+    while (insertPosition > 0 && intPart[insertPosition - 1] != '-') {
+        intPart.insert(insertPosition, ",");
+        if (insertPosition <= 3) break;
         insertPosition -= 3;
     }
-    return num;
-}
 
+    return intPart + fracPart;
+}
 inline void to_lower(std::string& str) {
     std::ranges::transform(str, str.begin(),
         [](const unsigned char c) { return static_cast<char>(std::tolower(c)); });

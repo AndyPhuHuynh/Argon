@@ -21,6 +21,8 @@ set(INCLUDE_FILES
     ${CMAKE_SOURCE_DIR}/include/Argon/Options/OptionComponent.hpp
     ${CMAKE_SOURCE_DIR}/include/Argon/Options/OptionGroup.hpp
     ${CMAKE_SOURCE_DIR}/include/Argon/Options/OptionHolder.hpp
+    ${CMAKE_SOURCE_DIR}/include/Argon/Options/OptionIntegralBase.hpp
+    ${CMAKE_SOURCE_DIR}/include/Argon/Options/OptionTypeExtensions.hpp
     ${CMAKE_SOURCE_DIR}/include/Argon/Options/Positional.hpp
     ${CMAKE_SOURCE_DIR}/include/Argon/Options/SetValue.hpp
     ${CMAKE_SOURCE_DIR}/include/Argon/Parser.hpp

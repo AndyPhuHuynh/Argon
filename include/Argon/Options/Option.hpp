@@ -1,12 +1,12 @@
 ﻿#ifndef ARGON_OPTION_INCLUDE
 #define ARGON_OPTION_INCLUDE
 
+#include "GetConfig.hpp"
+#include "OptionTypeExtensions.hpp"
 #include "Argon/Flag.hpp"
-#include "Argon/Options/OptionCharBase.hpp"
 #include "Argon/Options/OptionComponent.hpp"
 #include "Argon/Options/SetValue.hpp"
 #include "Argon/ParserConfig.hpp"
-#include "Argon/Traits.hpp"
 
 namespace Argon {
 class IsSingleOption {};
@@ -17,7 +17,7 @@ class Option
       public HasFlag<Option<T>>,
       public SetSingleValueImpl<Option<T>, T>,
       public OptionComponent<Option<T>>,
-      public std::conditional_t<is_numeric_char_type<T>, OptionCharBase<Option<T>>, EmptyBase> {
+      public OptionTypeExtensions<Option<T>, T> {
     using SetSingleValueImpl<Option, T>::setValue;
 public:
     Option() = default;
@@ -29,11 +29,8 @@ public:
     Option(T defaultValue, T *out) : SetSingleValueImpl<Option, T>(defaultValue, out) {};
 protected:
     auto setValue(const ParserConfig& parserConfig, std::string_view flag, std::string_view value) -> void override {
-        OptionConfig optionConfig;
-        if constexpr (is_numeric_char_type<T>) {
-            optionConfig.charMode = this->m_charMode;
-        }
-        SetSingleValueImpl<Option, T>::setValue(parserConfig, optionConfig, flag, value);
+        auto optionConfig = detail::getOptionConfig<Option, T>(parserConfig, this);
+        SetSingleValueImpl<Option, T>::setValue(optionConfig, flag, value);
         this->m_error = this->getConversionError();
         this->m_isSet = true;
     }

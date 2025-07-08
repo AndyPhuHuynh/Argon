@@ -8,6 +8,8 @@ namespace Argon {
     class OptionCharBase {
     protected:
         CharMode m_charMode = CharMode::UseDefault;
+        OptionCharBase() = default;
+        virtual ~OptionCharBase() = default;
     public:
         [[nodiscard]] auto getCharMode() const -> CharMode {
             return m_charMode;

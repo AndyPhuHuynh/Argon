@@ -4,7 +4,6 @@
 #include "Argon/Options/OptionCharBase.hpp"
 #include "Argon/Options/OptionComponent.hpp"
 #include "Argon/Options/SetValue.hpp"
-#include "Argon/Traits.hpp"
 
 namespace Argon {
 class IsPositional {
@@ -19,7 +18,7 @@ class Positional
     : public IsPositional,
       public SetSingleValueImpl<Positional<T>, T>,
       public OptionComponent<Positional<T>>,
-      public std::conditional_t<is_numeric_char_type<T>, OptionCharBase<Positional<T>>, EmptyBase> {
+      public OptionTypeExtensions<Positional<T>, T> {
     using SetSingleValueImpl<Positional, T>::setValue;
 public:
     Positional() = default;
@@ -32,11 +31,8 @@ public:
 
 protected:
     auto setValue(const ParserConfig& parserConfig, std::string_view flag, std::string_view value) -> void override {
-        OptionConfig optionConfig;
-        if constexpr (is_numeric_char_type<T>) {
-            optionConfig.charMode = this->m_charMode;
-        }
-        SetSingleValueImpl<Positional, T>::setValue(parserConfig, optionConfig, flag, value);
+        OptionConfig<T> optionConfig = detail::getOptionConfig<Positional, T>(parserConfig, this);
+        SetSingleValueImpl<Positional, T>::setValue(optionConfig, flag, value);
         this->m_error = this->getConversionError();
         this->m_isSet = true;
     }

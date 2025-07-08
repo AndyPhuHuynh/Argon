@@ -6,7 +6,7 @@
 #include <istream>
 
 namespace Argon {
-    class EmptyBase {};
+    template <size_t N> class EmptyBase {};
 
     template<typename T, typename = void>
     struct has_stream_extraction : std::false_type {};
@@ -24,6 +24,9 @@ namespace Argon {
         std::is_same_v<T, char> ||
         std::is_same_v<T, signed char> ||
         std::is_same_v<T, unsigned char>;
+
+    template <typename T>
+    constexpr bool is_non_bool_number = is_non_bool_integral<T> || std::is_floating_point_v<T>;
 
     template<typename T>
     std::string type_name() {

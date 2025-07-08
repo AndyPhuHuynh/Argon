@@ -37,7 +37,7 @@ inline auto getBaseFromPrefix(const std::string_view arg) -> Base {
 }
 
 template <typename T> requires std::is_integral_v<T>
-auto parseIntegralType(const std::string_view arg, T& out) -> bool {
+auto parseIntegralType(const OptionConfig<T>& config, const std::string_view arg, T& out) -> bool {
     if (arg.empty()) return false;
     const auto base = getBaseFromPrefix(arg);
     if (base == Base::Invalid) return false;
@@ -63,6 +63,7 @@ auto parseIntegralType(const std::string_view arg, T& out) -> bool {
     if (begin == end) return false;
 
     auto [ptr, ec] = std::from_chars(begin, end, out, static_cast<int>(base));
+    if (out < config.min || out > config.max) return false;
     return ec == std::errc() && ptr == end;
 }
 
@@ -83,9 +84,9 @@ inline auto parseBool(const std::string_view arg, bool& out) -> bool {
 }
 
 template <typename T> requires is_numeric_char_type<T>
-auto parseNumericChar(const std::string_view arg, T& out, const CharMode charMode) -> bool {
-    if (charMode == CharMode::ExpectInteger) {
-        return parseIntegralType(arg, out);
+auto parseNumericChar(const OptionConfig<T>& config, const std::string_view arg, T& out) -> bool {
+    if (config.charMode == CharMode::ExpectInteger) {
+        return parseIntegralType(config, arg, out);
     }
     if (arg.length() == 1) {
         out = static_cast<T>(arg[0]);
@@ -95,7 +96,7 @@ auto parseNumericChar(const std::string_view arg, T& out, const CharMode charMod
 }
 
 template <typename T> requires std::is_floating_point_v<T>
-auto parseFloatingPoint(const std::string_view arg, T& out) -> bool {
+auto parseFloatingPoint(const OptionConfig<T>& config, const std::string_view arg, T& out) -> bool {
     if (arg.empty()) return false;
 
     const char *cstr = arg.data();
@@ -110,6 +111,7 @@ auto parseFloatingPoint(const std::string_view arg, T& out) -> bool {
         out = std::strtold(cstr, &end);
     }
 
+    if (out < config.min || out > config.max) return false;
     return errno == 0 && end == cstr + arg.length();
 }
 
@@ -119,8 +121,7 @@ public:
     virtual ~ISetValue() = default;
 
     virtual void setValue(const ParserConfig& parserConfig, std::string_view flag, std::string_view value) = 0;
-    virtual void setValue(const ParserConfig& parserConfig, const OptionConfig& optionConfig,
-                          std::string_view flag, std::string_view value) = 0;
+    virtual void setValue(const IOptionConfig& optionConfig, std::string_view flag, std::string_view value) = 0;
 };
 
 template <typename T>
@@ -134,8 +135,7 @@ protected:
     GenerateErrorMsgFn m_generate_error_msg_fn = nullptr;
     std::string m_conversionError;
 
-    auto generateErrorMsg(const ParserConfig& parserConfig, const OptionConfig&
-                          optionConfig, std::string_view optionName, std::string_view invalidArg) -> void {
+    auto generateErrorMsg(const OptionConfig<T>& config, std::string_view optionName, std::string_view invalidArg) -> void {
         // Generate custom error message if provided
         if (this->m_generate_error_msg_fn != nullptr) {
             this->m_conversionError = this->m_generate_error_msg_fn(optionName, invalidArg);
@@ -151,23 +151,36 @@ protected:
             ss << std::format("Invalid value for '{}': ", optionName);
         }
 
-        const CharMode charMode = optionConfig.charMode == CharMode::UseDefault ? parserConfig.getDefaultCharMode() : optionConfig.charMode;
         if constexpr (is_numeric_char_type<T>) {
-            if (charMode == CharMode::ExpectAscii) {
+            if (config.charMode == CharMode::ExpectAscii) {
                 ss << "expected ASCII character";
             } else {
                 ss << std::format(
-                    "expected integer between {} and {}",
-                    detail::format_with_commas(std::numeric_limits<T>::min()),
-                    detail::format_with_commas(std::numeric_limits<T>::max()));
+                    "expected integer between {} and {} inclusive",
+                    detail::format_with_commas(config.min),
+                    detail::format_with_commas(config.max));
             }
         } else if constexpr (is_non_bool_integral<T>) {
             ss << std::format(
-                "expected integer between {} and {}",
-                detail::format_with_commas(std::numeric_limits<T>::min()),
-                detail::format_with_commas(std::numeric_limits<T>::max()));
+                "expected integer between {} and {} inclusive",
+                detail::format_with_commas(config.min),
+                detail::format_with_commas(config.max));
         } else if constexpr (std::is_same_v<T, bool>) {
             ss << "expected boolean (true or false)";
+        } else if constexpr (std::is_floating_point_v<T>) {
+            if (config.min != std::numeric_limits<T>::lowest() && config.max != std::numeric_limits<T>::max()) {
+                ss << std::format("expected floating point number between {} and {} inclusive",
+                    detail::format_with_commas(config.min),
+                    detail::format_with_commas(config.max));
+            } else if (config.max != std::numeric_limits<T>::max()) {
+                ss << std::format("expected floating point number less than or equal to {}",
+                    detail::format_with_commas(config.max));
+            } else if (config.min != std::numeric_limits<T>::lowest()) {
+                ss << std::format("expected floating point number greater than or equal to {}",
+                    detail::format_with_commas(config.min));
+            } else {
+                ss << "expected floating point number";
+            }
         } else {
             ss << std::format("expected {}", type_name<T>());
         }
@@ -178,8 +191,9 @@ protected:
     }
 
 public:
-    auto convert(const ParserConfig& parserConfig, const OptionConfig& optionConfig, const std::string_view flag,
-                 std::string_view value, T& outValue) -> void {
+    auto convert(
+         const OptionConfig<T>& config, const std::string_view flag, std::string_view value, T& outValue
+    ) -> void {
         m_conversionError.clear();
         bool success;
         // Use custom conversion function for this specific option if supplied
@@ -187,22 +201,21 @@ public:
             success = this->m_conversion_fn(value, outValue);
         }
         // Search for conversion list for conversion for this type if specified
-        else if (parserConfig.getDefaultConversions().contains(std::type_index(typeid(T)))) {
-            success = parserConfig.getDefaultConversions().at(std::type_index(typeid(T)))(value, static_cast<void*>(&outValue));
+        else if (config.conversionFn != nullptr) {
+            success = (*config.conversionFn)(value, static_cast<void*>(&outValue));
         }
         // Fallback to generic parsing
         // Parse as a character
         else if constexpr (is_numeric_char_type<T>) {
-            success = parseNumericChar<T>(value, outValue,
-                optionConfig.charMode == CharMode::UseDefault ? parserConfig.getDefaultCharMode() : optionConfig.charMode);
+            success = parseNumericChar<T>(config, value, outValue);
         }
         // Parse as a floating point
         else if constexpr (std::is_floating_point_v<T>) {
-            success = parseFloatingPoint<T>(value, outValue);
+            success = parseFloatingPoint<T>(config, value, outValue);
         }
         // Parse as non-bool integral if valid
         else if constexpr (is_non_bool_integral<T>) {
-            success = parseIntegralType<T>(value, outValue);
+            success = parseIntegralType<T>(config, value, outValue);
         }
         // Parse as boolean if T is a boolean
         else if constexpr (std::is_same_v<T, bool>) {
@@ -221,7 +234,7 @@ public:
         }
         // Set error if not successful
         if (!success) {
-            generateErrorMsg(parserConfig, optionConfig, flag, value);
+            generateErrorMsg(config, flag, value);
         }
     }
 
@@ -273,10 +286,9 @@ public:
         return m_value;
     }
 protected:
-    auto setValue(const ParserConfig& parserConfig, const OptionConfig& optionConfig,
-                  std::string_view flag, std::string_view value) -> void override {
+    auto setValue(const IOptionConfig& optionConfig, std::string_view flag, std::string_view value) -> void override {
         T temp;
-        this->convert(parserConfig, optionConfig, flag, value, temp);
+        this->convert(static_cast<const OptionConfig<T>&>(optionConfig), flag, value, temp);
         if (this->hasConversionError()) {
             return;
         }

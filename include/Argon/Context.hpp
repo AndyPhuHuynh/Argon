@@ -9,7 +9,7 @@
 
 #include "Error.hpp"
 #include "Flag.hpp"
-#include "ParserConfig.hpp"
+#include "Config/ContextConfig.hpp"
 #include "Traits.hpp"
 
 namespace Argon {

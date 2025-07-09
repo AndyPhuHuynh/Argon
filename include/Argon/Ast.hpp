@@ -5,7 +5,7 @@
 #include <string>
 #include <vector>
 
-#include "ParserConfig.hpp"
+#include "Config/ContextConfig.hpp"
 #include "Scanner.hpp"
 
 namespace Argon {

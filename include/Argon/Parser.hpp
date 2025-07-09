@@ -7,7 +7,7 @@
 
 #include "Error.hpp"
 #include "Flag.hpp"
-#include "ParserConfig.hpp"
+#include "Config/ContextConfig.hpp"
 #include "Scanner.hpp"
 #include "Traits.hpp"
 
@@ -37,7 +37,7 @@ namespace Argon {
         std::vector<Token> m_poppedBrackets;
         bool m_mismatchedRBRACK = false;
 
-        ParserConfig m_config;
+        ContextConfig m_config;
         std::unique_ptr<Constraints> m_constraints = std::make_unique<Constraints>();
 
         std::string m_shortPrefix = "-";
@@ -112,9 +112,9 @@ namespace Argon {
         template <typename ValueType, size_t Pos>
         auto getPositionalValue(const FlagPath& groupPath) const;
 
-        auto getConfig() -> ParserConfig&;
+        auto getConfig() -> ContextConfig&;
 
-        [[nodiscard]] auto getConfig() const -> const ParserConfig&;
+        [[nodiscard]] auto getConfig() const -> const ContextConfig&;
 
         [[nodiscard]] auto constraints() const -> Constraints&;
 
@@ -558,11 +558,11 @@ auto Parser::getPositionalValue(const FlagPath& groupPath) const {
     return m_context->getPositionalValue<ValueType, Pos>(groupPath);
 }
 
-inline auto Parser::getConfig() -> ParserConfig& {
+inline auto Parser::getConfig() -> ContextConfig& {
     return m_config;
 }
 
-inline auto Parser::getConfig() const -> const ParserConfig& {
+inline auto Parser::getConfig() const -> const ContextConfig& {
     return m_config;
 }
 

@@ -1,7 +1,7 @@
 #ifndef ARGON_OPTION_CHAR_BASE_INCLUDE
 #define ARGON_OPTION_CHAR_BASE_INCLUDE
 
-#include "Argon/ParserConfig.hpp"
+#include "../Config/ContextConfig.hpp"
 
 namespace Argon {
     template <typename Derived>

@@ -1,15 +1,16 @@
 #ifndef ARGON_GET_CONFIG_INCLUDE
 #define ARGON_GET_CONFIG_INCLUDE
 
-#include "IOption.hpp"
-#include "OptionCharBase.hpp"
-#include "OptionIntegralBaseImpl.hpp"
-#include "Argon/ParserConfig.hpp"
+#include "Argon/Config/OptionConfig.hpp"
+#include "Argon/Options/IOption.hpp"
+#include "Argon/Options/OptionCharBase.hpp"
+#include "Argon/Options/OptionIntegralBaseImpl.hpp"
+#include "ContextConfig.hpp"
 
 namespace Argon::detail {
 
 template <typename OptionType, typename ValueType>
-auto getOptionConfig(const ParserConfig& parserConfig, const IOption *option) -> OptionConfig<ValueType> {
+auto getOptionConfig(const ContextConfig& parserConfig, const IOption *option) -> OptionConfig<ValueType> {
     OptionConfig<ValueType> optionConfig;
     if constexpr (is_numeric_char_type<ValueType>) {
         if (const auto charOpt = dynamic_cast<const OptionCharBase<OptionType>*>(option); charOpt != nullptr) {

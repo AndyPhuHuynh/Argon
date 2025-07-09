@@ -30,7 +30,7 @@ public:
     Positional(T defaultValue, T *out) : SetSingleValueImpl<Positional, T>(defaultValue, out) {}
 
 protected:
-    auto setValue(const ParserConfig& parserConfig, std::string_view flag, std::string_view value) -> void override {
+    auto setValue(const ContextConfig& parserConfig, std::string_view flag, std::string_view value) -> void override {
         OptionConfig<T> optionConfig = detail::getOptionConfig<Positional, T>(parserConfig, this);
         SetSingleValueImpl<Positional, T>::setValue(optionConfig, flag, value);
         this->m_error = this->getConversionError();

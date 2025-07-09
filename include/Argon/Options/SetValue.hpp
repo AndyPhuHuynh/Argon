@@ -6,7 +6,8 @@
 #include <string>
 #include <string_view>
 
-#include "Argon/ParserConfig.hpp"
+#include "Argon/Config/OptionConfig.hpp"
+#include "Argon/Config/ContextConfig.hpp"
 #include "Argon/StringUtil.hpp"
 #include "Argon/Traits.hpp"
 
@@ -120,7 +121,7 @@ public:
     ISetValue() = default;
     virtual ~ISetValue() = default;
 
-    virtual void setValue(const ParserConfig& parserConfig, std::string_view flag, std::string_view value) = 0;
+    virtual void setValue(const ContextConfig& parserConfig, std::string_view flag, std::string_view value) = 0;
     virtual void setValue(const IOptionConfig& optionConfig, std::string_view flag, std::string_view value) = 0;
 };
 

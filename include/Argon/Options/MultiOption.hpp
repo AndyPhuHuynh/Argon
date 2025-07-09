@@ -69,7 +69,7 @@ namespace Argon {
 
         MultiOption(const std::array<T, N>& defaultValue, const std::array<T, N> *out);
 
-        auto setValue(const ParserConfig& parserConfig, std::string_view flag, std::string_view value) -> void override;
+        auto setValue(const ContextConfig& parserConfig, std::string_view flag, std::string_view value) -> void override;
     };
 
     // MultiOptionVectorBase
@@ -112,7 +112,7 @@ namespace Argon {
 
         MultiOption(const std::vector<T>& defaultValue, std::vector<T> *out);
 
-        auto setValue(const ParserConfig& parserConfig, std::string_view flag, std::string_view value) -> void override;
+        auto setValue(const ContextConfig& parserConfig, std::string_view flag, std::string_view value) -> void override;
     };
 }
 
@@ -212,7 +212,7 @@ MultiOption<std::array<T, N>>::MultiOption(const std::array<T, N>& defaultValue,
     : MultiOptionArrayBase<MultiOption, T, N>(defaultValue, out) {}
 
 template<typename T, size_t N>
-auto MultiOption<std::array<T, N>>::setValue(const ParserConfig& parserConfig, std::string_view flag, std::string_view value) -> void {
+auto MultiOption<std::array<T, N>>::setValue(const ContextConfig& parserConfig, std::string_view flag, std::string_view value) -> void {
     OptionConfig<T> optionConfig = detail::getOptionConfig<MultiOption, T>(parserConfig, this);
     MultiOptionArrayBase<MultiOption, T, N>::setValue(optionConfig, flag, value);
     this->m_isSet = true;
@@ -276,7 +276,7 @@ MultiOption<std::vector<T>>::MultiOption(const std::vector<T>& defaultValue, std
     : MultiOptionVectorBase<MultiOption, T>(defaultValue, out) {}
 
 template <typename T>
-void MultiOption<std::vector<T>>::setValue(const ParserConfig& parserConfig,
+void MultiOption<std::vector<T>>::setValue(const ContextConfig& parserConfig,
     const std::string_view flag, const std::string_view value) {
     OptionConfig<T> optionConfig = detail::getOptionConfig<MultiOption, T>(parserConfig, this);
     MultiOptionVectorBase<MultiOption, T>::setValue(optionConfig, flag, value);

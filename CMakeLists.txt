@@ -8,28 +8,9 @@ source_group("Documentation" FILES ${DOC_FILES})
 add_custom_target(Documentation SOURCES ${DOC_FILES})
 
 set(INCLUDE_FILES
-    ${CMAKE_SOURCE_DIR}/include/Argon/Ast.hpp
-    ${CMAKE_SOURCE_DIR}/include/Argon/Attributes.hpp
-    ${CMAKE_SOURCE_DIR}/include/Argon/Context.hpp
-    ${CMAKE_SOURCE_DIR}/include/Argon/Error.hpp
-    ${CMAKE_SOURCE_DIR}/include/Argon/Flag.hpp
-    ${CMAKE_SOURCE_DIR}/include/Argon/MultiOption.hpp
-    ${CMAKE_SOURCE_DIR}/include/Argon/Options/IOption.hpp
-    ${CMAKE_SOURCE_DIR}/include/Argon/Options/MultiOption.hpp
-    ${CMAKE_SOURCE_DIR}/include/Argon/Options/Option.hpp
-    ${CMAKE_SOURCE_DIR}/include/Argon/Options/OptionCharBase.hpp
-    ${CMAKE_SOURCE_DIR}/include/Argon/Options/OptionComponent.hpp
-    ${CMAKE_SOURCE_DIR}/include/Argon/Options/OptionGroup.hpp
-    ${CMAKE_SOURCE_DIR}/include/Argon/Options/OptionHolder.hpp
-    ${CMAKE_SOURCE_DIR}/include/Argon/Options/OptionIntegralBase.hpp
-    ${CMAKE_SOURCE_DIR}/include/Argon/Options/OptionTypeExtensions.hpp
-    ${CMAKE_SOURCE_DIR}/include/Argon/Options/Positional.hpp
-    ${CMAKE_SOURCE_DIR}/include/Argon/Options/SetValue.hpp
-    ${CMAKE_SOURCE_DIR}/include/Argon/Parser.hpp
-    ${CMAKE_SOURCE_DIR}/include/Argon/ParserConfig.hpp
-    ${CMAKE_SOURCE_DIR}/include/Argon/Scanner.hpp
-    ${CMAKE_SOURCE_DIR}/include/Argon/StringUtil.hpp
-    ${CMAKE_SOURCE_DIR}/include/Argon/Traits.hpp
+    ${CMAKE_SOURCE_DIR}/include/Argon/*.hpp
+    ${CMAKE_SOURCE_DIR}/include/Argon/Config/*.hpp
+    ${CMAKE_SOURCE_DIR}/include/Argon/Options/*.hpp
 )
 
 add_library(Argon INTERFACE)

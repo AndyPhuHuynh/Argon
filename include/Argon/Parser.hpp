@@ -249,7 +249,7 @@ inline auto Parser::parse(const int argc, const char **argv) -> bool {
 }
 
 inline auto Parser::parse(const std::string_view str) -> bool {
-    m_context->validate(m_validationErrors, m_context->config.getFlagPrefixes());
+    m_context->validate(m_validationErrors);
     if (m_validationErrors.hasErrors()) {
         std::cerr << "Argon::Parser is in an invalid state. "
                      "Please fix the following errors in order for the library to function: \n";
@@ -430,7 +430,7 @@ inline auto Parser::getNextValidFlag(const Ast& parentAst, const Context& contex
     Token flag = m_scanner.peekToken();
 
     const bool isIdentifier     = flag.kind == TokenKind::IDENTIFIER;
-    const bool hasFlagPrefix    = detail::startsWithAny(flag.image, m_context->config.getFlagPrefixes());
+    const bool hasFlagPrefix    = detail::startsWithAny(flag.image, context.config.getFlagPrefixes());
     const bool inContext        = context.containsLocalFlag(flag.image);
     const bool isPositional     = isIdentifier && !hasFlagPrefix;
 

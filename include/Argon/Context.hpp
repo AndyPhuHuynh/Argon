@@ -68,7 +68,7 @@ namespace Argon {
 
         [[nodiscard]] auto getPositionalsVector() const -> const std::vector<OptionHolder<IOption>>&;
 
-        auto validate(ErrorGroup& errorGroup, const std::vector<std::string>& flagPrefixes) const -> void;
+        auto validate(ErrorGroup& errorGroup) const -> void;
 
     private:
         [[nodiscard]] auto getConfigImpl() -> ContextConfig& override;
@@ -91,9 +91,9 @@ namespace Argon {
 
         auto collectAllSetOptions(OptionMap& map, const std::vector<Flag>& pathSoFar) const -> void;
 
-        auto validate(const FlagPath& pathSoFar, ErrorGroup& validationErrors, const std::vector<std::string>& flagPrefixes) const -> void;
+        auto validate(const FlagPath& pathSoFar, ErrorGroup& validationErrors) const -> void;
 
-        static auto checkPrefixes(const std::vector<const Flag *>& flags, ErrorGroup& validationErrors, const std::vector<std::string>& flagPrefixes) -> void;
+        auto checkPrefixes(ErrorGroup& validationErrors) const -> void;
     };
 }
 
@@ -433,11 +433,8 @@ inline auto Context::collectAllSetOptions(OptionMap& map, //NOLINT (recursion)
     }
 }
 
-inline auto Context::validate(
-    ErrorGroup& errorGroup,
-    const std::vector<std::string>& flagPrefixes
-) const -> void {
-    validate(FlagPath(), errorGroup, flagPrefixes);
+inline auto Context::validate(ErrorGroup& errorGroup) const -> void {
+    validate(FlagPath(), errorGroup);
 }
 
 inline auto Context::getConfigImpl() -> ContextConfig& {
@@ -449,11 +446,10 @@ inline auto Context::getConfigImpl() const -> const ContextConfig& {
 }
 
 inline auto Context::validate( // NOLINT (misc-no-recursion)
-    const FlagPath& pathSoFar, ErrorGroup& validationErrors,
-    const std::vector<std::string>& flagPrefixes
+    const FlagPath& pathSoFar, ErrorGroup& validationErrors
 ) const -> void {
     const auto allFlags = collectAllFlags();
-    checkPrefixes(allFlags, validationErrors, flagPrefixes);
+    checkPrefixes(validationErrors);
     std::set<std::string> flags;
     std::set<std::string> duplicateFlags;
     for (const auto& flag : allFlags) {
@@ -489,23 +485,21 @@ inline auto Context::validate( // NOLINT (misc-no-recursion)
         if (const auto groupPtr = dynamic_cast<const OptionGroup*>(&ref); groupPtr != nullptr) {
             FlagPath newPath = pathSoFar;
             newPath.extendPath(groupPtr->getFlag().mainFlag);
-            groupPtr->getContext().validate(newPath, validationErrors, flagPrefixes);
+            groupPtr->getContext().validate(newPath, validationErrors);
         }
     }
 }
 
-inline auto Context::checkPrefixes(
-    const std::vector<const Flag *>& flags, ErrorGroup& validationErrors,
-    const std::vector<std::string>& flagPrefixes
-) -> void {
-    for (const auto& flag : flags) {
-        if (!detail::startsWithAny(flag->mainFlag, flagPrefixes)) {
+inline auto Context::checkPrefixes(ErrorGroup& validationErrors) const -> void {
+    for (const auto& holder : m_options) {
+        const auto flag = detail::getIFlag(holder);
+        if (!detail::startsWithAny(flag->getFlag().mainFlag, config.getFlagPrefixes())) {
             validationErrors.addErrorMessage(
-                std::format("Flag '{}' does not start with a flag prefix", flag->mainFlag),
+                std::format("Flag '{}' does not start with a flag prefix", flag->getFlag().mainFlag),
                 -1, ErrorType::Validation_NoPrefix);
         }
-        for (const auto& alias : flag->aliases) {
-            if (!detail::startsWithAny(alias, flagPrefixes)) {
+        for (const auto& alias : flag->getFlag().aliases) {
+            if (!detail::startsWithAny(alias, config.getFlagPrefixes())) {
                 validationErrors.addErrorMessage(
                 std::format("Flag '{}' does not start with a flag prefix", alias),
                 -1, ErrorType::Validation_NoPrefix);

@@ -936,3 +936,63 @@ TEST_CASE("Parsing setCharMode", "[options][positional][char]") {
         CHECK(cPos == 1); CHECK(scPos == 3); CHECK(ucPos == 5);
     }
 }
+
+TEST_CASE("Option group config", "[options][option-group][config]") {
+    char topLevelChar; int topLevelInt; std::string topLevelString;
+    char oneLevelChar; int oneLevelInt; std::string oneLevelString;
+    char twoLevelChar; int twoLevelInt; std::string twoLevelString; std::string twoLevelString2;
+    auto parser = Option(&topLevelChar)["/topLevelChar"]
+                | Option(&topLevelInt)["/topLevelInt"]
+                | Positional(&topLevelString)
+                | (
+                    OptionGroup()["/group"]
+                        .withDefaultPositionalPolicy(PositionalPolicy::BeforeFlags)
+                        .withDefaultCharMode(CharMode::ExpectAscii).withFlagPrefixes({"\\"}).withMin(5).withMax(10)
+                    + Option(&oneLevelChar)["\\oneLevelChar"]
+                    + Option(&oneLevelInt)["\\oneLevelInt"]
+                    + Positional(&oneLevelString)
+                    + (
+                        OptionGroup()["\\nested"]
+                            .withDefaultPositionalPolicy(PositionalPolicy::Interleaved)
+                            .withDefaultCharMode(CharMode::ExpectInteger).withFlagPrefixes({"--"}).withMin(20).withMax(30)
+                        + Option(&twoLevelChar)["--twoLevelChar"]
+                        + Option(&twoLevelInt)["--twoLevelInt"]
+                        + Positional(&twoLevelString)
+                        + Positional(&twoLevelString2)
+                    )
+                );
+
+    parser.withDefaultPositionalPolicy(PositionalPolicy::AfterFlags)
+        .withDefaultCharMode(CharMode::ExpectInteger).withFlagPrefixes({"/"}).withMin(10).withMax(20);
+
+    SECTION("Only top level") {
+        const std::string input = "/topLevelChar 15 /topLevelInt 16 topLevelStringHere!";
+        parser.parse(input);
+        CHECK(!parser.hasErrors());
+        CHECK(topLevelChar == 15); CHECK(topLevelInt == 16); CHECK(topLevelString == "topLevelStringHere!");
+    }
+
+    SECTION("Top level and group") {
+        const std::string input
+            = "/topLevelChar 15 /topLevelInt 16 /group [oneLevelString! \\oneLevelChar a \\oneLevelInt 6] "
+              "topLevelStringHere!";
+        parser.parse(input);
+        CHECK(!parser.hasErrors());
+        parser.printErrors();
+        CHECK(topLevelChar == 15); CHECK(topLevelInt == 16); CHECK(topLevelString == "topLevelStringHere!");
+        CHECK(oneLevelChar == 'a'); CHECK(oneLevelInt == 6); CHECK(oneLevelString == "oneLevelString!");
+    }
+
+   SECTION("Fully nested") {
+        const std::string input
+           = "/topLevelChar 15 /topLevelInt 16 /group [oneLevelString! \\oneLevelChar a \\oneLevelInt 6 \\nested ["
+             "--twoLevelChar 25 string1 --twoLevelInt 26 string2]] topLevelStringHere!";
+        parser.parse(input);
+        CHECK(!parser.hasErrors());
+        parser.printErrors();
+        CHECK(topLevelChar == 15); CHECK(topLevelInt == 16); CHECK(topLevelString == "topLevelStringHere!");
+        CHECK(oneLevelChar == 'a'); CHECK(oneLevelInt == 6); CHECK(oneLevelString == "oneLevelString!");
+        CHECK(twoLevelChar == 25); CHECK(twoLevelInt == 26); CHECK(twoLevelString == "string1");
+        CHECK(twoLevelString2 == "string2");
+    }
+}

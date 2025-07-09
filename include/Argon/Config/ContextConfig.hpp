@@ -155,7 +155,7 @@ auto ContextConfig::setMin(T min) -> ContextConfig& {
     if (!m_bounds.map.contains(id)) {
         m_bounds.map[id] = std::make_unique<detail::IntegralBounds<T>>();
     }
-    static_cast<detail::IntegralBounds<T> *>(m_bounds.map.at(id).get()).min = min;
+    static_cast<detail::IntegralBounds<T> *>(m_bounds.map.at(id).get())->min = min;
     return *this;
 }
 
@@ -173,7 +173,7 @@ auto ContextConfig::setMax(T max) -> ContextConfig& {
     if (!m_bounds.map.contains(id)) {
         m_bounds.map[id] = std::make_unique<detail::IntegralBounds<T>>();
     }
-    static_cast<detail::IntegralBounds<T> *>(m_bounds.map.at(id).get()).max = max;
+    static_cast<detail::IntegralBounds<T> *>(m_bounds.map.at(id).get())->max = max;
     return *this;
 }
 

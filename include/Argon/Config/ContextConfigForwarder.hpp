@@ -22,12 +22,12 @@ public:
         return getConfigImpl().getDefaultCharMode();
     }
 
-    auto setDefaultCharMode(const CharMode newCharMode) & -> Derived& {
+    auto withDefaultCharMode(const CharMode newCharMode) & -> Derived& {
         getConfigImpl().setDefaultCharMode(newCharMode);
         return static_cast<Derived&>(*this);
     }
 
-    auto setDefaultCharMode(const CharMode newCharMode) && -> Derived&& {
+    auto withDefaultCharMode(const CharMode newCharMode) && -> Derived&& {
         getConfigImpl().setDefaultCharMode(newCharMode);
         return static_cast<Derived&&>(*this);
     }
@@ -70,13 +70,13 @@ public:
     template <typename T> requires is_non_bool_number<T>
     auto withMin(T min) & -> Derived& {
         getConfigImpl().setMin<T>(min);
-        return static_cast<Derived&>(this);
+        return static_cast<Derived&>(*this);
     }
 
     template <typename T> requires is_non_bool_number<T>
     auto withMin(T min) && -> Derived&& {
         getConfigImpl().setMin<T>(min);
-        return static_cast<Derived&&>(this);
+        return static_cast<Derived&&>(*this);
     }
 
     template <typename T> requires is_non_bool_number<T>
@@ -87,13 +87,13 @@ public:
     template <typename T> requires is_non_bool_number<T>
     auto withMax(T max) & -> Derived& {
         getConfigImpl().setMax<T>(max);
-        return static_cast<Derived&>(this);
+        return static_cast<Derived&>(*this);
     }
 
     template <typename T> requires is_non_bool_number<T>
     auto withMax(T max) && -> Derived&& {
         getConfigImpl().setMax<T>(max);
-        return static_cast<Derived&&>(this);
+        return static_cast<Derived&&>(*this);
     }
 
     auto getFlagPrefixes() -> const std::vector<std::string>& {

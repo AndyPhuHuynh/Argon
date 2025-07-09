@@ -16,6 +16,7 @@ class ContextConfig {
     CharMode m_defaultCharMode = CharMode::ExpectAscii;
     PositionalPolicy m_positionalPolicy = PositionalPolicy::Interleaved;
     detail::BoundsMap m_bounds;
+    std::vector<std::string> m_flagPrefixes{"-", "--"};
 public:
     [[nodiscard]] auto getDefaultCharMode() const -> CharMode;
     auto setDefaultCharMode(CharMode newCharMode) -> ContextConfig&;
@@ -38,6 +39,10 @@ public:
 
     template <typename T> requires is_non_bool_number<T>
     auto setMax(T max) -> ContextConfig&;
+
+    auto getFlagPrefixes() -> const std::vector<std::string>&;
+
+    auto setFlagPrefixes(std::initializer_list<std::string_view> prefixes);
 };
 
 } // End namespace Argon
@@ -101,6 +106,14 @@ auto ContextConfig::registerConversionFn(const std::function<bool(std::string_vi
 
 inline auto ContextConfig::getDefaultConversions() const -> const DefaultConversions& {
     return m_defaultConversions;
+}
+
+inline auto ContextConfig::getFlagPrefixes() -> const std::vector<std::string>& {
+    return m_flagPrefixes;
+}
+
+inline auto ContextConfig::setFlagPrefixes(const std::initializer_list<std::string_view> prefixes) {
+    m_flagPrefixes.assign(prefixes.begin(), prefixes.end());
 }
 
 template<typename T> requires is_non_bool_number<T>

@@ -5,11 +5,12 @@
 #include <string>
 #include <variant>
 
-#include "Error.hpp"
-#include "Flag.hpp"
-#include "Config/ContextConfig.hpp"
-#include "Scanner.hpp"
-#include "Traits.hpp"
+#include "Argon/Config/ContextConfig.hpp"
+#include "Argon/Config/ContextConfigForwarder.hpp"
+#include "Argon/Error.hpp"
+#include "Argon/Flag.hpp"
+#include "Argon/Scanner.hpp"
+#include "Argon/Traits.hpp"
 
 namespace Argon {
     class Ast;
@@ -24,7 +25,7 @@ namespace Argon {
     class Context;
     class Constraints;
 
-    class Parser {
+    class Parser : public detail::ContextConfigForwarder<Parser> {
         std::unique_ptr<Context> m_context = std::make_unique<Context>();
         Scanner m_scanner;
 
@@ -39,9 +40,6 @@ namespace Argon {
 
         ContextConfig m_config;
         std::unique_ptr<Constraints> m_constraints = std::make_unique<Constraints>();
-
-        std::string m_shortPrefix = "-";
-        std::string m_longPrefix  = "--";
     public:
         Parser() = default;
 
@@ -118,10 +116,6 @@ namespace Argon {
 
         [[nodiscard]] auto constraints() const -> Constraints&;
 
-        auto setDefaultPrefixes(std::string_view shortPrefix, std::string_view longPrefix);
-
-        auto withPositionalPolicy(PositionalPolicy policy) & -> Parser&;
-
     private:
         auto copyFrom(const Parser& other) -> void;
 
@@ -152,6 +146,8 @@ namespace Argon {
         auto skipScope() -> void;
 
         auto validateConstraints() -> void;
+
+        auto getConfigImpl() -> ContextConfig& override;
     };
 
     template<typename Left, typename Right> requires DerivesFrom<Left, IOption> && DerivesFrom<Right, IOption>
@@ -252,7 +248,7 @@ inline auto Parser::parse(const int argc, const char **argv) -> bool {
 }
 
 inline auto Parser::parse(const std::string_view str) -> bool {
-    m_context->validate(m_validationErrors, m_shortPrefix, m_longPrefix);
+    m_context->validate(m_validationErrors, m_config.getFlagPrefixes());
     if (m_validationErrors.hasErrors()) {
         std::cerr << "Argon::Parser is in an invalid state. "
                      "Please fix the following errors in order for the library to function: \n";
@@ -433,7 +429,7 @@ inline auto Parser::getNextValidFlag(const Ast& parentAst, const Context& contex
     Token flag = m_scanner.peekToken();
 
     const bool isIdentifier     = flag.kind == TokenKind::IDENTIFIER;
-    const bool hasFlagPrefix    = flag.image.starts_with(m_shortPrefix) || flag.image.starts_with(m_longPrefix);
+    const bool hasFlagPrefix    = detail::startsWithAny(flag.image, m_config.getFlagPrefixes());
     const bool inContext        = context.containsLocalFlag(flag.image);
     const bool isPositional     = isIdentifier && !hasFlagPrefix;
 
@@ -570,16 +566,6 @@ inline auto Parser::constraints() const -> Constraints& {
     return *m_constraints;
 }
 
-inline auto Parser::setDefaultPrefixes(const std::string_view shortPrefix, const std::string_view longPrefix) {
-    m_shortPrefix = shortPrefix;
-    m_longPrefix = longPrefix;
-}
-
-inline auto Parser::withPositionalPolicy(const PositionalPolicy policy) & -> Parser& {
-    m_context->setPositionalPolicy(policy);
-    return *this;
-}
-
 inline auto Parser::copyFrom(const Parser& other) -> void {
     m_context = std::make_unique<Context>(*other.m_context);
     m_scanner = other.m_scanner;
@@ -595,9 +581,6 @@ inline auto Parser::copyFrom(const Parser& other) -> void {
 
     m_config      = other.m_config;
     m_constraints = std::make_unique<Constraints>(*other.m_constraints);
-
-    m_shortPrefix = other.m_shortPrefix;
-    m_longPrefix  = other.m_longPrefix;
 }
 
 inline auto Parser::reset() -> void {
@@ -681,5 +664,10 @@ auto operator|(Left&& left, Right&& right) -> Parser {
     parser.addOption(std::forward<Right>(right));
     return parser;
 }
+
+inline auto Parser::getConfigImpl() -> ContextConfig& {
+    return m_config;
+}
+
 } // End namespace Argon
 #endif // ARGON_PARSER_INCLUDE

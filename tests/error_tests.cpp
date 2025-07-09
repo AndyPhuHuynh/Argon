@@ -971,8 +971,7 @@ TEST_CASE("Positional policy with parser config", "[positional][errors]") {
     }
 
     SECTION("Mixed policy test") {
-        parser.getConfig().setDefaultPositionalPolicy(PositionalPolicy::BeforeFlags);
-        parser.withPositionalPolicy(PositionalPolicy::AfterFlags);
+        parser.withDefaultPositionalPolicy(PositionalPolicy::AfterFlags);
         teachersGroup.withPositionalPolicy(PositionalPolicy::BeforeFlags);
         schoolGroup.withPositionalPolicy(PositionalPolicy::AfterFlags);
         parser.parse("--name1 John 100 --name2 Sammy 200 --name3 Joshua 300 Sam --address [400 --street Jam 500] "
@@ -984,7 +983,7 @@ TEST_CASE("Positional policy with parser config", "[positional][errors]") {
         CheckMessage(RequireMsg(syntaxErrors.getErrors()[1]), {"--name3", "200"}, 31, ErrorType::Syntax_MisplacedPositional);
         CheckMessage(RequireMsg(syntaxErrors.getErrors()[2]), {"--address", "300"}, 50, ErrorType::Syntax_MisplacedPositional);
         CheckMessage(RequireMsg(syntaxErrors.getErrors()[3]), {"--address", "Sam"}, 54, ErrorType::Syntax_MisplacedPositional);
-        CheckMessage(RequireMsg(syntaxErrors.getErrors()[4]), {"--street", "500", "--address"}, 86, ErrorType::Syntax_MisplacedPositional);
+        CheckMessage(RequireMsg(syntaxErrors.getErrors()[4]), {"--street", "400", "--address"}, 69, ErrorType::Syntax_MisplacedPositional);
         CheckMessage(RequireMsg(syntaxErrors.getErrors()[5]), {"--homeroom", "History", "--school"}, 101, ErrorType::Syntax_MisplacedPositional);
         CheckMessage(RequireMsg(syntaxErrors.getErrors()[6]), {"--classroom1", "Mr.Smith", "--school > --teachers"}, 152, ErrorType::Syntax_MisplacedPositional);
         CheckMessage(RequireMsg(syntaxErrors.getErrors()[7]), {"--classroom2", "Mrs.Smith", "--school > --teachers"}, 177, ErrorType::Syntax_MisplacedPositional);

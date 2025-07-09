@@ -67,7 +67,7 @@ namespace Argon {
 
         [[nodiscard]] auto getPositionalsVector() const -> const std::vector<OptionHolder<IOption>>&;
 
-        auto validate(ErrorGroup& errorGroup, std::string_view shortPrefix, std::string_view longPrefix) const -> void;
+        auto validate(ErrorGroup& errorGroup, const std::vector<std::string>& flagPrefixes) const -> void;
 
         [[nodiscard]] auto getPositionalPolicy() const -> PositionalPolicy;
 
@@ -89,9 +89,9 @@ namespace Argon {
 
         auto collectAllSetOptions(OptionMap& map, const std::vector<Flag>& pathSoFar) const -> void;
 
-        auto validate(const FlagPath& pathSoFar, ErrorGroup& validationErrors, std::string_view shortPrefix, std::string_view longPrefix) const -> void;
+        auto validate(const FlagPath& pathSoFar, ErrorGroup& validationErrors, const std::vector<std::string>& flagPrefixes) const -> void;
 
-        static auto checkPrefixes(const std::vector<const Flag *>& flags, ErrorGroup& validationErrors, std::string_view shortPrefix, std::string_view longPrefix) -> void;
+        static auto checkPrefixes(const std::vector<const Flag *>& flags, ErrorGroup& validationErrors, const std::vector<std::string>& flagPrefixes) -> void;
     };
 }
 
@@ -116,7 +116,7 @@ inline auto containsFlagPath(const OptionMap& map, const FlagPath& flag) -> cons
     return nullptr;
 }
 
-inline auto startsWithAny(const std::string_view str, const std::initializer_list<std::string_view> prefixes) -> bool {
+inline auto startsWithAny(const std::string_view str, const std::vector<std::string>& prefixes) -> bool {
     return std::ranges::any_of(prefixes, [str](const std::string_view prefix) {
         return str.starts_with(prefix);
     });
@@ -433,17 +433,17 @@ inline auto Context::collectAllSetOptions(OptionMap& map, //NOLINT (recursion)
 
 inline auto Context::validate(
     ErrorGroup& errorGroup,
-    const std::string_view shortPrefix, const std::string_view longPrefix
+    const std::vector<std::string>& flagPrefixes
 ) const -> void {
-    validate(FlagPath(), errorGroup, shortPrefix, longPrefix);
+    validate(FlagPath(), errorGroup, flagPrefixes);
 }
 
 inline auto Context::validate( // NOLINT (misc-no-recursion)
     const FlagPath& pathSoFar, ErrorGroup& validationErrors,
-    const std::string_view shortPrefix, const std::string_view longPrefix
+    const std::vector<std::string>& flagPrefixes
 ) const -> void {
     const auto allFlags = collectAllFlags();
-    checkPrefixes(allFlags, validationErrors, shortPrefix, longPrefix);
+    checkPrefixes(allFlags, validationErrors, flagPrefixes);
     std::set<std::string> flags;
     std::set<std::string> duplicateFlags;
     for (const auto& flag : allFlags) {
@@ -479,23 +479,23 @@ inline auto Context::validate( // NOLINT (misc-no-recursion)
         if (const auto groupPtr = dynamic_cast<const OptionGroup*>(&ref); groupPtr != nullptr) {
             FlagPath newPath = pathSoFar;
             newPath.extendPath(groupPtr->getFlag().mainFlag);
-            groupPtr->getContext().validate(newPath, validationErrors, shortPrefix, longPrefix);
+            groupPtr->getContext().validate(newPath, validationErrors, flagPrefixes);
         }
     }
 }
 
 inline auto Context::checkPrefixes(
     const std::vector<const Flag *>& flags, ErrorGroup& validationErrors,
-    const std::string_view shortPrefix, const std::string_view longPrefix
+    const std::vector<std::string>& flagPrefixes
 ) -> void {
     for (const auto& flag : flags) {
-        if (!detail::startsWithAny(flag->mainFlag, {shortPrefix, longPrefix})) {
+        if (!detail::startsWithAny(flag->mainFlag, flagPrefixes)) {
             validationErrors.addErrorMessage(
                 std::format("Flag '{}' does not start with a flag prefix", flag->mainFlag),
                 -1, ErrorType::Validation_NoPrefix);
         }
         for (const auto& alias : flag->aliases) {
-            if (!detail::startsWithAny(alias, {shortPrefix, longPrefix})) {
+            if (!detail::startsWithAny(alias, flagPrefixes)) {
                 validationErrors.addErrorMessage(
                 std::format("Flag '{}' does not start with a flag prefix", alias),
                 -1, ErrorType::Validation_NoPrefix);

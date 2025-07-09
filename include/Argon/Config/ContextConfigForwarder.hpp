@@ -35,12 +35,12 @@ public:
         return getConfigImpl().getDefaultPositionalPolicy();
     }
 
-    auto setDefaultPositionalPolicy(const PositionalPolicy newPolicy) & -> Derived& {
+    auto withDefaultPositionalPolicy(const PositionalPolicy newPolicy) & -> Derived& {
         getConfigImpl().setDefaultPositionalPolicy(newPolicy);
         return static_cast<Derived&>(*this);
     }
 
-    auto setDefaultPositionalPolicy(const PositionalPolicy newPolicy) && -> Derived&& {
+    auto withDefaultPositionalPolicy(const PositionalPolicy newPolicy) && -> Derived&& {
         getConfigImpl().setDefaultPositionalPolicy(newPolicy);
         return static_cast<Derived&&>(*this);
     }
@@ -67,13 +67,13 @@ public:
     }
 
     template <typename T> requires is_non_bool_number<T>
-    auto setMin(T min) & -> Derived& {
+    auto withMin(T min) & -> Derived& {
         getConfigImpl().setMin<T>(min);
         return static_cast<Derived&>(this);
     }
 
     template <typename T> requires is_non_bool_number<T>
-    auto setMin(T min) && -> Derived&& {
+    auto withMin(T min) && -> Derived&& {
         getConfigImpl().setMin<T>(min);
         return static_cast<Derived&&>(this);
     }
@@ -84,15 +84,29 @@ public:
     }
 
     template <typename T> requires is_non_bool_number<T>
-    auto setMax(T max) & -> Derived& {
+    auto withMax(T max) & -> Derived& {
         getConfigImpl().setMax<T>(max);
         return static_cast<Derived&>(this);
     }
 
     template <typename T> requires is_non_bool_number<T>
-    auto setMax(T max) && -> Derived&& {
+    auto withMax(T max) && -> Derived&& {
         getConfigImpl().setMax<T>(max);
         return static_cast<Derived&&>(this);
+    }
+
+    auto getFlagPrefixes() -> const std::vector<std::string>& {
+        return getConfigImpl().getFlagPrefixes();
+    }
+
+    auto withFlagPrefixes(const std::initializer_list<std::string_view> prefixes) & -> Derived& {
+        getConfigImpl().setFlagPrefixes(prefixes);
+        return static_cast<Derived&>(*this);
+    }
+
+    auto withFlagPrefixes(const std::initializer_list<std::string_view> prefixes) && -> Derived&& {
+        getConfigImpl().setFlagPrefixes(prefixes);
+        return static_cast<Derived&&>(*this);
     }
 };
 

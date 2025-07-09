@@ -260,12 +260,12 @@ inline auto Parser::parse(const std::string_view str) -> bool {
     reset();
     m_scanner = Scanner(str);
     StatementAst ast = parseStatement();
-    ast.checkPositionals(*this, *m_context);
+    ast.checkPositionals(*this, *m_context, getDefaultPositionalPolicy());
     if (m_syntaxErrors.hasErrors()) {
         return false;
     }
 
-    ast.analyze(*this, *m_context);
+    ast.analyze(*this, *m_context, m_context->config);
     validateConstraints();
     return !hasErrors();
 }

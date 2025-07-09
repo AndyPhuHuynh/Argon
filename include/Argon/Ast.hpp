@@ -23,7 +23,7 @@ namespace Argon {
 
         auto setParent(OptionGroupAst *parent) -> void;
 
-        virtual auto analyze(Parser& parser, Context& context) -> void = 0;
+        virtual auto analyze(Parser& parser, Context& context, const ContextConfig& config) -> void = 0;
     protected:
         OptionGroupAst *m_parent = nullptr;
 
@@ -46,7 +46,7 @@ namespace Argon {
         OptionAst(const Token& flagToken, const Token& valueToken);
         ~OptionAst() override = default;
 
-        void analyze(Parser& parser, Context& context) override;
+        void analyze(Parser& parser, Context& context, const ContextConfig& config) override;
     };
 
     class MultiOptionAst : public OptionBaseAst {
@@ -57,7 +57,7 @@ namespace Argon {
         ~MultiOptionAst() override = default;
 
         void addValue(const Token& value);
-        void analyze(Parser& parser, Context& context) override;
+        void analyze(Parser& parser, Context& context, const ContextConfig& config) override;
     };
 
     class PositionalAst : public Ast {
@@ -66,9 +66,9 @@ namespace Argon {
 
         explicit PositionalAst(const Token& flagToken);
 
-        void analyze(Parser& parser, Context& context) override;
+        void analyze(Parser& parser, Context& context, const ContextConfig& config) override;
 
-        void analyze(Parser& parser, Context& context, size_t position);
+        void analyze(Parser& parser, Context& context, const ContextConfig& config, size_t position);
     };
 
     class OptionGroupAst : public OptionBaseAst {
@@ -88,8 +88,8 @@ namespace Argon {
         [[nodiscard]] auto getGroupPath() const -> std::string override;
         void addOption(std::unique_ptr<OptionBaseAst> option);
         void addOption(std::unique_ptr<PositionalAst> option);
-        void checkPositionals(Parser& parser, Context& context) const;
-        void analyze(Parser& parser, Context& context) override;
+        void checkPositionals(Parser& parser, Context& context, PositionalPolicy policy) const;
+        void analyze(Parser& parser, Context& context, const ContextConfig& config) override;
 
     private:
         std::vector<std::unique_ptr<OptionBaseAst>> m_options;
@@ -110,8 +110,8 @@ namespace Argon {
 
         void addOption(std::unique_ptr<OptionBaseAst> option);
         void addOption(std::unique_ptr<PositionalAst> option);
-        void checkPositionals(Parser& parser, Context& context) const;
-        void analyze(Parser& parser, Context& context) override;
+        void checkPositionals(Parser& parser, Context& context, PositionalPolicy policy) const;
+        void analyze(Parser& parser, Context& context, const ContextConfig& config) override;
     private:
         std::vector<std::unique_ptr<OptionBaseAst>> m_options;
         std::vector<std::unique_ptr<PositionalAst>> m_positionals;
@@ -129,15 +129,13 @@ namespace Argon {
 
 namespace Argon {
 
-inline auto checkPositionals(const Ast& thisAst,
-                             Parser& parser,
-                             const Context& context,
-                             const std::vector<std::unique_ptr<OptionBaseAst>>& options,
-                             const std::vector<std::unique_ptr<PositionalAst>>& positionals) {
-    const std::string contextPath = thisAst.getGroupPath();
-    const auto policy =
-        context.getDefaultPositionalPolicy() != PositionalPolicy::UseDefault ?
-        context.getDefaultPositionalPolicy() : parser.getConfig().getDefaultPositionalPolicy();
+inline auto checkPositionals( // NOLINT (misc-no-recursion)
+    Parser& parser,
+    Context& context,
+    const PositionalPolicy policy,
+    const std::string& groupPath,
+    const std::vector<std::unique_ptr<OptionBaseAst>>& options, const std::vector<std::unique_ptr<PositionalAst>>& positionals
+) -> void {
     switch (policy) {
         case PositionalPolicy::UseDefault:
             throw std::invalid_argument("Cannot validate PositionPolicy::None");
@@ -152,7 +150,7 @@ inline auto checkPositionals(const Ast& thisAst,
                 }
                 if (flagIndex > options.size()) break;
                 if (flagIndex == 0) continue;
-                if (contextPath.empty()) {
+                if (groupPath.empty()) {
                     parser.addSyntaxError(std::format(
                         "Found positional value '{}' after flag '{}'. Positional values must occur before all flags at top level.",
                         positional->value.value, options[flagIndex - 1]->flag.value),
@@ -161,7 +159,7 @@ inline auto checkPositionals(const Ast& thisAst,
                     parser.addSyntaxError(std::format(
                         "Found positional value '{}' after flag '{}' inside group '{}'. "
                         "Positional values must occur before all flags inside group '{}'.",
-                        positional->value.value, options[flagIndex - 1]->flag.value, contextPath, contextPath),
+                        positional->value.value, options[flagIndex - 1]->flag.value, groupPath, groupPath),
                         positional->value.pos, ErrorType::Syntax_MisplacedPositional);
                 }
             }
@@ -176,7 +174,7 @@ inline auto checkPositionals(const Ast& thisAst,
                     flagIndex++;
                 }
                 if (flagIndex >= options.size()) break;
-                if (contextPath.empty()) {
+                if (groupPath.empty()) {
                     parser.addSyntaxError(std::format(
                         "Found positional value '{}' before flag '{}'. Positional values must occur after all flags at top level.",
                         positional->value.value, options[flagIndex]->flag.value),
@@ -185,11 +183,20 @@ inline auto checkPositionals(const Ast& thisAst,
                     parser.addSyntaxError(std::format(
                         "Found positional value '{}' before flag '{}' inside group '{}'. "
                         "Positional values must occur after all flags inside group '{}'.",
-                        positional->value.value, options[flagIndex]->flag.value, contextPath, contextPath),
+                        positional->value.value, options[flagIndex]->flag.value, groupPath, groupPath),
                         positional->value.pos, ErrorType::Syntax_MisplacedPositional);
                 }
             }
             break;
+        }
+    }
+    for (const auto& optionAst : options) {
+        if (const auto groupAst = dynamic_cast<OptionGroupAst*>(optionAst.get())) {
+            const auto iOption = context.getFlagOption(groupAst->flag.value);
+            if (const auto groupPtr = dynamic_cast<OptionGroup*>(iOption)) {
+                groupAst->checkPositionals(parser, groupPtr->getContext(),
+                    detail::resolvePositionalPolicy(policy, groupPtr->getDefaultPositionalPolicy()));
+            }
         }
     }
 }
@@ -217,7 +224,7 @@ inline Argon::OptionAst::OptionAst(const Token& flagToken, const Token& valueTok
     value = { .value = valueToken.image, .pos = valueToken.position };
 }
 
-inline void Argon::OptionAst::analyze(Parser& parser, Context& context) {
+inline void Argon::OptionAst::analyze(Parser& parser, Context& context, const ContextConfig& config) {
     IOption *iOption = context.getFlagOption(flag.value);
     if (!iOption) {
         parser.addAnalysisError(std::format("Unknown option: '{}'", flag.value), flag.pos, ErrorType::Analysis_UnknownFlag);
@@ -230,7 +237,7 @@ inline void Argon::OptionAst::analyze(Parser& parser, Context& context) {
         return;
     }
 
-    setValue->setValue(parser.getConfig(), flag.value, value.value);
+    setValue->setValue(config, flag.value, value.value);
     if (iOption->hasError()) {
         parser.addAnalysisError(iOption->getError(), value.pos, ErrorType::Analysis_ConversionError);
     }
@@ -244,7 +251,7 @@ inline void Argon::MultiOptionAst::addValue(const Token& value) {
     m_values.emplace_back(value.image, value.position);
 }
 
-inline void Argon::MultiOptionAst::analyze(Parser& parser, Context &context) {
+inline void Argon::MultiOptionAst::analyze(Parser& parser, Context &context, const ContextConfig& config) {
     IOption *iOption = context.getFlagOption(flag.value);
     if (!iOption) {
         parser.addAnalysisError(std::format("Unknown multi-option: '{}'", flag.value), flag.pos, ErrorType::Analysis_UnknownFlag);
@@ -259,7 +266,7 @@ inline void Argon::MultiOptionAst::analyze(Parser& parser, Context &context) {
     }
 
     for (const auto&[value, pos] : m_values) {
-        setValue->setValue(parser.getConfig(), flag.value, value);
+        setValue->setValue(config, flag.value, value);
         if (iOption->hasError()) {
             parser.addAnalysisError(iOption->getError(), pos, ErrorType::Analysis_ConversionError);
         }
@@ -272,9 +279,9 @@ inline Argon::PositionalAst::PositionalAst(const Token& flagToken) {
     value = { .value = flagToken.image, .pos = flagToken.position };
 }
 
-inline void Argon::PositionalAst::analyze(Parser&, Context&) {}
+inline void Argon::PositionalAst::analyze(Parser&, Context&, const ContextConfig&) {}
 
-inline void Argon::PositionalAst::analyze(Parser& parser, Context& context, const size_t position) {
+inline void Argon::PositionalAst::analyze(Parser& parser, Context& context, const ContextConfig& config, const size_t position) {
     IsPositional *opt = context.getPositional(position);
     if (!opt) {
         parser.addAnalysisError(std::format("Unexpected token: '{}'", value.value), value.pos, ErrorType::Analysis_UnexpectedToken);
@@ -285,7 +292,7 @@ inline void Argon::PositionalAst::analyze(Parser& parser, Context& context, cons
     const auto *iOption = dynamic_cast<IOption*>(opt);
     if (!setValue || !iOption) std::unreachable();
 
-    setValue->setValue(parser.getConfig(), iOption->getInputHint(), value.value);
+    setValue->setValue(config, iOption->getInputHint(), value.value);
     if (iOption->hasError()) {
         parser.addAnalysisError(iOption->getError(), value.pos, ErrorType::Analysis_ConversionError);
     }
@@ -328,19 +335,11 @@ inline void Argon::OptionGroupAst::addOption(std::unique_ptr<PositionalAst> opti
     m_positionals.back()->setParent(this);
 }
 
-inline void Argon::OptionGroupAst::checkPositionals(Parser& parser, Context& context) const { //NOLINT (misc-recursion)
-    Argon::checkPositionals(*this, parser, context, m_options, m_positionals);
-    for (const auto& optionAst : m_options) {
-        if (const auto groupAst = dynamic_cast<OptionGroupAst*>(optionAst.get())) {
-            const auto iOption = context.getFlagOption(groupAst->flag.value);
-            if (const auto groupPtr = dynamic_cast<OptionGroup*>(iOption)) {
-                groupAst->checkPositionals(parser, groupPtr->getContext());
-            }
-        }
-    }
+inline void Argon::OptionGroupAst::checkPositionals(Parser& parser, Context& context, PositionalPolicy policy) const { //NOLINT (misc-recursion)
+    Argon::checkPositionals(parser, context, policy, getGroupPath(), m_options, m_positionals);
 }
 
-inline void Argon::OptionGroupAst::analyze(Parser& parser, Context& context) {
+inline void Argon::OptionGroupAst::analyze(Parser& parser, Context& context, const ContextConfig& config) {
     IOption *iOption = context.getFlagOption(flag.value);
     if (!iOption) {
         parser.removeErrorGroup(flag.pos);
@@ -357,12 +356,13 @@ inline void Argon::OptionGroupAst::analyze(Parser& parser, Context& context) {
     }
 
     auto& nextContext = optionGroup->getContext();
+    const auto nextConfig = detail::resolveContextConfig(config, nextContext.config);
     for (const auto& option : m_options) {
-        option->analyze(parser, nextContext);
+        option->analyze(parser, nextContext, nextConfig);
     }
 
     for (size_t i = 0; i < m_positionals.size(); i++) {
-        m_positionals[i]->analyze(parser, nextContext, i);
+        m_positionals[i]->analyze(parser, nextContext, nextConfig, i);
     }
 }
 
@@ -382,25 +382,17 @@ inline void Argon::StatementAst::addOption(std::unique_ptr<PositionalAst> option
     m_positionals.push_back(std::move(option));
 }
 
-inline void Argon::StatementAst::checkPositionals(Parser& parser, Context& context) const {
-    Argon::checkPositionals(*this, parser, context, m_options, m_positionals);
-    for (const auto& optionAst : m_options) {
-        if (const auto groupAst = dynamic_cast<OptionGroupAst*>(optionAst.get())) {
-            const auto iOption = context.getFlagOption(groupAst->flag.value);
-            if (const auto groupPtr = dynamic_cast<OptionGroup*>(iOption)) {
-                groupAst->checkPositionals(parser, groupPtr->getContext());
-            }
-        }
-    }
+inline void Argon::StatementAst::checkPositionals(Parser& parser, Context& context, const PositionalPolicy policy) const {
+    Argon::checkPositionals(parser, context, policy, getGroupPath(), m_options, m_positionals);
 }
 
-inline void Argon::StatementAst::analyze(Parser& parser, Context& context) {
+inline void Argon::StatementAst::analyze(Parser& parser, Context& context, const ContextConfig& config) {
     for (const auto& option : m_options) {
-        option->analyze(parser, context);
+        option->analyze(parser, context, config);
     }
 
     for (size_t i = 0; i < m_positionals.size(); i++) {
-        m_positionals[i]->analyze(parser, context, i);
+        m_positionals[i]->analyze(parser, context, config, i);
     }
 }
 

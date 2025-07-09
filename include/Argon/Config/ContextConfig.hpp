@@ -1,7 +1,6 @@
 #ifndef ARGON_PARSERCONFIG_INCLUDE
 #define ARGON_PARSERCONFIG_INCLUDE
 
-#include <cassert>
 #include <functional>
 #include <string_view>
 #include <typeindex>
@@ -13,11 +12,14 @@ namespace Argon {
 
 class ContextConfig {
     DefaultConversions m_defaultConversions;
-    CharMode m_defaultCharMode = CharMode::ExpectAscii;
-    PositionalPolicy m_positionalPolicy = PositionalPolicy::Interleaved;
+    CharMode m_defaultCharMode;
+    PositionalPolicy m_positionalPolicy;
     detail::BoundsMap m_bounds;
     std::vector<std::string> m_flagPrefixes{"-", "--"};
+    bool m_allowDefaults;
 public:
+    explicit ContextConfig(bool allowDefaults);
+
     [[nodiscard]] auto getDefaultCharMode() const -> CharMode;
     auto setDefaultCharMode(CharMode newCharMode) -> ContextConfig&;
 
@@ -54,14 +56,18 @@ namespace Argon::detail {
 inline auto resolveCharMode(
     const CharMode defaultMode, const CharMode otherMode
 ) -> CharMode {
-    assert(defaultMode != CharMode::UseDefault&& "Default char mode must be not use default");
+    if (defaultMode == CharMode::UseDefault) {
+        throw std::invalid_argument("Default char mode cannot be UseDefault");
+    }
     return otherMode == CharMode::UseDefault ? defaultMode : otherMode;
 }
 
 inline auto resolvePositionalPolicy(
     const PositionalPolicy defaultPolicy, const PositionalPolicy contextPolicy
 ) -> PositionalPolicy {
-    assert(defaultPolicy != PositionalPolicy::UseDefault && "Default positional policy must be not use default");
+    if (defaultPolicy == PositionalPolicy::UseDefault) {
+        throw std::invalid_argument("Default positional policy cannot be UseDefault");
+    }
     return contextPolicy == PositionalPolicy::UseDefault ? defaultPolicy : contextPolicy;
 }
 
@@ -70,13 +76,22 @@ inline auto resolvePositionalPolicy(
 //---------------------------------------------------Implementations----------------------------------------------------
 
 namespace Argon {
+inline ContextConfig::ContextConfig(const bool allowDefaults) : m_allowDefaults(allowDefaults) {
+    if (m_allowDefaults) {
+        m_defaultCharMode = CharMode::UseDefault;
+        m_positionalPolicy = PositionalPolicy::UseDefault;
+    } else {
+        m_defaultCharMode = CharMode::ExpectAscii;
+        m_positionalPolicy = PositionalPolicy::Interleaved;
+    }
+}
 
 inline auto ContextConfig::getDefaultCharMode() const -> CharMode {
     return m_defaultCharMode;
 }
 
 inline auto ContextConfig::setDefaultCharMode(const CharMode newCharMode) -> ContextConfig& {
-    if (newCharMode == CharMode::UseDefault) {
+    if (!m_allowDefaults && newCharMode == CharMode::UseDefault) {
         throw std::invalid_argument("Default char mode cannot be UseDefault");
     }
     m_defaultCharMode = newCharMode;
@@ -88,7 +103,7 @@ inline auto ContextConfig::getDefaultPositionalPolicy() const -> PositionalPolic
 }
 
 inline auto ContextConfig::setDefaultPositionalPolicy(const PositionalPolicy newPolicy) -> ContextConfig& {
-    if (newPolicy == PositionalPolicy::UseDefault) {
+    if (!m_allowDefaults && newPolicy == PositionalPolicy::UseDefault) {
         throw std::invalid_argument("Default positional policy cannot be UseDefault");
     }
     m_positionalPolicy = newPolicy;

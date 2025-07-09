@@ -15,7 +15,8 @@ protected:
     ContextConfigForwarder& operator=(ContextConfigForwarder &&) = default;
     virtual ~ContextConfigForwarder() = default;
 
-    virtual auto getConfigImpl() -> ContextConfig& = 0;
+    [[nodiscard]] virtual auto getConfigImpl() -> ContextConfig& = 0;
+    [[nodiscard]] virtual auto getConfigImpl() const -> const ContextConfig& = 0;
 public:
     [[nodiscard]] auto getDefaultCharMode() const -> CharMode {
         return getConfigImpl().getDefaultCharMode();

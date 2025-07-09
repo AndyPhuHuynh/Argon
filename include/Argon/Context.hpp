@@ -19,13 +19,14 @@ namespace Argon {
 
     using OptionMap = std::unordered_map<FlagPathWithAlias, const IOption*>;
 
-    class Context {
+    class Context final : public detail::ContextConfigForwarder<Context>{
         std::vector<OptionHolder<IOption>> m_options;
         std::vector<OptionHolder<IOption>> m_positionals;
-
-        PositionalPolicy m_positionalPolicy = PositionalPolicy::UseDefault;
     public:
-        Context() = default;
+        ContextConfig config = ContextConfig(true);
+
+        // Context() = default;
+        explicit Context(const bool allowConfigUseDefault) : config(allowConfigUseDefault) {}
 
         Context(const Context&) = default;
         auto operator=(const Context&) -> Context& = default;
@@ -69,10 +70,11 @@ namespace Argon {
 
         auto validate(ErrorGroup& errorGroup, const std::vector<std::string>& flagPrefixes) const -> void;
 
-        [[nodiscard]] auto getPositionalPolicy() const -> PositionalPolicy;
-
-        auto setPositionalPolicy(PositionalPolicy newPolicy) -> void;
     private:
+        [[nodiscard]] auto getConfigImpl() -> ContextConfig& override;
+
+        [[nodiscard]] auto getConfigImpl() const -> const ContextConfig& override;
+
         template <typename T> requires DerivesFrom<T, IsPositional>
         auto addPositionalOption(T&& option) -> void;
 
@@ -169,7 +171,7 @@ inline auto getFullInputHint(const IOption *option, const PositionalPolicy defau
 
     if (const auto group = dynamic_cast<const OptionGroup *>(option); group != nullptr) {
         const auto positionals = group->getContext().getPositionalsVector();
-        const auto policy = resolvePositionalPolicy(defaultPositionalPolicy, group->getContext().getPositionalPolicy());
+        const auto policy = resolvePositionalPolicy(defaultPositionalPolicy, group->getContext().getDefaultPositionalPolicy());
         switch (policy) {
             case PositionalPolicy::BeforeFlags:
                 concatPositionals(name, positionals);
@@ -438,6 +440,14 @@ inline auto Context::validate(
     validate(FlagPath(), errorGroup, flagPrefixes);
 }
 
+inline auto Context::getConfigImpl() -> ContextConfig& {
+    return config;
+}
+
+inline auto Context::getConfigImpl() const -> const ContextConfig& {
+    return config;
+}
+
 inline auto Context::validate( // NOLINT (misc-no-recursion)
     const FlagPath& pathSoFar, ErrorGroup& validationErrors,
     const std::vector<std::string>& flagPrefixes
@@ -502,14 +512,6 @@ inline auto Context::checkPrefixes(
             }
         }
     }
-}
-
-inline auto Context::getPositionalPolicy() const -> PositionalPolicy {
-    return m_positionalPolicy;
-}
-
-inline auto Context::setPositionalPolicy(const PositionalPolicy newPolicy) -> void {
-    m_positionalPolicy = newPolicy;
 }
 
 inline auto Context::collectAllFlags() const -> std::vector<const Flag*> {

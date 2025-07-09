@@ -136,8 +136,8 @@ inline auto checkPositionals(const Ast& thisAst,
                              const std::vector<std::unique_ptr<PositionalAst>>& positionals) {
     const std::string contextPath = thisAst.getGroupPath();
     const auto policy =
-        context.getPositionalPolicy() != PositionalPolicy::UseDefault ?
-        context.getPositionalPolicy() : parser.getConfig().getDefaultPositionalPolicy();
+        context.getDefaultPositionalPolicy() != PositionalPolicy::UseDefault ?
+        context.getDefaultPositionalPolicy() : parser.getConfig().getDefaultPositionalPolicy();
     switch (policy) {
         case PositionalPolicy::UseDefault:
             throw std::invalid_argument("Cannot validate PositionPolicy::None");

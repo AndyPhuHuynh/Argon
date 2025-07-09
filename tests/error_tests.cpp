@@ -972,8 +972,8 @@ TEST_CASE("Positional policy with parser config", "[positional][errors]") {
 
     SECTION("Mixed policy test") {
         parser.withDefaultPositionalPolicy(PositionalPolicy::AfterFlags);
-        teachersGroup.withPositionalPolicy(PositionalPolicy::BeforeFlags);
-        schoolGroup.withPositionalPolicy(PositionalPolicy::AfterFlags);
+        teachersGroup.withDefaultPositionalPolicy(PositionalPolicy::BeforeFlags);
+        schoolGroup.withDefaultPositionalPolicy(PositionalPolicy::AfterFlags);
         parser.parse("--name1 John 100 --name2 Sammy 200 --name3 Joshua 300 Sam --address [400 --street Jam 500] "
                      "--school [History --homeroom 026 --teachers [--classroom1 10 Mr.Smith --classroom2 20 Mrs.Smith] English]");
         CHECK(parser.hasErrors());

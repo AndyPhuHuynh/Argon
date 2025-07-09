@@ -26,7 +26,7 @@ namespace Argon {
     class Constraints;
 
     class Parser : public detail::ContextConfigForwarder<Parser> {
-        std::unique_ptr<Context> m_context = std::make_unique<Context>();
+        std::unique_ptr<Context> m_context = std::make_unique<Context>(false);
         Scanner m_scanner;
 
         ErrorGroup m_validationErrors = ErrorGroup("Validation Errors", -1, -1);
@@ -38,7 +38,6 @@ namespace Argon {
         std::vector<Token> m_poppedBrackets;
         bool m_mismatchedRBRACK = false;
 
-        ContextConfig m_config;
         std::unique_ptr<Constraints> m_constraints = std::make_unique<Constraints>();
     public:
         Parser() = default;
@@ -147,7 +146,9 @@ namespace Argon {
 
         auto validateConstraints() -> void;
 
-        auto getConfigImpl() -> ContextConfig& override;
+        [[nodiscard]] auto getConfigImpl() -> ContextConfig& override;
+
+        [[nodiscard]] auto getConfigImpl() const -> const ContextConfig& override;
     };
 
     template<typename Left, typename Right> requires DerivesFrom<Left, IOption> && DerivesFrom<Right, IOption>
@@ -213,7 +214,7 @@ inline auto Parser::hasErrors() const -> bool {
 }
 
 inline auto Parser::getHelpMessage(const size_t maxLineWidth) const -> std::string {
-    return m_context->getHelpMessage(maxLineWidth, m_config.getDefaultPositionalPolicy());
+    return m_context->getHelpMessage(maxLineWidth, m_context->config.getDefaultPositionalPolicy());
 }
 
 inline auto Parser::printErrors() const -> void {
@@ -248,7 +249,7 @@ inline auto Parser::parse(const int argc, const char **argv) -> bool {
 }
 
 inline auto Parser::parse(const std::string_view str) -> bool {
-    m_context->validate(m_validationErrors, m_config.getFlagPrefixes());
+    m_context->validate(m_validationErrors, m_context->config.getFlagPrefixes());
     if (m_validationErrors.hasErrors()) {
         std::cerr << "Argon::Parser is in an invalid state. "
                      "Please fix the following errors in order for the library to function: \n";
@@ -429,7 +430,7 @@ inline auto Parser::getNextValidFlag(const Ast& parentAst, const Context& contex
     Token flag = m_scanner.peekToken();
 
     const bool isIdentifier     = flag.kind == TokenKind::IDENTIFIER;
-    const bool hasFlagPrefix    = detail::startsWithAny(flag.image, m_config.getFlagPrefixes());
+    const bool hasFlagPrefix    = detail::startsWithAny(flag.image, m_context->config.getFlagPrefixes());
     const bool inContext        = context.containsLocalFlag(flag.image);
     const bool isPositional     = isIdentifier && !hasFlagPrefix;
 
@@ -555,11 +556,11 @@ auto Parser::getPositionalValue(const FlagPath& groupPath) const {
 }
 
 inline auto Parser::getConfig() -> ContextConfig& {
-    return m_config;
+    return m_context->config;
 }
 
 inline auto Parser::getConfig() const -> const ContextConfig& {
-    return m_config;
+    return m_context->config;
 }
 
 inline auto Parser::constraints() const -> Constraints& {
@@ -579,7 +580,6 @@ inline auto Parser::copyFrom(const Parser& other) -> void {
     m_poppedBrackets            = other.m_poppedBrackets;
     m_mismatchedRBRACK          = other.m_mismatchedRBRACK;
 
-    m_config      = other.m_config;
     m_constraints = std::make_unique<Constraints>(*other.m_constraints);
 }
 
@@ -666,7 +666,11 @@ auto operator|(Left&& left, Right&& right) -> Parser {
 }
 
 inline auto Parser::getConfigImpl() -> ContextConfig& {
-    return m_config;
+    return m_context->config;
+}
+
+inline auto Parser::getConfigImpl() const -> const ContextConfig& {
+    return m_context->config;
 }
 
 } // End namespace Argon

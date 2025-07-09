@@ -1,7 +1,7 @@
 ﻿#ifndef ARGON_OPTION_INCLUDE
 #define ARGON_OPTION_INCLUDE
 
-#include "../Config/GetConfig.hpp"
+#include "../Config/ConfigHelpers.hpp"
 #include "OptionTypeExtensions.hpp"
 #include "Argon/Flag.hpp"
 #include "Argon/Options/OptionComponent.hpp"

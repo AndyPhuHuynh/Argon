@@ -9,6 +9,10 @@
 #include "Argon/Traits.hpp"
 
 namespace Argon {
+class ContextConfig;
+namespace detail {
+    auto resolveContextConfig(const ContextConfig& parentConfig, const ContextConfig& childConfig) -> ContextConfig;
+}
 
 class ContextConfig {
     DefaultConversions m_defaultConversions;
@@ -18,6 +22,7 @@ class ContextConfig {
     std::vector<std::string> m_flagPrefixes{"-", "--"};
     bool m_allowDefaults;
 public:
+    friend auto detail::resolveContextConfig(const ContextConfig& parentConfig, const ContextConfig& childConfig) -> ContextConfig;
     explicit ContextConfig(bool allowDefaults);
 
     [[nodiscard]] auto getDefaultCharMode() const -> CharMode;
@@ -26,23 +31,28 @@ public:
     [[nodiscard]] auto getDefaultPositionalPolicy() const -> PositionalPolicy;
     auto setDefaultPositionalPolicy(PositionalPolicy newPolicy) -> ContextConfig&;
 
-    template <typename T>
-    auto registerConversionFn(const std::function<bool(std::string_view, T *)>& conversionFn) -> ContextConfig&;
     [[nodiscard]] auto getDefaultConversions() const -> const DefaultConversions&;
 
+    template <typename T>
+    auto registerConversionFn(const std::function<bool(std::string_view, T *)>& conversionFn) -> ContextConfig&;
+    auto registerConversionFn(const std::type_index& type,
+        const std::function<bool(std::string_view, void *)>& conversionFn) -> ContextConfig&;
+
+    [[nodiscard]] auto getBounds() const -> const detail::BoundsMap&;
+
     template <typename T> requires is_non_bool_number<T>
-    auto getMin() const -> T;
+    [[nodiscard]] auto getMin() const -> T;
 
     template <typename T> requires is_non_bool_number<T>
     auto setMin(T min) -> ContextConfig&;
 
     template <typename T> requires is_non_bool_number<T>
-    auto getMax() const -> T;
+    [[nodiscard]] auto getMax() const -> T;
 
     template <typename T> requires is_non_bool_number<T>
     auto setMax(T max) -> ContextConfig&;
 
-    auto getFlagPrefixes() -> const std::vector<std::string>&;
+    [[nodiscard]] auto getFlagPrefixes() const -> const std::vector<std::string>&;
 
     auto setFlagPrefixes(std::initializer_list<std::string_view> prefixes);
 };
@@ -123,7 +133,7 @@ inline auto ContextConfig::getDefaultConversions() const -> const DefaultConvers
     return m_defaultConversions;
 }
 
-inline auto ContextConfig::getFlagPrefixes() -> const std::vector<std::string>& {
+inline auto ContextConfig::getFlagPrefixes() const -> const std::vector<std::string>& {
     return m_flagPrefixes;
 }
 

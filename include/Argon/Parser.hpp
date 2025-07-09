@@ -25,7 +25,7 @@ namespace Argon {
     class Context;
     class Constraints;
 
-    class Parser : public detail::ContextConfigForwarder<Parser> {
+    class Parser final : public detail::ContextConfigForwarder<Parser> {
         std::unique_ptr<Context> m_context = std::make_unique<Context>(false);
         Scanner m_scanner;
 

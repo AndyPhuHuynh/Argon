@@ -30,5 +30,28 @@ auto getOptionConfig(const ContextConfig& parserConfig, const IOption *option) -
     return optionConfig;
 }
 
+inline auto resolveContextConfig(const ContextConfig& parentConfig, const ContextConfig& childConfig) -> ContextConfig {
+    auto result = parentConfig;
+    if (const auto charMode = childConfig.getDefaultCharMode(); charMode != CharMode::UseDefault) {
+        result.setDefaultCharMode(charMode);
+    }
+    if (const auto posPolicy = childConfig.getDefaultPositionalPolicy(); posPolicy != PositionalPolicy::UseDefault) {
+        result.setDefaultPositionalPolicy(posPolicy);
+    }
+    for (const auto& [type, func] : childConfig.getDefaultConversions()) {
+        result.m_defaultConversions[type] = func;
+    }
+    for (const auto& [type, bound] : childConfig.m_bounds.map) {
+        result.m_bounds.map[type] = bound->clone();
+    }
+
+    std::vector<std::string_view> prefixViews;
+    for (const auto& s : childConfig.getFlagPrefixes()) {
+        prefixViews.push_back(s);
+    }
+    result.m_flagPrefixes.assign(childConfig.m_flagPrefixes.begin(), childConfig.m_flagPrefixes.end());
+    return result;
+}
+
 } // End namespace Argon::detail
 #endif // ARGON_GET_CONFIG_INCLUDE

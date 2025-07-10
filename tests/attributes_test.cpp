@@ -174,9 +174,9 @@ TEST_CASE("Min and max values", "[constraints][min][max]") {
     double              d   = 0;
     long double         ld  = 0;
 
-    auto parser = Option(&sc)  ["-sc"].setCharMode(CharMode::ExpectInteger).withMin(10).withMax(20)
-                | Option(&uc)  ["-uc"].setCharMode(CharMode::ExpectInteger).withMin(10).withMax(20)
-                | Option(&c)   ["-c"] .setCharMode(CharMode::ExpectInteger).withMin(10).withMax(20)
+    auto parser = Option(&sc)  ["-sc"].withCharMode(CharMode::ExpectInteger).withMin(10).withMax(20)
+                | Option(&uc)  ["-uc"].withCharMode(CharMode::ExpectInteger).withMin(10).withMax(20)
+                | Option(&c)   ["-c"] .withCharMode(CharMode::ExpectInteger).withMin(10).withMax(20)
                 | Option(&ss)  ["-ss"].withMin(10).withMax(20)      | Option(&us)  ["-us"].withMin(10).withMax(20)
                 | Option(&si)  ["-si"].withMin(10).withMax(20)      | Option(&ui)  ["-ui"].withMin(10).withMax(20)
                 | Option(&sl)  ["-sl"].withMin(10).withMax(20)      | Option(&ul)  ["-ul"].withMin(10).withMax(20)

@@ -15,12 +15,12 @@ namespace Argon {
             return m_charMode;
         }
 
-        auto setCharMode(const CharMode mode) & -> Derived& {
+        auto withCharMode(const CharMode mode) & -> Derived& {
             m_charMode = mode;
             return *this;
         }
 
-        auto setCharMode(const CharMode mode) && -> Derived&& {
+        auto withCharMode(const CharMode mode) && -> Derived&& {
             m_charMode = mode;
             return static_cast<Derived&&>(*this);
         }

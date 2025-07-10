@@ -113,9 +113,9 @@ TEST_CASE("Option all built-in numeric types", "[options]") {
     long double         ld  = 0;
 
     auto parser = Option(&fb)  ["-fb"]      | Option(&tb)  ["-tb"]
-                | Option(&sc)  ["-sc"].setCharMode(CharMode::ExpectInteger)
-                | Option(&uc)  ["-uc"].setCharMode(CharMode::ExpectInteger)
-                | Option(&c)   ["-c"] .setCharMode(CharMode::ExpectAscii)
+                | Option(&sc)  ["-sc"].withCharMode(CharMode::ExpectInteger)
+                | Option(&uc)  ["-uc"].withCharMode(CharMode::ExpectInteger)
+                | Option(&c)   ["-c"] .withCharMode(CharMode::ExpectAscii)
                 | Option(&ss)  ["-ss"]      | Option(&us)  ["-us"]
                 | Option(&si)  ["-si"]      | Option(&ui)  ["-ui"]
                 | Option(&sl)  ["-sl"]      | Option(&ul)  ["-ul"]
@@ -798,7 +798,7 @@ TEST_CASE("Positional getValue", "[options][positional]") {
 }
 
 TEST_CASE("Positional getValue with groups", "[option-group][positional]") {
-    auto parser = Option<char>(123)["--num"].setCharMode(CharMode::ExpectInteger)
+    auto parser = Option<char>(123)["--num"].withCharMode(CharMode::ExpectInteger)
                 | Positional(123)
                 | (
                     OptionGroup()["--group"]
@@ -940,7 +940,8 @@ TEST_CASE("Parsing setCharMode", "[options][positional][char]") {
 TEST_CASE("Option group config", "[options][option-group][config]") {
     char topLevelChar; int topLevelInt; std::string topLevelString;
     char oneLevelChar; int oneLevelInt; std::string oneLevelString;
-    char twoLevelChar; int twoLevelInt; std::string twoLevelString; std::string twoLevelString2;
+    char twoLevelChar; int twoLevelInt; std::string twoLevelString;
+    char twoLevelChar2; int twoLevelInt2; std::string twoLevelString2;
     auto parser = Option(&topLevelChar)["/topLevelChar"]
                 | Option(&topLevelInt)["/topLevelInt"]
                 | Positional(&topLevelString)
@@ -958,6 +959,8 @@ TEST_CASE("Option group config", "[options][option-group][config]") {
                         + Option(&twoLevelChar)["--twoLevelChar"]
                         + Option(&twoLevelInt)["--twoLevelInt"]
                         + Positional(&twoLevelString)
+                        + Positional(&twoLevelChar2).withCharMode(CharMode::ExpectAscii)
+                        + Positional(&twoLevelInt2).withMin(40).withMax(50)
                         + Positional(&twoLevelString2)
                     )
                 );
@@ -986,13 +989,13 @@ TEST_CASE("Option group config", "[options][option-group][config]") {
    SECTION("Fully nested") {
         const std::string input
            = "/topLevelChar 15 /topLevelInt 16 /group [oneLevelString! \\oneLevelChar a \\oneLevelInt 6 \\nested ["
-             "--twoLevelChar 25 string1 --twoLevelInt 26 string2]] topLevelStringHere!";
+             "--twoLevelChar 25 string1 --twoLevelInt 26 b 45 string2]] topLevelStringHere!";
         parser.parse(input);
         CHECK(!parser.hasErrors());
         parser.printErrors();
         CHECK(topLevelChar == 15); CHECK(topLevelInt == 16); CHECK(topLevelString == "topLevelStringHere!");
         CHECK(oneLevelChar == 'a'); CHECK(oneLevelInt == 6); CHECK(oneLevelString == "oneLevelString!");
         CHECK(twoLevelChar == 25); CHECK(twoLevelInt == 26); CHECK(twoLevelString == "string1");
-        CHECK(twoLevelString2 == "string2");
+        CHECK(twoLevelChar2 == 'b'); CHECK(twoLevelInt2 == 45); CHECK(twoLevelString2 == "string2");
     }
 }

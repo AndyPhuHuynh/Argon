@@ -562,9 +562,9 @@ TEST_CASE("Integer analysis errors", "[analysis][errors]") {
     long double         ld  = 0;
 
     auto parser = Option(&fb)  ["-fb"]      | Option(&tb)  ["-tb"]
-                | Option(&sc)  ["-sc"].setCharMode(CharMode::ExpectInteger)
-                | Option(&uc)  ["-uc"].setCharMode(CharMode::ExpectInteger)
-                | Option(&c)   ["-c"] .setCharMode(CharMode::ExpectInteger)
+                | Option(&sc)  ["-sc"].withCharMode(CharMode::ExpectInteger)
+                | Option(&uc)  ["-uc"].withCharMode(CharMode::ExpectInteger)
+                | Option(&c)   ["-c"] .withCharMode(CharMode::ExpectInteger)
                 | Option(&ss)  ["-ss"]      | Option(&us)  ["-us"]
                 | Option(&si)  ["-si"]      | Option(&ui)  ["-ui"]
                 | Option(&sl)  ["-sl"]      | Option(&ul)  ["-ul"]

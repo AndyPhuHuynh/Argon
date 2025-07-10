@@ -6,14 +6,16 @@
 
 #include "Argon/Error.hpp"
 
-inline auto RequireMsg(const Argon::ErrorVariant& var) {
+inline auto RequireMsg(const Argon::ErrorContainer& container) {
+    const auto& var = container.error;
     REQUIRE(std::holds_alternative<Argon::ErrorMessage>(var));
     return std::get<Argon::ErrorMessage>(var);
 }
 
-inline auto RequireGroup(const Argon::ErrorVariant& var) {
-    REQUIRE(std::holds_alternative<Argon::ErrorGroup>(var));
-    return std::get<Argon::ErrorGroup>(var);
+inline auto RequireGroup(const Argon::ErrorContainer& container) -> const Argon::ErrorGroup& {
+    const auto& var = container.error;
+    REQUIRE(std::holds_alternative<std::unique_ptr<Argon::ErrorGroup>>(var));
+    return *std::get<std::unique_ptr<Argon::ErrorGroup>>(var);
 }
 
 inline auto CheckMessage(const Argon::ErrorMessage& error, const std::string_view msg, const int pos, Argon::ErrorType type) {

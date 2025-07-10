@@ -93,6 +93,12 @@ auto parseNumericChar(const OptionConfig<T>& config, const std::string_view arg,
         out = static_cast<T>(arg[0]);
         return true;
     }
+    if (arg.length() == 3) {
+        if ((arg[0] == '\'' && arg[2] == '\'') || arg[0] == '\"' && arg[2] == '\"') {
+            out = static_cast<T>(arg[1]);
+            return true;
+        }
+    }
     return false;
 }
 

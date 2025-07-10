@@ -977,7 +977,6 @@ TEST_CASE("Positional policy with parser config", "[positional][errors]") {
         parser.parse("--name1 John 100 --name2 Sammy 200 --name3 Joshua 300 Sam --address [400 --street Jam 500] "
                      "--school [History --homeroom 026 --teachers [--classroom1 10 Mr.Smith --classroom2 20 Mrs.Smith] English]");
         CHECK(parser.hasErrors());
-        parser.printErrors();
         const auto& syntaxErrors = CheckGroup(parser.getSyntaxErrors(), "Syntax Errors", -1, -1, 8);
         CheckMessage(RequireMsg(syntaxErrors.getErrors()[0]), {"--name2", "100"}, 13, ErrorType::Syntax_MisplacedPositional);
         CheckMessage(RequireMsg(syntaxErrors.getErrors()[1]), {"--name3", "200"}, 31, ErrorType::Syntax_MisplacedPositional);

@@ -892,13 +892,13 @@ TEST_CASE("Ascii CharMode", "[options][char]") {
     }
 
     SECTION("Test 2") {
-        parser.parse("-c d -sc e -uc f");
+        parser.parse("-c 'd' -sc 'e' -uc 'f'");
         CHECK(!parser.hasErrors());
         CHECK(c == 'd'); CHECK(sc == 'e'); CHECK(uc == 'f');
     }
 
     SECTION("Test 3") {
-        parser.parse("-c g -sc h -uc i");
+        parser.parse(R"(-c "g" -sc "h" -uc "i")");
         CHECK(!parser.hasErrors());
         CHECK(c == 'g'); CHECK(sc == 'h'); CHECK(uc == 'i');
     }

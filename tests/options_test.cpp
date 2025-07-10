@@ -744,7 +744,7 @@ TEST_CASE("Positional args basic test", "[options][positional]") {
     CHECK(n2  == 20);
 }
 
-TEST_CASE("Positional getValue", "[options][positional]") {
+TEST_CASE("Positional getValue rvalue", "[options][positional][getValue]") {
     auto parser = Positional('a')
                 | Positional(1)
                 | Positional(1.0f)
@@ -797,7 +797,62 @@ TEST_CASE("Positional getValue", "[options][positional]") {
     }
 }
 
-TEST_CASE("Positional getValue with groups", "[option-group][positional]") {
+TEST_CASE("Positional getValue lvalue", "[options][positional][getValue]") {
+    auto posChar    = Positional('a');
+    auto posInt     = Positional(1);
+    auto posFloat   = Positional(1.0f);
+    auto posDouble  = Positional(1.0);
+    auto posString  = Positional(std::string("Hello world!"));
+    auto optInt     = Option(1)["--integer"];
+    auto optFloat   = Option(1.0f)["--float"];
+    auto optDouble  = Option(1.0)["--double"];
+
+    auto parser = posChar | posInt | posFloat | posDouble | posString | optInt | optFloat | optDouble;
+
+    SECTION("Default values") {
+        CHECK(!parser.hasErrors());
+        CHECK(posChar.getValue()    == 'a');
+        CHECK(posInt.getValue()     == 1);
+        CHECK(posFloat.getValue()   == Catch::Approx(1.0).epsilon(1e-6));
+        CHECK(posDouble.getValue()  == Catch::Approx(1.0).epsilon(1e-6));
+        CHECK(posString.getValue()  == "Hello world!");
+    }
+
+    SECTION("First three set") {
+        parser.parse("b 2 2.0");
+        CHECK(!parser.hasErrors());
+        CHECK(posChar.getValue()    == 'b');
+        CHECK(posInt.getValue()     == 2);
+        CHECK(posFloat.getValue()   == Catch::Approx(2.0).epsilon(1e-6));
+        CHECK(posDouble.getValue()  == Catch::Approx(1.0).epsilon(1e-6));
+        CHECK(posString.getValue()  == "Hello world!");
+    }
+
+    SECTION("All five set") {
+        parser.parse("b 2 2.0 2.0 Goodbye!");
+        CHECK(!parser.hasErrors());
+        CHECK(posChar.getValue()    == 'b');
+        CHECK(posInt.getValue()     == 2);
+        CHECK(posFloat.getValue()   == Catch::Approx(2.0).epsilon(1e-6));
+        CHECK(posDouble.getValue()  == Catch::Approx(2.0).epsilon(1e-6));
+        CHECK(posString.getValue()  == "Goodbye!");
+    }
+
+    SECTION("With normal options") {
+        parser.parse("c --integer 10 20 30.5 --double 2.5 --float 2.5 40.5 Hello!");
+        CHECK(!parser.hasErrors());
+        CHECK(posChar.getValue()    == 'c');
+        CHECK(posInt.getValue()     == 20);
+        CHECK(posFloat.getValue()   == Catch::Approx(30.5).epsilon(1e-6));
+        CHECK(posDouble.getValue()  == Catch::Approx(40.5).epsilon(1e-6));
+        CHECK(posString.getValue()  == "Hello!");
+        CHECK(optInt.getValue()     == 10);
+        CHECK(optFloat.getValue()   == Catch::Approx(2.5).epsilon(1e-6));
+        CHECK(optDouble.getValue()  == Catch::Approx(2.5).epsilon(1e-6));
+    }
+}
+
+TEST_CASE("Positional getValue with groups", "[option-group][positional][getValue]") {
     auto parser = Option<char>(123)["--num"].withCharMode(CharMode::ExpectInteger)
                 | Positional(123)
                 | (

@@ -149,7 +149,7 @@ protected:
         if (optionName.empty()) {
             ss << "Invalid value: ";
         } else {
-            ss << std::format("Invalid value for '{}': ", optionName);
+            ss << std::format(R"(Invalid value for "{}": )", optionName);
         }
 
         if constexpr (is_numeric_char_type<T>) {
@@ -167,7 +167,7 @@ protected:
                 detail::format_with_commas(config.min),
                 detail::format_with_commas(config.max));
         } else if constexpr (std::is_same_v<T, bool>) {
-            ss << "expected boolean (true or false)";
+            ss << "expected boolean";
         } else if constexpr (std::is_floating_point_v<T>) {
             if (config.min != std::numeric_limits<T>::lowest() && config.max != std::numeric_limits<T>::max()) {
                 ss << std::format("expected floating point number between {} and {} inclusive",
@@ -187,7 +187,7 @@ protected:
         }
 
         // Actual value
-        ss << std::format(", got: '{}'", invalidArg);
+        ss << std::format(R"(, got: "{}")", invalidArg);
         this->m_conversionError = ss.str();
     }
 

@@ -152,13 +152,13 @@ inline auto checkPositionals( // NOLINT (misc-no-recursion)
                 if (flagIndex == 0) continue;
                 if (groupPath.empty()) {
                     parser.addSyntaxError(std::format(
-                        "Found positional value '{}' after flag '{}'. Positional values must occur before all flags at top level.",
+                        R"(Found positional value "{}" after flag "{}". Positional values must occur before all flags at top level.)",
                         positional->value.value, options[flagIndex - 1]->flag.value),
                         positional->value.pos, ErrorType::Syntax_MisplacedPositional);
                 } else {
                     parser.addSyntaxError(std::format(
-                        "Found positional value '{}' after flag '{}' inside group '{}'. "
-                        "Positional values must occur before all flags inside group '{}'.",
+                        R"(Found positional value "{}" after flag "{}" inside group "{}". )"
+                        R"(Positional values must occur before all flags inside group "{}".)",
                         positional->value.value, options[flagIndex - 1]->flag.value, groupPath, groupPath),
                         positional->value.pos, ErrorType::Syntax_MisplacedPositional);
                 }
@@ -176,13 +176,13 @@ inline auto checkPositionals( // NOLINT (misc-no-recursion)
                 if (flagIndex >= options.size()) break;
                 if (groupPath.empty()) {
                     parser.addSyntaxError(std::format(
-                        "Found positional value '{}' before flag '{}'. Positional values must occur after all flags at top level.",
+                        R"(Found positional value "{}" before flag "{}". Positional values must occur after all flags at top level.)",
                         positional->value.value, options[flagIndex]->flag.value),
                         positional->value.pos, ErrorType::Syntax_MisplacedPositional);
                 } else {
                     parser.addSyntaxError(std::format(
-                        "Found positional value '{}' before flag '{}' inside group '{}'. "
-                        "Positional values must occur after all flags inside group '{}'.",
+                        R"(Found positional value "{}" before flag "{}" inside group "{}". )"
+                        R"(Positional values must occur after all flags inside group "{}".)",
                         positional->value.value, options[flagIndex]->flag.value, groupPath, groupPath),
                         positional->value.pos, ErrorType::Syntax_MisplacedPositional);
                 }
@@ -227,13 +227,13 @@ inline Argon::OptionAst::OptionAst(const Token& flagToken, const Token& valueTok
 inline void Argon::OptionAst::analyze(Parser& parser, Context& context, const ContextConfig& config) {
     IOption *iOption = context.getFlagOption(flag.value);
     if (!iOption) {
-        parser.addAnalysisError(std::format("Unknown option: '{}'", flag.value), flag.pos, ErrorType::Analysis_UnknownFlag);
+        parser.addAnalysisError(std::format(R"(Unknown option: "{}")", flag.value), flag.pos, ErrorType::Analysis_UnknownFlag);
         return;
     }
 
     auto *setValue = dynamic_cast<ISetValue*>(iOption);
     if (!setValue || !dynamic_cast<IsSingleOption*>(iOption)) {
-        parser.addAnalysisError(std::format("Flag '{}' is not an option", flag.value), flag.pos, ErrorType::Analysis_IncorrectOptionType);
+        parser.addAnalysisError(std::format(R"(Flag "{}" is not an option)", flag.value), flag.pos, ErrorType::Analysis_IncorrectOptionType);
         return;
     }
 
@@ -254,13 +254,13 @@ inline void Argon::MultiOptionAst::addValue(const Token& value) {
 inline void Argon::MultiOptionAst::analyze(Parser& parser, Context &context, const ContextConfig& config) {
     IOption *iOption = context.getFlagOption(flag.value);
     if (!iOption) {
-        parser.addAnalysisError(std::format("Unknown multi-option: '{}'", flag.value), flag.pos, ErrorType::Analysis_UnknownFlag);
+        parser.addAnalysisError(std::format(R"(Unknown multi-option: "{}")", flag.value), flag.pos, ErrorType::Analysis_UnknownFlag);
         return;
     }
 
     auto *setValue = dynamic_cast<ISetValue*>(iOption);
     if (!setValue || !dynamic_cast<IsMultiOption*>(iOption)) {
-        parser.addAnalysisError(std::format("Flag '{}' is not a multi-option", flag.value),
+        parser.addAnalysisError(std::format(R"(Flag "{}" is not a multi-option)", flag.value),
             flag.pos, ErrorType::Analysis_IncorrectOptionType);
         return;
     }
@@ -284,7 +284,7 @@ inline void Argon::PositionalAst::analyze(Parser&, Context&, const ContextConfig
 inline void Argon::PositionalAst::analyze(Parser& parser, Context& context, const ContextConfig& config, const size_t position) {
     IsPositional *opt = context.getPositional(position);
     if (!opt) {
-        parser.addAnalysisError(std::format("Unexpected token: '{}'", value.value), value.pos, ErrorType::Analysis_UnexpectedToken);
+        parser.addAnalysisError(std::format(R"(Unexpected token: "{}")", value.value), value.pos, ErrorType::Analysis_UnexpectedToken);
         return;
     }
 
@@ -343,14 +343,14 @@ inline void Argon::OptionGroupAst::analyze(Parser& parser, Context& context, con
     IOption *iOption = context.getFlagOption(flag.value);
     if (!iOption) {
         parser.removeErrorGroup(flag.pos);
-        parser.addAnalysisError(std::format("Unknown option group: '{}'", flag.value), flag.pos, ErrorType::Analysis_UnknownFlag);
+        parser.addAnalysisError(std::format(R"(Unknown option group: "{}")", flag.value), flag.pos, ErrorType::Analysis_UnknownFlag);
         return;
     }
 
     const auto optionGroup = dynamic_cast<OptionGroup*>(iOption);
     if (!optionGroup) {
         parser.removeErrorGroup(flag.pos);
-        parser.addAnalysisError(std::format("Flag '{}' is not an option group", flag.value),
+        parser.addAnalysisError(std::format(R"(Flag "{}" is not an option group)", flag.value),
             flag.pos, ErrorType::Analysis_IncorrectOptionType);
         return;
     }

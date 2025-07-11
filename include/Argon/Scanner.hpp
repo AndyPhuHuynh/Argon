@@ -16,6 +16,7 @@ namespace Argon {
         RBRACK,
         IDENTIFIER,
         EQUALS,
+        DOUBLE_DASH,
         END,
     };
 
@@ -42,16 +43,16 @@ namespace Argon {
         Scanner() = default;
         explicit Scanner(std::string_view buffer);
 
-        [[nodiscard]] bool seeTokenKind(TokenKind kind) const;
-        [[nodiscard]] bool seeTokenKind(const std::initializer_list<TokenKind>& kinds) const;
-        [[nodiscard]] std::optional<char> peekChar() const;
+        [[nodiscard]] auto seeTokenKind(TokenKind kind) const -> bool;
+        [[nodiscard]] auto seeTokenKind(const std::initializer_list<TokenKind>& kinds) const -> bool;
+        [[nodiscard]] auto peekChar() const -> std::optional<char>;
         auto nextChar() -> std::optional<char>;
         auto getNextToken() -> Token;
         [[nodiscard]] auto getAllTokens() const -> const std::vector<Token>&;
-        [[nodiscard]] Token peekToken() const;
+        [[nodiscard]] auto peekToken() const -> Token;
         
-        void recordPosition();
-        void rewindToPosition();
+        auto recordPosition() -> void;
+        auto rewindToPosition() -> void;
         auto rewind(uint32_t amount) -> std::span<const Token>;
     private:
         std::vector<Token> m_tokens;
@@ -60,9 +61,13 @@ namespace Argon {
 
         std::string_view m_buffer;
         uint32_t m_bufferPos = 0;
+        uint32_t m_bufferRewindPos = 0;
 
-        void scanNextToken();
-        void scanBuffer();
+        auto recordBufferPosition() -> void;
+        auto rewindToBufferPosition() -> void;
+
+        auto scanNextToken() -> void;
+        auto scanBuffer() -> void;
 
         [[nodiscard]] Token getEndToken() const;
     };
@@ -168,6 +173,14 @@ inline auto Argon::Scanner::rewind(const uint32_t amount) -> std::span<const Tok
     return {m_tokens.data() + m_tokenPos, rewindAmount};
 }
 
+inline auto Argon::Scanner::recordBufferPosition() -> void {
+    m_bufferRewindPos = m_bufferPos;
+}
+
+inline auto Argon::Scanner::rewindToBufferPosition() -> void {
+    m_bufferPos = m_bufferRewindPos;
+}
+
 inline void Argon::Scanner::scanNextToken() {
     int position = static_cast<int>(m_bufferPos);
     auto optCh = nextChar();
@@ -194,6 +207,16 @@ inline void Argon::Scanner::scanNextToken() {
         if (ch == '=') {
             m_tokens.emplace_back(TokenKind::EQUALS, position);
             return;
+        }
+        if (ch == '-') {
+            recordBufferPosition();
+            const auto secondDash = nextChar();
+            if (const auto space = nextChar();
+                secondDash.has_value() && space.has_value() && secondDash.value() == '-' && space.value() == ' ') {
+                m_tokens.emplace_back(TokenKind::DOUBLE_DASH, position);
+                return;
+            }
+            rewindToBufferPosition();
         }
 
         std::string image;
@@ -232,6 +255,7 @@ inline auto operator<<(std::ostream& os, const Argon::TokenKind kind) -> std::os
         case Argon::TokenKind::RBRACK:      return os << "RBRACK";
         case Argon::TokenKind::IDENTIFIER:  return os << "IDENTIFIER";
         case Argon::TokenKind::EQUALS:      return os << "EQUALS";
+        case Argon::TokenKind::DOUBLE_DASH: return os << "DOUBLE_DASH";
         case Argon::TokenKind::END:         return os << "END";
     }
     return os << "UNKNOWN";

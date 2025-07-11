@@ -141,6 +141,7 @@ TEST_CASE("Option group syntax errors", "[option-group][syntax][errors]") {
     SECTION("Missing left bracket") {
         parser.parse("--name John --group --age 20]");
         CHECK(parser.hasErrors());
+        parser.printErrors();
         const auto& syntaxErrors = parser.getSyntaxErrors();
         CheckGroup(syntaxErrors, "Syntax Errors", -1, -1, 2);
 

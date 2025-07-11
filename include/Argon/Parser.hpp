@@ -122,27 +122,29 @@ namespace Argon {
 
         auto parseStatement() -> StatementAst;
 
-        auto parseOptionBundle(const Ast& parentAst, Context& context) ->
+        auto parseOptionBundle(const Ast& parentAst, Context& context, const std::optional<Token>& doubleDashToken) ->
             std::variant<std::monostate, std::unique_ptr<OptionBaseAst>, std::unique_ptr<PositionalAst>>;
 
-        auto parseSingleOption(const Ast& parentAst, Context& context, const Token& flag) -> std::unique_ptr<OptionAst>;
+        auto parseSingleOption(const Ast& parentAst, Context& context, const Token& flag, const std::optional<Token>& doubleDashToken) -> std::unique_ptr<OptionAst>;
 
         auto parseMultiOption(const Context& context, const Token& flag) -> std::unique_ptr<MultiOptionAst>;
 
         auto parseGroupContents(OptionGroupAst& optionGroupAst, Context& nextContext) -> void;
 
-        auto parseOptionGroup(const Ast& parentAst, Context& context, const Token& flag) -> std::unique_ptr<OptionGroupAst>;
+        auto parseOptionGroup(const Ast& parentAst, Context& context, const Token& flag, const std::optional<Token>& doubleDashToken) -> std::unique_ptr<OptionGroupAst>;
 
-        auto getNextValidFlag(const Ast& parentAst, const Context& context, bool printErrors = true) ->
-            std::variant<std::monostate, Token, std::unique_ptr<PositionalAst>>;
+        auto getNextValidFlag(const Ast& parentAst, const Context& context, bool printErrors,
+            const std::optional<Token>& doubleDashToken) -> std::variant<std::monostate, Token, std::unique_ptr<PositionalAst>>;
 
-        auto skipToNextValidFlag(const Ast& parentAst, const Context& context) -> void;
+        auto skipToNextValidFlag(const Ast& parentAst, const Context& context, const std::optional<Token>& doubleDashToken) -> void;
 
         auto getNextToken() -> Token;
 
         auto rewindScanner(uint32_t rewindAmount) -> void;
 
         auto skipScope() -> void;
+
+        auto getDoubleDashInScope() -> std::optional<Token>;
 
         auto validateConstraints() -> void;
 
@@ -272,13 +274,14 @@ inline auto Parser::parse(const std::string_view str) -> bool {
 
 inline auto Parser::parseStatement() -> StatementAst {
     StatementAst statement;
+    const auto doubleDash = getDoubleDashInScope();
     while (!m_scanner.seeTokenKind(TokenKind::END)) {
         // Handle rbrack that gets leftover after SkipScope
         if (m_scanner.seeTokenKind(TokenKind::RBRACK)) {
             getNextToken();
             continue;
         }
-        auto parsed = parseOptionBundle(statement, *m_context);
+        auto parsed = parseOptionBundle(statement, *m_context, doubleDash);
         std::visit([&statement]<typename T>(T& opt) {
             if constexpr (std::is_same_v<T, std::monostate>) {}
             else {statement.addOption(std::move(opt));}
@@ -287,22 +290,22 @@ inline auto Parser::parseStatement() -> StatementAst {
     return statement;
 }
 
-inline auto Parser::parseOptionBundle(const Ast& parentAst, Context& context) -> // NOLINT(misc-no-recursion)
+inline auto Parser::parseOptionBundle(const Ast& parentAst, Context& context, const std::optional<Token>& doubleDashToken) -> // NOLINT(misc-no-recursion)
     std::variant<std::monostate, std::unique_ptr<OptionBaseAst>, std::unique_ptr<PositionalAst>> {
-    auto var = getNextValidFlag(parentAst, context);
+    auto var = getNextValidFlag(parentAst, context, true, doubleDashToken);
     if (std::holds_alternative<std::monostate>(var)) { return std::monostate{}; }
     if (std::holds_alternative<Token>(var)) {
         const auto& flagToken = std::get<Token>(var);
 
         IOption *iOption = context.getFlagOption(flagToken.image);
         if (dynamic_cast<IsSingleOption *>(iOption)) {
-            return parseSingleOption(parentAst, context, flagToken);
+            return parseSingleOption(parentAst, context, flagToken, doubleDashToken);
         }
         if (dynamic_cast<IsMultiOption *>(iOption)) {
             return parseMultiOption(context, flagToken);
         }
         if (dynamic_cast<OptionGroup *>(iOption)) {
-            return parseOptionGroup(parentAst, context, flagToken);
+            return parseOptionGroup(parentAst, context, flagToken, doubleDashToken);
         }
 
         return std::monostate{};
@@ -313,14 +316,13 @@ inline auto Parser::parseOptionBundle(const Ast& parentAst, Context& context) ->
     return std::monostate{};
 }
 
-inline auto Parser::parseSingleOption(const Ast& parentAst, Context& context, const Token& flag)
+inline auto Parser::parseSingleOption(const Ast& parentAst, Context& context, const Token& flag, const std::optional<Token>& doubleDashToken)
     -> std::unique_ptr<OptionAst> {
     Token value = m_scanner.peekToken();
 
     // Boolean flag with no explicit value
-    const bool nextTokenIsAnotherFlag = value.kind == TokenKind::IDENTIFIER && context.containsLocalFlag(value.image);
-    if (context.getOptionDynamic<Option<bool>>(flag.image) &&
-        (!value.isOneOf({TokenKind::IDENTIFIER, TokenKind::EQUALS}) || nextTokenIsAnotherFlag)) {
+    if (const bool nextTokenIsAnotherFlag = value.kind == TokenKind::IDENTIFIER && context.containsLocalFlag(value.image);
+        context.getOptionDynamic<Option<bool>>(flag.image) && (!value.isOneOf({TokenKind::IDENTIFIER, TokenKind::EQUALS}) || nextTokenIsAnotherFlag)) {
         return std::make_unique<OptionAst>(flag, Token(TokenKind::IDENTIFIER, "true", flag.position));
     }
 
@@ -335,7 +337,7 @@ inline auto Parser::parseSingleOption(const Ast& parentAst, Context& context, co
         m_syntaxErrors.addErrorMessage(
             std::format("Expected flag value, got '{}' at position {}", value.image, value.position),
             value.position, ErrorType::Syntax_MissingValue);
-        skipToNextValidFlag(parentAst, context);
+        skipToNextValidFlag(parentAst, context, doubleDashToken);
         return nullptr;
     }
 
@@ -379,6 +381,7 @@ inline auto Parser::parseMultiOption(const Context& context,
 }
 
 inline auto Parser::parseGroupContents(OptionGroupAst& optionGroupAst, Context& nextContext) -> void { //NOLINT (misc-no-recursion)
+    const auto doubleDash = getDoubleDashInScope();
     while (true) {
         const Token nextToken = m_scanner.peekToken();
 
@@ -398,7 +401,7 @@ inline auto Parser::parseGroupContents(OptionGroupAst& optionGroupAst, Context& 
                 nextToken.position, ErrorType::Syntax_MissingRightBracket);
             return;
         }
-        auto parsed = parseOptionBundle(optionGroupAst, nextContext);
+        auto parsed = parseOptionBundle(optionGroupAst, nextContext, doubleDash);
         std::visit([&optionGroupAst]<typename T>(T& opt) {
             if constexpr (std::is_same_v<T, std::monostate>) {}
             else {optionGroupAst.addOption(std::move(opt));}
@@ -406,13 +409,12 @@ inline auto Parser::parseGroupContents(OptionGroupAst& optionGroupAst, Context& 
     }
 }
 
-inline auto Parser::parseOptionGroup(const Ast& parentAst, Context& context, const Token& flag) -> std::unique_ptr<OptionGroupAst> { //NOLINT (misc-no-recursion)
-    const Token lbrack = m_scanner.peekToken();
-    if (lbrack.kind != TokenKind::LBRACK) {
+inline auto Parser::parseOptionGroup(const Ast& parentAst, Context& context, const Token& flag, const std::optional<Token>& doubleDashToken) -> std::unique_ptr<OptionGroupAst> { //NOLINT (misc-no-recursion)
+    if (const Token lbrack = m_scanner.peekToken(); lbrack.kind != TokenKind::LBRACK) {
         m_syntaxErrors.addErrorMessage(
             std::format("Expected '[', got '{}' at position {}", lbrack.image, lbrack.position),
             lbrack.position, ErrorType::Syntax_MissingLeftBracket);
-        skipToNextValidFlag(parentAst, context);
+        skipToNextValidFlag(parentAst, context, doubleDashToken);
         return nullptr;
     }
     getNextToken();
@@ -425,8 +427,9 @@ inline auto Parser::parseOptionGroup(const Ast& parentAst, Context& context, con
     return optionGroupAst;
 }
 
-inline auto Parser::getNextValidFlag(const Ast& parentAst, const Context& context, const bool printErrors) ->
-    std::variant<std::monostate, Token, std::unique_ptr<PositionalAst>> {
+inline auto Parser::getNextValidFlag(
+    const Ast& parentAst, const Context& context, const bool printErrors, const std::optional<Token>& doubleDashToken
+) -> std::variant<std::monostate, Token, std::unique_ptr<PositionalAst>> {
     Token flag = m_scanner.peekToken();
 
     const bool isIdentifier     = flag.kind == TokenKind::IDENTIFIER;
@@ -492,8 +495,8 @@ inline auto Parser::getNextValidFlag(const Ast& parentAst, const Context& contex
     }
 }
 
-inline auto Parser::skipToNextValidFlag(const Ast& parentAst, const Context& context) -> void {
-    getNextValidFlag(parentAst, context, false);
+inline auto Parser::skipToNextValidFlag(const Ast& parentAst, const Context& context, const std::optional<Token>& doubleDashToken) -> void {
+    getNextValidFlag(parentAst, context, false, doubleDashToken);
     if (m_scanner.peekToken().kind != TokenKind::END) {
         rewindScanner(1);
     }
@@ -546,7 +549,7 @@ auto Parser::getPositionalValue(const std::string_view groupFlag) const {
 }
 
 template<typename ValueType, size_t Pos>
-auto Parser::getPositionalValue(std::initializer_list<std::string_view> groupPath) const {
+auto Parser::getPositionalValue(const std::initializer_list<std::string_view> groupPath) const {
     return m_context->getPositionalValue<ValueType, Pos>(groupPath);
 }
 
@@ -650,6 +653,32 @@ inline auto Parser::skipScope() -> void {
             return;
         }
     }
+}
+
+inline auto Parser::getDoubleDashInScope() -> std::optional<Token> {
+    int bracketLayer = 0;
+    uint32_t tokenCount = 0;
+    Token nextToken;
+    do {
+        nextToken = m_scanner.getNextToken();
+        tokenCount++;
+
+        if (nextToken.kind == TokenKind::LBRACK) {
+            bracketLayer++;
+        } else if (nextToken.kind == TokenKind::RBRACK) {
+            if (bracketLayer == 0) {
+                break;
+            }
+            bracketLayer--;
+        } else if (nextToken.kind == TokenKind::DOUBLE_DASH && bracketLayer == 0) {
+            break;
+        }
+    } while (nextToken.kind != TokenKind::END);
+    m_scanner.rewind(tokenCount);
+    if (nextToken.kind == TokenKind::END) {
+        return {nextToken};
+    }
+    return std::nullopt;
 }
 
 inline auto Parser::validateConstraints() -> void {

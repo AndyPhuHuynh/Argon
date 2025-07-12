@@ -1,5 +1,5 @@
-#ifndef ARGON_GET_CONFIG_INCLUDE
-#define ARGON_GET_CONFIG_INCLUDE
+#ifndef ARGON_CONFIG_HELPERS_INCLUDE
+#define ARGON_CONFIG_HELPERS_INCLUDE
 
 #include "Argon/Config/OptionConfig.hpp"
 #include "Argon/Options/IOption.hpp"
@@ -54,4 +54,4 @@ inline auto resolveContextConfig(const ContextConfig& parentConfig, const Contex
 }
 
 } // End namespace Argon::detail
-#endif // ARGON_GET_CONFIG_INCLUDE
+#endif // ARGON_CONFIG_HELPERS_INCLUDE

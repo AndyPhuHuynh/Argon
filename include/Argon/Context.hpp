@@ -7,10 +7,11 @@
 #include <type_traits>
 #include <vector>
 
-#include "Error.hpp"
-#include "Flag.hpp"
-#include "Config/ContextConfig.hpp"
-#include "Traits.hpp"
+#include "Argon/Config/ContextConfig.hpp"
+#include "Argon/Config/ContextConfigForwarder.hpp"
+#include "Argon/Error.hpp"
+#include "Argon/Flag.hpp"
+#include "Argon/Traits.hpp"
 
 namespace Argon {
     class IOption;
@@ -64,7 +65,11 @@ namespace Argon {
 
         [[nodiscard]] auto collectAllSetOptions() const -> OptionMap;
 
+        [[nodiscard]] auto getOptionsVector() -> std::vector<OptionHolder<IOption>>&;
+
         [[nodiscard]] auto getOptionsVector() const -> const std::vector<OptionHolder<IOption>>&;
+
+        [[nodiscard]] auto getPositionalsVector() -> std::vector<OptionHolder<IOption>>&;
 
         [[nodiscard]] auto getPositionalsVector() const -> const std::vector<OptionHolder<IOption>>&;
 
@@ -189,6 +194,17 @@ inline auto getFullInputHint(const IOption *option, const PositionalPolicy defau
         concatTypeHint(name, option);
     }
     return name.str();
+}
+
+inline auto resolveAllChildContextConfigs(Context *context) -> void { // NOLINT (misc-no-recursion)
+    for (auto& optionHolder : context->getOptionsVector()) {
+        const auto ptr = optionHolder.getPtr();
+        if (const auto group = dynamic_cast<OptionGroup *>(ptr)) {
+            auto& groupContext = group->getContext();
+            groupContext.config = resolveContextConfig(context->config, groupContext.config);
+            resolveAllChildContextConfigs(&groupContext);
+        }
+    }
 }
 
 } // End namespace Argon::detail
@@ -409,8 +425,16 @@ inline auto Context::collectAllSetOptions() const -> OptionMap {
     return result;
 }
 
+inline auto Context::getOptionsVector() -> std::vector<OptionHolder<IOption>>& {
+    return m_options;
+}
+
 inline auto Context::getOptionsVector() const -> const std::vector<OptionHolder<IOption>>& {
     return m_options;
+}
+
+inline auto Context::getPositionalsVector() -> std::vector<OptionHolder<IOption>>& {
+    return m_positionals;
 }
 
 inline auto Context::getPositionalsVector() const -> const std::vector<OptionHolder<IOption>>& {

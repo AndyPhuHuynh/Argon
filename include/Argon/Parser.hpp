@@ -259,15 +259,17 @@ inline auto Parser::parse(const std::string_view str) -> bool {
         return false;
     }
 
+    detail::resolveAllChildContextConfigs(m_context.get());
+
     reset();
     m_scanner = Scanner(str);
     StatementAst ast = parseStatement();
-    ast.checkPositionals(*this, *m_context, getDefaultPositionalPolicy());
+    ast.checkPositionals(*this, *m_context);
     if (m_syntaxErrors.hasErrors()) {
         return false;
     }
 
-    ast.analyze(*this, *m_context, m_context->config);
+    ast.analyze(*this, *m_context);
     validateConstraints();
     return !hasErrors();
 }
@@ -431,6 +433,27 @@ inline auto Parser::getNextValidFlag(
     const Ast& parentAst, const Context& context, const bool printErrors, const std::optional<Token>& doubleDashToken
 ) -> std::variant<std::monostate, Token, std::unique_ptr<PositionalAst>> {
     Token flag = m_scanner.peekToken();
+
+    if (doubleDashToken.has_value()) {
+        const auto& dash = doubleDashToken.value();
+        switch (context.config.getDefaultPositionalPolicy()) {
+            case PositionalPolicy::UseDefault:
+                throw std::runtime_error("Internal Argon error: PositionalPolicy::UseDefault encountered in getNextValidFlag");
+            case PositionalPolicy::BeforeFlags:
+                if (flag.position < dash.position) {
+                    getNextToken();
+                    return std::make_unique<PositionalAst>(flag);
+                }
+                break;
+            case PositionalPolicy::Interleaved:
+            case PositionalPolicy::AfterFlags:
+                if (flag.position > dash.position) {
+                    getNextToken();
+                    return std::make_unique<PositionalAst>(flag);
+                }
+                break;
+        }
+    }
 
     const bool isIdentifier     = flag.kind == TokenKind::IDENTIFIER;
     const bool hasFlagPrefix    = detail::startsWithAny(flag.image, context.config.getFlagPrefixes());
@@ -662,7 +685,6 @@ inline auto Parser::getDoubleDashInScope() -> std::optional<Token> {
     do {
         nextToken = m_scanner.getNextToken();
         tokenCount++;
-
         if (nextToken.kind == TokenKind::LBRACK) {
             bracketLayer++;
         } else if (nextToken.kind == TokenKind::RBRACK) {
@@ -675,7 +697,7 @@ inline auto Parser::getDoubleDashInScope() -> std::optional<Token> {
         }
     } while (nextToken.kind != TokenKind::END);
     m_scanner.rewind(tokenCount);
-    if (nextToken.kind == TokenKind::END) {
+    if (nextToken.kind == TokenKind::DOUBLE_DASH) {
         return {nextToken};
     }
     return std::nullopt;

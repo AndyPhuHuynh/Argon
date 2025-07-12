@@ -156,7 +156,6 @@ TEST_CASE("Option all built-in numeric types", "[options]") {
                                   "-sll -0x123456789    -ull 0x123456789 "
                                   "-f   -0x1.5p1        -d   0x1.5p1        -ld 0x1.5p1 ";
         parser.parse(input);
-        parser.printErrors();
         CHECK(!parser.hasErrors());
         CHECK(sc  == -0x1);             CHECK(uc  == 0x1);
         CHECK(ss  == -0x123);           CHECK(us  == 0x123);
@@ -175,7 +174,6 @@ TEST_CASE("Option all built-in numeric types", "[options]") {
                                   "-sl  -0b1111     -ul  0b1111 "
                                   "-sll -0b11111    -ull 0b11111 ";
         parser.parse(input);
-        parser.printErrors();
         CHECK(!parser.hasErrors());
         CHECK(sc  == -0b1);         CHECK(uc  == 0b1);
         CHECK(ss  == -0b11);        CHECK(us  == 0b11);
@@ -570,10 +568,6 @@ TEST_CASE("Booleans options", "[options]") {
         CHECK(!parser.hasErrors());
         CHECK(debug   == true);
         CHECK(verbose == true);
-
-        if (parser.hasErrors()) {
-            parser.printErrors();
-        }
     }
 
     SECTION("Only one explicit") {
@@ -1036,7 +1030,6 @@ TEST_CASE("Option group config", "[options][option-group][config]") {
               "topLevelStringHere!";
         parser.parse(input);
         CHECK(!parser.hasErrors());
-        parser.printErrors();
         CHECK(topLevelChar == 15); CHECK(topLevelInt == 16); CHECK(topLevelString == "topLevelStringHere!");
         CHECK(oneLevelChar == 'a'); CHECK(oneLevelInt == 6); CHECK(oneLevelString == "oneLevelString!");
     }
@@ -1047,7 +1040,6 @@ TEST_CASE("Option group config", "[options][option-group][config]") {
              "--twoLevelChar 25 string1 --twoLevelInt 26 b 45 string2]] topLevelStringHere!";
         parser.parse(input);
         CHECK(!parser.hasErrors());
-        parser.printErrors();
         CHECK(topLevelChar == 15); CHECK(topLevelInt == 16); CHECK(topLevelString == "topLevelStringHere!");
         CHECK(oneLevelChar == 'a'); CHECK(oneLevelInt == 6); CHECK(oneLevelString == "oneLevelString!");
         CHECK(twoLevelChar == 25); CHECK(twoLevelInt == 26); CHECK(twoLevelString == "string1");

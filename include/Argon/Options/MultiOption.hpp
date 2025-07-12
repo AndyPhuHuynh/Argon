@@ -2,8 +2,8 @@
 #define ARGON_MULTIOPTION_INCLUDE
 
 #include "Argon/Flag.hpp"
-#include "Argon/Options/OptionCharBase.hpp"
 #include "Argon/Options/OptionComponent.hpp"
+#include "Argon/Options/OptionTypeExtensions.hpp"
 #include "Argon/Options/SetValue.hpp"
 
 // Template Specializations
@@ -131,6 +131,8 @@ namespace Argon {
 }
 
 // Template Implementations
+
+#include <Argon/Config/ConfigHelpers.hpp>
 
 namespace Argon {
 // IArrayCapacity

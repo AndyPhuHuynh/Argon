@@ -50,6 +50,7 @@ namespace Argon {
         auto getNextToken() -> Token;
         [[nodiscard]] auto getAllTokens() const -> const std::vector<Token>&;
         [[nodiscard]] auto peekToken() const -> Token;
+        auto setCurrentToken(const Token& token) -> void;
         
         auto recordPosition() -> void;
         auto rewindToPosition() -> void;
@@ -76,7 +77,6 @@ namespace Argon {
 // --------------------------------------------- Implementations -------------------------------------------------------
 
 #include <algorithm>
-#include <unordered_map>
 
 inline Argon::Token::Token(const TokenKind kind) : kind(kind) {
     image = getDefaultImage(kind);
@@ -102,14 +102,21 @@ inline bool Argon::Token::isOneOf(const std::initializer_list<TokenKind> &kinds)
 }
 
 inline std::string Argon::getDefaultImage(const TokenKind kind) {
-    static const std::unordered_map<TokenKind, std::string> kindToImage = {
-        { TokenKind::LBRACK, "[" },
-        { TokenKind::RBRACK, "]" },
-        { TokenKind::EQUALS, "=" },
-        { TokenKind::END, "" }
-    };
-
-    return kindToImage.contains(kind) ? kindToImage.at(kind) : "";
+    switch (kind) {
+        case TokenKind::LBRACK:
+            return "[";
+        case TokenKind::RBRACK:
+            return "]";
+        case TokenKind::EQUALS:
+            return "=";
+        case TokenKind::DOUBLE_DASH:
+            return "--";
+        case TokenKind::NONE:
+        case TokenKind::END:
+        case TokenKind::IDENTIFIER:
+            return "";
+    }
+    return "";
 }
 
 inline Argon::Scanner::Scanner(const std::string_view buffer) {
@@ -145,6 +152,11 @@ inline Argon::Token Argon::Scanner::peekToken() const {
     } else {
         return m_tokens[m_tokenPos];
     }
+}
+
+inline auto Argon::Scanner::setCurrentToken(const Token& token) -> void {
+    if (m_tokenPos >= m_tokens.size()) return;
+    m_tokens[m_tokenPos] = token;
 }
 
 inline Argon::Token Argon::Scanner::getNextToken() {
@@ -212,7 +224,8 @@ inline void Argon::Scanner::scanNextToken() {
             recordBufferPosition();
             const auto secondDash = nextChar();
             if (const auto space = nextChar();
-                secondDash.has_value() && space.has_value() && secondDash.value() == '-' && space.value() == ' ') {
+                secondDash.has_value() && secondDash.value() == '-' &&
+                ((space.has_value() && space.value() == ' ') || !space.has_value())) {
                 m_tokens.emplace_back(TokenKind::DOUBLE_DASH, position);
                 return;
             }

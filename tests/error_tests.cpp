@@ -988,3 +988,31 @@ TEST_CASE("Positional policy with parser config", "[positional][errors]") {
         CheckMessage(RequireMsg(syntaxErrors.getErrors()[7]), {"--classroom2", "Mrs.Smith", "--school > --teachers"}, 177, ErrorType::Syntax_MisplacedPositional);
     }
 }
+
+TEST_CASE("Double dash errors", "[double-dash][errors]") {
+    auto parser =
+        Positional(std::string("Positional1")) |
+        Positional(std::string("Positional2")) |
+        Positional(std::string("Positional3")) |
+        Option(std::string("Option1"))  [{"--option1", "--opt1"}] |
+        Option(10)                      [{"--option2", "--opt2"}] |
+        Option(true)                    [{"--option3", "--opt3"}];
+
+    SECTION("Before flags with multiple double dashes") {
+        parser.withDefaultPositionalPolicy(PositionalPolicy::BeforeFlags);
+        parser.parse("--opt1 --opt2 --opt3 -- --opt1 -- --opt2 -- --opt3 false");
+        CHECK(parser.hasErrors());
+        const auto& syntaxErrors = CheckGroup(parser.getSyntaxErrors(), "Syntax Errors", -1, -1, 3);
+        CheckMessage(RequireMsg(syntaxErrors.getErrors()[0]), 31, ErrorType::Syntax_MultipleDoubleDash);
+        CheckMessage(RequireMsg(syntaxErrors.getErrors()[1]), {"--"}, 31, ErrorType::Syntax_MissingValue);
+        CheckMessage(RequireMsg(syntaxErrors.getErrors()[2]), {"--"}, 41, ErrorType::Syntax_MissingValue);
+    }
+
+    SECTION("After flags with multiple dashes") {
+        parser.withDefaultPositionalPolicy(PositionalPolicy::AfterFlags);
+        parser.parse("--opt1 Hello --opt2 50 --opt3 false -- -- -- opt3");
+        CHECK(parser.hasErrors());
+        const auto& syntaxErrors = CheckGroup(parser.getSyntaxErrors(), "Syntax Errors", -1, -1, 1);
+        CheckMessage(RequireMsg(syntaxErrors.getErrors()[0]), 39, ErrorType::Syntax_MultipleDoubleDash);
+    }
+}

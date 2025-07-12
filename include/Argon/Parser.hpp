@@ -144,7 +144,7 @@ namespace Argon {
 
         auto skipScope() -> void;
 
-        auto getDoubleDashInScope() -> std::optional<Token>;
+        auto getDoubleDashInScope(std::string_view groupName) -> std::optional<Token>;
 
         auto validateConstraints() -> void;
 
@@ -276,7 +276,7 @@ inline auto Parser::parse(const std::string_view str) -> bool {
 
 inline auto Parser::parseStatement() -> StatementAst {
     StatementAst statement;
-    const auto doubleDash = getDoubleDashInScope();
+    const auto doubleDash = getDoubleDashInScope("");
     while (!m_scanner.seeTokenKind(TokenKind::END)) {
         // Handle rbrack that gets leftover after SkipScope
         if (m_scanner.seeTokenKind(TokenKind::RBRACK)) {
@@ -383,7 +383,7 @@ inline auto Parser::parseMultiOption(const Context& context,
 }
 
 inline auto Parser::parseGroupContents(OptionGroupAst& optionGroupAst, Context& nextContext) -> void { //NOLINT (misc-no-recursion)
-    const auto doubleDash = getDoubleDashInScope();
+    const auto doubleDash = getDoubleDashInScope(optionGroupAst.getGroupPath());
     while (true) {
         const Token nextToken = m_scanner.peekToken();
 
@@ -436,6 +436,13 @@ inline auto Parser::getNextValidFlag(
 
     if (doubleDashToken.has_value()) {
         const auto& dash = doubleDashToken.value();
+        if (flag == dash) {
+            m_scanner.getNextToken();
+            flag = m_scanner.peekToken();
+            if (flag.kind == TokenKind::END) {
+                return std::monostate{};
+            }
+        }
         switch (context.config.getDefaultPositionalPolicy()) {
             case PositionalPolicy::UseDefault:
                 throw std::runtime_error("Internal Argon error: PositionalPolicy::UseDefault encountered in getNextValidFlag");
@@ -678,10 +685,12 @@ inline auto Parser::skipScope() -> void {
     }
 }
 
-inline auto Parser::getDoubleDashInScope() -> std::optional<Token> {
+inline auto Parser::getDoubleDashInScope(const std::string_view groupName) -> std::optional<Token> {
     int bracketLayer = 0;
     uint32_t tokenCount = 0;
     Token nextToken;
+    Token doubleDash;
+    bool foundDoubleDash = false;
     do {
         nextToken = m_scanner.getNextToken();
         tokenCount++;
@@ -693,12 +702,25 @@ inline auto Parser::getDoubleDashInScope() -> std::optional<Token> {
             }
             bracketLayer--;
         } else if (nextToken.kind == TokenKind::DOUBLE_DASH && bracketLayer == 0) {
-            break;
+            if (foundDoubleDash) {
+                if (groupName.empty()) {
+                    m_syntaxErrors.addErrorMessage("Multiple double dashes found at the root level",
+                        nextToken.position, ErrorType::Syntax_MultipleDoubleDash);
+                } else {
+                    m_syntaxErrors.addErrorMessage(
+                        std::format(R"(Multiple double dashes found at the root level within group "{}")", groupName),
+                        nextToken.position, ErrorType::Syntax_MultipleDoubleDash);
+                }
+                m_scanner.rewind(tokenCount);
+                return doubleDash;
+            }
+            doubleDash = nextToken;
+            foundDoubleDash = true;
         }
     } while (nextToken.kind != TokenKind::END);
     m_scanner.rewind(tokenCount);
-    if (nextToken.kind == TokenKind::DOUBLE_DASH) {
-        return {nextToken};
+    if (foundDoubleDash) {
+        return {doubleDash};
     }
     return std::nullopt;
 }

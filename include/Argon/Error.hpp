@@ -26,6 +26,7 @@ namespace Argon {
         Syntax_MissingRightBracket,
         Syntax_UnknownFlag,
         Syntax_MisplacedPositional,
+        Syntax_MultipleDoubleDash,
 
         Analysis_UnknownFlag,
         Analysis_IncorrectOptionType,

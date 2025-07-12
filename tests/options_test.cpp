@@ -1046,3 +1046,101 @@ TEST_CASE("Option group config", "[options][option-group][config]") {
         CHECK(twoLevelChar2 == 'b'); CHECK(twoLevelInt2 == 45); CHECK(twoLevelString2 == "string2");
     }
 }
+
+TEST_CASE("Double dash", "[positionals][double-dash]") {
+    auto parser =
+        Positional(std::string("Positional1")) |
+        Positional(std::string("Positional2")) |
+        Positional(std::string("Positional3")) |
+        Option(std::string("Option1"))  [{"--option1", "--opt1"}] |
+        Option(10)                      [{"--option2", "--opt2"}] |
+        Option(true)                    [{"--option3", "--opt3"}];
+
+    SECTION("Positional policy before flags") {
+        parser.withDefaultPositionalPolicy(PositionalPolicy::BeforeFlags);
+        parser.parse("--opt1 --opt2 --opt3 -- --opt1 Hello --opt2 50 --opt3 false");
+        parser.printErrors();
+        CHECK(!parser.hasErrors());
+        CHECK(parser.getPositionalValue<std::string, 0>() == "--opt1");
+        CHECK(parser.getPositionalValue<std::string, 1>() == "--opt2");
+        CHECK(parser.getPositionalValue<std::string, 2>() == "--opt3");
+        CHECK(parser.getOptionValue<std::string>("--option1")   == "Hello");
+        CHECK(parser.getOptionValue<int>("--option2")           == 50);
+        CHECK(parser.getOptionValue<bool>("--option3")          == false);
+    }
+
+    SECTION("Before flags dash at start") {
+        parser.withDefaultPositionalPolicy(PositionalPolicy::BeforeFlags);
+        parser.parse("-- --opt1 Hello --opt2 50 --opt3 false");
+        parser.printErrors();
+        CHECK(!parser.hasErrors());
+        CHECK(parser.getPositionalValue<std::string, 0>() == "Positional1");
+        CHECK(parser.getPositionalValue<std::string, 1>() == "Positional2");
+        CHECK(parser.getPositionalValue<std::string, 2>() == "Positional3");
+        CHECK(parser.getOptionValue<std::string>("--option1")   == "Hello");
+        CHECK(parser.getOptionValue<int>("--option2")           == 50);
+        CHECK(parser.getOptionValue<bool>("--option3")          == false);
+    }
+
+    SECTION("Before flags dash at end") {
+        parser.withDefaultPositionalPolicy(PositionalPolicy::BeforeFlags);
+        parser.parse("--opt1 --opt2 --opt3 --");
+        parser.printErrors();
+        CHECK(!parser.hasErrors());
+        CHECK(parser.getPositionalValue<std::string, 0>() == "--opt1");
+        CHECK(parser.getPositionalValue<std::string, 1>() == "--opt2");
+        CHECK(parser.getPositionalValue<std::string, 2>() == "--opt3");
+        CHECK(parser.getOptionValue<std::string>("--option1")   == "Option1");
+        CHECK(parser.getOptionValue<int>("--option2")           == 10);
+        CHECK(parser.getOptionValue<bool>("--option3")          == true);
+    }
+
+    SECTION("Positional policy after flags") {
+        parser.withDefaultPositionalPolicy(PositionalPolicy::AfterFlags);
+        parser.parse("--opt1 Hello --opt2 50 --opt3 false -- --opt1 --opt2 --opt3");
+        parser.printErrors();
+        CHECK(!parser.hasErrors());
+        CHECK(parser.getPositionalValue<std::string, 0>() == "--opt1");
+        CHECK(parser.getPositionalValue<std::string, 1>() == "--opt2");
+        CHECK(parser.getPositionalValue<std::string, 2>() == "--opt3");
+        CHECK(parser.getOptionValue<std::string>("--option1")   == "Hello");
+        CHECK(parser.getOptionValue<int>("--option2")           == 50);
+        CHECK(parser.getOptionValue<bool>("--option3")          == false);
+    }
+
+    SECTION("After flags dash at start") {
+        parser.withDefaultPositionalPolicy(PositionalPolicy::AfterFlags);
+        parser.parse("-- --opt1 --opt2 --opt3");
+        parser.printErrors();
+        CHECK(!parser.hasErrors());
+        CHECK(parser.getPositionalValue<std::string, 0>() == "--opt1");
+        CHECK(parser.getPositionalValue<std::string, 1>() == "--opt2");
+        CHECK(parser.getPositionalValue<std::string, 2>() == "--opt3");
+        CHECK(parser.getOptionValue<std::string>("--option1")   == "Option1");
+        CHECK(parser.getOptionValue<int>("--option2")           == 10);
+        CHECK(parser.getOptionValue<bool>("--option3")          == true);
+    }
+
+    SECTION("After flags dash at end") {
+        parser.withDefaultPositionalPolicy(PositionalPolicy::AfterFlags);
+        parser.parse("--opt1 Hello --opt2 50 --opt3 false --");
+        parser.printErrors();
+        CHECK(!parser.hasErrors());
+        CHECK(parser.getPositionalValue<std::string, 0>() == "Positional1");
+        CHECK(parser.getPositionalValue<std::string, 1>() == "Positional2");
+        CHECK(parser.getPositionalValue<std::string, 2>() == "Positional3");
+        CHECK(parser.getOptionValue<std::string>("--option1")   == "Hello");
+        CHECK(parser.getOptionValue<int>("--option2")           == 50);
+        CHECK(parser.getOptionValue<bool>("--option3")          == false);
+    }
+}
+
+TEST_CASE("Double dash with groups", "[positionals][double-dash][option-group]") {
+    auto parser =
+        Positional(std::string("Positional1")) |
+        Positional(std::string("Positional2")) |
+        Positional(std::string("Positional3")) |
+        Option(std::string("Option1"))  [{"--option1", "--opt1"}] |
+        Option(10)                      [{"--option2", "--opt2"}] |
+        Option(true)                    [{"--option3", "--opt3"}];
+}

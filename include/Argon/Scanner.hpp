@@ -15,6 +15,7 @@ namespace Argon {
         LBRACK,
         RBRACK,
         IDENTIFIER,
+        STRING_LITERAL,
         EQUALS,
         DOUBLE_DASH,
         END,
@@ -50,12 +51,14 @@ namespace Argon {
         auto getNextToken() -> Token;
         [[nodiscard]] auto getAllTokens() const -> const std::vector<Token>&;
         [[nodiscard]] auto peekToken() const -> Token;
-        auto setCurrentToken(const Token& token) -> void;
-        
+        [[nodiscard]] auto hasErrors() const -> bool;
+        [[nodiscard]] auto getErrors() const -> const std::vector<std::string>&;
+
         auto recordPosition() -> void;
         auto rewindToPosition() -> void;
         auto rewind(uint32_t amount) -> std::span<const Token>;
     private:
+        std::vector<std::string> m_errors;
         std::vector<Token> m_tokens;
         uint32_t m_tokenPos = 0;
         uint32_t m_rewindPos = 0;
@@ -66,6 +69,7 @@ namespace Argon {
 
         auto recordBufferPosition() -> void;
         auto rewindToBufferPosition() -> void;
+        auto rewindBufferPos(uint32_t amount) -> void;
 
         auto scanNextToken() -> void;
         auto scanBuffer() -> void;
@@ -74,9 +78,20 @@ namespace Argon {
     };
 }
 
-// --------------------------------------------- Implementations -------------------------------------------------------
+//---------------------------------------------------Free Functions-----------------------------------------------------
 
 #include <algorithm>
+
+namespace Argon::detail {
+
+inline auto isValidIdentifierChar(const char c) -> bool {
+    return !(c == '[' || c == ']' || c == '=');
+}
+
+} // End namespace Argon::detail
+
+// --------------------------------------------- Implementations -------------------------------------------------------
+
 
 inline Argon::Token::Token(const TokenKind kind) : kind(kind) {
     image = getDefaultImage(kind);
@@ -114,6 +129,7 @@ inline std::string Argon::getDefaultImage(const TokenKind kind) {
         case TokenKind::NONE:
         case TokenKind::END:
         case TokenKind::IDENTIFIER:
+        case TokenKind::STRING_LITERAL:
             return "";
     }
     return "";
@@ -154,9 +170,12 @@ inline Argon::Token Argon::Scanner::peekToken() const {
     }
 }
 
-inline auto Argon::Scanner::setCurrentToken(const Token& token) -> void {
-    if (m_tokenPos >= m_tokens.size()) return;
-    m_tokens[m_tokenPos] = token;
+inline auto Argon::Scanner::hasErrors() const -> bool {
+    return !m_errors.empty();
+}
+
+inline auto Argon::Scanner::getErrors() const -> const std::vector<std::string>& {
+    return m_errors;
 }
 
 inline Argon::Token Argon::Scanner::getNextToken() {
@@ -193,6 +212,11 @@ inline auto Argon::Scanner::rewindToBufferPosition() -> void {
     m_bufferPos = m_bufferRewindPos;
 }
 
+inline auto Argon::Scanner::rewindBufferPos(const uint32_t amount) -> void {
+    const uint32_t rewindAmount = std::min(m_bufferPos, amount);
+    m_bufferPos -= rewindAmount;
+}
+
 inline void Argon::Scanner::scanNextToken() {
     int position = static_cast<int>(m_bufferPos);
     auto optCh = nextChar();
@@ -220,13 +244,32 @@ inline void Argon::Scanner::scanNextToken() {
             m_tokens.emplace_back(TokenKind::EQUALS, position);
             return;
         }
+        if (ch == '"') {
+            std::string image;
+            optCh = nextChar();
+            while (optCh.has_value()) {
+                ch = optCh.value();
+                if (ch == '"') {
+                    m_tokens.emplace_back(TokenKind::STRING_LITERAL, image, position);
+                    return;
+                }
+                image += ch;
+                optCh = nextChar();
+            }
+            m_errors.emplace_back(
+                std::format("No matching quotation mark for quotation mark found at position {}", position));
+        }
         if (ch == '-') {
             recordBufferPosition();
             const auto secondDash = nextChar();
             if (const auto space = nextChar();
                 secondDash.has_value() && secondDash.value() == '-' &&
-                ((space.has_value() && space.value() == ' ') || !space.has_value())) {
+                ((space.has_value() && (space.value() == ' ' || !detail::isValidIdentifierChar(space.value())))
+                    || !space.has_value())) {
                 m_tokens.emplace_back(TokenKind::DOUBLE_DASH, position);
+                if (space.has_value()) {
+                    rewindBufferPos(1);
+                }
                 return;
             }
             rewindToBufferPosition();
@@ -263,13 +306,14 @@ inline Argon::Token Argon::Scanner::getEndToken() const {
 
 inline auto operator<<(std::ostream& os, const Argon::TokenKind kind) -> std::ostream& {
     switch (kind) {
-        case Argon::TokenKind::NONE:        return os << "NONE";
-        case Argon::TokenKind::LBRACK:      return os << "LBRACK";
-        case Argon::TokenKind::RBRACK:      return os << "RBRACK";
-        case Argon::TokenKind::IDENTIFIER:  return os << "IDENTIFIER";
-        case Argon::TokenKind::EQUALS:      return os << "EQUALS";
-        case Argon::TokenKind::DOUBLE_DASH: return os << "DOUBLE_DASH";
-        case Argon::TokenKind::END:         return os << "END";
+        case Argon::TokenKind::NONE:            return os << "NONE";
+        case Argon::TokenKind::LBRACK:          return os << "LBRACK";
+        case Argon::TokenKind::RBRACK:          return os << "RBRACK";
+        case Argon::TokenKind::IDENTIFIER:      return os << "IDENTIFIER";
+        case Argon::TokenKind::STRING_LITERAL:  return os << "STRING_LITERAL";
+        case Argon::TokenKind::EQUALS:          return os << "EQUALS";
+        case Argon::TokenKind::DOUBLE_DASH:     return os << "DOUBLE_DASH";
+        case Argon::TokenKind::END:             return os << "END";
     }
     return os << "UNKNOWN";
 }

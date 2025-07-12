@@ -228,6 +228,11 @@ public:
         else if constexpr (std::is_same_v<T, bool>) {
             success = parseBool(value, outValue);
         }
+        // Parse as a string
+        else if constexpr (std::is_same_v<T, std::string>) {
+            outValue = value;
+            success = true;
+        }
         // Use stream extraction if custom conversion not supplied and type is not integral
         else if constexpr (has_stream_extraction<T>::value) {
             auto iss = std::istringstream(std::string(value));

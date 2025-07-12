@@ -157,11 +157,20 @@ namespace Argon {
     auto operator|(Left&& left, Right&& right) -> Parser;
 }
 
-// --------------------------------------------- Implementations -------------------------------------------------------
+//---------------------------------------------------Free Functions----------------------------------------------------
 
 #include "Argon/Ast.hpp"
 #include "Argon/Attributes.hpp"
 #include "Argon/Options/MultiOption.hpp"
+
+namespace Argon::detail {
+inline auto isValue(const Token& token) {
+    return token.kind == TokenKind::IDENTIFIER || token.kind == TokenKind::STRING_LITERAL;
+}
+} // End namespace Argon::detail
+
+// --------------------------------------------- Implementations -------------------------------------------------------
+
 
 namespace Argon {
 template<typename T> requires DerivesFrom<T, IOption>
@@ -335,7 +344,7 @@ inline auto Parser::parseSingleOption(const Ast& parentAst, Context& context, co
     }
 
     // Get value
-    if (value.kind != TokenKind::IDENTIFIER) {
+    if (!detail::isValue(value)) {
         m_syntaxErrors.addErrorMessage(
             std::format("Expected flag value, got '{}' at position {}", value.image, value.position),
             value.position, ErrorType::Syntax_MissingValue);
@@ -371,8 +380,7 @@ inline auto Parser::parseMultiOption(const Context& context,
     while (true) {
         Token nextToken = m_scanner.peekToken();
 
-        const bool endOfMultiOption = nextToken.kind != TokenKind::IDENTIFIER || context.containsLocalFlag(
-                                          nextToken.image);
+        const bool endOfMultiOption = !detail::isValue(nextToken) || context.containsLocalFlag(nextToken.image);
         if (endOfMultiOption) {
             return multiOptionAst;
         }
@@ -438,10 +446,7 @@ inline auto Parser::getNextValidFlag(
         const auto& dash = doubleDashToken.value();
         if (flag == dash) {
             m_scanner.getNextToken();
-            flag = m_scanner.peekToken();
-            if (flag.kind == TokenKind::END) {
-                return std::monostate{};
-            }
+            return std::monostate{};
         }
         switch (context.config.getDefaultPositionalPolicy()) {
             case PositionalPolicy::UseDefault:
@@ -465,7 +470,7 @@ inline auto Parser::getNextValidFlag(
     const bool isIdentifier     = flag.kind == TokenKind::IDENTIFIER;
     const bool hasFlagPrefix    = detail::startsWithAny(flag.image, context.config.getFlagPrefixes());
     const bool inContext        = context.containsLocalFlag(flag.image);
-    const bool isPositional     = isIdentifier && !hasFlagPrefix;
+    const bool isPositional     = detail::isValue(flag) && !hasFlagPrefix;
 
     // Is a positional arg
     if (isPositional) {
@@ -708,7 +713,7 @@ inline auto Parser::getDoubleDashInScope(const std::string_view groupName) -> st
                         nextToken.position, ErrorType::Syntax_MultipleDoubleDash);
                 } else {
                     m_syntaxErrors.addErrorMessage(
-                        std::format(R"(Multiple double dashes found at the root level within group "{}")", groupName),
+                        std::format(R"(Multiple double dashes found within group "{}")", groupName),
                         nextToken.position, ErrorType::Syntax_MultipleDoubleDash);
                 }
                 m_scanner.rewind(tokenCount);

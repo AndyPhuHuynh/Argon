@@ -1059,7 +1059,6 @@ TEST_CASE("Double dash", "[positionals][double-dash]") {
     SECTION("Positional policy before flags") {
         parser.withDefaultPositionalPolicy(PositionalPolicy::BeforeFlags);
         parser.parse("--opt1 --opt2 --opt3 -- --opt1 Hello --opt2 50 --opt3 false");
-        parser.printErrors();
         CHECK(!parser.hasErrors());
         CHECK(parser.getPositionalValue<std::string, 0>() == "--opt1");
         CHECK(parser.getPositionalValue<std::string, 1>() == "--opt2");
@@ -1072,7 +1071,6 @@ TEST_CASE("Double dash", "[positionals][double-dash]") {
     SECTION("Before flags dash at start") {
         parser.withDefaultPositionalPolicy(PositionalPolicy::BeforeFlags);
         parser.parse("-- --opt1 Hello --opt2 50 --opt3 false");
-        parser.printErrors();
         CHECK(!parser.hasErrors());
         CHECK(parser.getPositionalValue<std::string, 0>() == "Positional1");
         CHECK(parser.getPositionalValue<std::string, 1>() == "Positional2");
@@ -1085,7 +1083,6 @@ TEST_CASE("Double dash", "[positionals][double-dash]") {
     SECTION("Before flags dash at end") {
         parser.withDefaultPositionalPolicy(PositionalPolicy::BeforeFlags);
         parser.parse("--opt1 --opt2 --opt3 --");
-        parser.printErrors();
         CHECK(!parser.hasErrors());
         CHECK(parser.getPositionalValue<std::string, 0>() == "--opt1");
         CHECK(parser.getPositionalValue<std::string, 1>() == "--opt2");
@@ -1098,7 +1095,6 @@ TEST_CASE("Double dash", "[positionals][double-dash]") {
     SECTION("Positional policy after flags") {
         parser.withDefaultPositionalPolicy(PositionalPolicy::AfterFlags);
         parser.parse("--opt1 Hello --opt2 50 --opt3 false -- --opt1 --opt2 --opt3");
-        parser.printErrors();
         CHECK(!parser.hasErrors());
         CHECK(parser.getPositionalValue<std::string, 0>() == "--opt1");
         CHECK(parser.getPositionalValue<std::string, 1>() == "--opt2");
@@ -1111,7 +1107,6 @@ TEST_CASE("Double dash", "[positionals][double-dash]") {
     SECTION("After flags dash at start") {
         parser.withDefaultPositionalPolicy(PositionalPolicy::AfterFlags);
         parser.parse("-- --opt1 --opt2 --opt3");
-        parser.printErrors();
         CHECK(!parser.hasErrors());
         CHECK(parser.getPositionalValue<std::string, 0>() == "--opt1");
         CHECK(parser.getPositionalValue<std::string, 1>() == "--opt2");
@@ -1124,7 +1119,6 @@ TEST_CASE("Double dash", "[positionals][double-dash]") {
     SECTION("After flags dash at end") {
         parser.withDefaultPositionalPolicy(PositionalPolicy::AfterFlags);
         parser.parse("--opt1 Hello --opt2 50 --opt3 false --");
-        parser.printErrors();
         CHECK(!parser.hasErrors());
         CHECK(parser.getPositionalValue<std::string, 0>() == "Positional1");
         CHECK(parser.getPositionalValue<std::string, 1>() == "Positional2");
@@ -1136,11 +1130,95 @@ TEST_CASE("Double dash", "[positionals][double-dash]") {
 }
 
 TEST_CASE("Double dash with groups", "[positionals][double-dash][option-group]") {
-    auto parser =
-        Positional(std::string("Positional1")) |
-        Positional(std::string("Positional2")) |
-        Positional(std::string("Positional3")) |
-        Option(std::string("Option1"))  [{"--option1", "--opt1"}] |
-        Option(10)                      [{"--option2", "--opt2"}] |
-        Option(true)                    [{"--option3", "--opt3"}];
+    auto group2 = OptionGroup()["--group2"]
+        + Positional(std::string("Positional1"))
+        + Positional(std::string("Positional2"))
+        + Positional(std::string("Positional3"))
+        + Option(std::string("Nested2"))  [{"--option1", "--opt1"}]
+        + Option(20)                      [{"--option2", "--opt2"}]
+        + Option(true)                    [{"--option3", "--opt3"}];
+
+    auto group1 = OptionGroup()["--group1"]
+        + Positional(std::string("Positional1"))
+        + Positional(std::string("Positional2"))
+        + Positional(std::string("Positional3"))
+        + Option(std::string("Nested1"))  [{"--option1", "--opt1"}]
+        + Option(20)                      [{"--option2", "--opt2"}]
+        + Option(true)                    [{"--option3", "--opt3"}]
+        + group2;
+
+    auto parser
+        = Positional(std::string("Positional1"))
+        | Positional(std::string("Positional2"))
+        | Positional(std::string("Positional3"))
+        | Option(std::string("Option1"))  [{"--option1", "--opt1"}]
+        | Option(10)                      [{"--option2", "--opt2"}]
+        | Option(true)                    [{"--option3", "--opt3"}]
+        | group1;
+
+    SECTION("Test 1") {
+        parser.withDefaultPositionalPolicy(PositionalPolicy::AfterFlags);
+        group1.withDefaultPositionalPolicy(PositionalPolicy::BeforeFlags);
+        group2.withDefaultPositionalPolicy(PositionalPolicy::AfterFlags);
+
+        parser.parse("--opt1 Hello --opt2 20 --opt3 disabled "
+                        "--group1 [--option1 --group2 -- --opt1 \"inside group1!\" "
+                            "--group2 [--opt3 no --opt2 30 --opt1 nested -- --opt1 --opt2 --opt3"
+                            "]"
+                        "]"
+                     "-- --opt1 --opt2 --opt3 ");
+        CHECK(!parser.hasErrors());
+        CHECK(parser.getPositionalValue<std::string, 0>() == "--opt1");
+        CHECK(parser.getPositionalValue<std::string, 1>() == "--opt2");
+        CHECK(parser.getPositionalValue<std::string, 2>() == "--opt3");
+        CHECK(parser.getOptionValue<std::string>("--option1")   == "Hello");
+        CHECK(parser.getOptionValue<int>("--option2")           == 20);
+        CHECK(parser.getOptionValue<bool>("--option3")          == false);
+
+        CHECK(parser.getPositionalValue<std::string, 0>("--group1") == "--option1");
+        CHECK(parser.getPositionalValue<std::string, 1>("--group1") == "--group2");
+        CHECK(parser.getOptionValue<std::string>({"--group1", "--option1"}) == "inside group1!");
+        CHECK(parser.getOptionValue<int>({"--group1", "--option2"})         == 20);
+        CHECK(parser.getOptionValue<bool>({"--group1", "--option3"})        == true);
+
+        CHECK(parser.getPositionalValue<std::string, 0>({"--group1", "--group2"}) == "--opt1");
+        CHECK(parser.getPositionalValue<std::string, 1>({"--group1", "--group2"}) == "--opt2");
+        CHECK(parser.getPositionalValue<std::string, 2>({"--group1", "--group2"}) == "--opt3");
+        CHECK(parser.getOptionValue<std::string>({"--group1", "--group2", "--option1"}) == "nested");
+        CHECK(parser.getOptionValue<int>({"--group1", "--group2", "--option2"})         == 30);
+        CHECK(parser.getOptionValue<bool>({"--group1", "--group2", "--option3"})        == false);
+    }
+
+    SECTION("Test 2") {
+        parser.withDefaultPositionalPolicy(PositionalPolicy::BeforeFlags);
+        group1.withDefaultPositionalPolicy(PositionalPolicy::AfterFlags);
+        group2.withDefaultPositionalPolicy(PositionalPolicy::BeforeFlags);
+
+        parser.parse("--opt1 --opt2 --opt3 -- "
+                        "--group1 [--opt1 \"inside group1!\" "
+                            "--group2 [--opt1 --opt2 --opt3 --]"
+                        "-- --option1 --group2 ]"
+                     "--opt1 Hello --opt2 20 --opt3 disabled");
+        CHECK(!parser.hasErrors());
+        parser.printErrors();
+        CHECK(parser.getPositionalValue<std::string, 0>() == "--opt1");
+        CHECK(parser.getPositionalValue<std::string, 1>() == "--opt2");
+        CHECK(parser.getPositionalValue<std::string, 2>() == "--opt3");
+        CHECK(parser.getOptionValue<std::string>("--option1")   == "Hello");
+        CHECK(parser.getOptionValue<int>("--option2")           == 20);
+        CHECK(parser.getOptionValue<bool>("--option3")          == false);
+
+        CHECK(parser.getPositionalValue<std::string, 0>("--group1") == "--option1");
+        CHECK(parser.getPositionalValue<std::string, 1>("--group1") == "--group2");
+        CHECK(parser.getOptionValue<std::string>({"--group1", "--option1"}) == "inside group1!");
+        CHECK(parser.getOptionValue<int>({"--group1", "--option2"})         == 20);
+        CHECK(parser.getOptionValue<bool>({"--group1", "--option3"})        == true);
+
+        CHECK(parser.getPositionalValue<std::string, 0>({"--group1", "--group2"}) == "--opt1");
+        CHECK(parser.getPositionalValue<std::string, 1>({"--group1", "--group2"}) == "--opt2");
+        CHECK(parser.getPositionalValue<std::string, 2>({"--group1", "--group2"}) == "--opt3");
+        CHECK(parser.getOptionValue<std::string>({"--group1", "--group2", "--option1"}) == "Nested2");
+        CHECK(parser.getOptionValue<int>({"--group1", "--group2", "--option2"})         == 20);
+        CHECK(parser.getOptionValue<bool>({"--group1", "--group2", "--option3"})        == true);
+    }
 }

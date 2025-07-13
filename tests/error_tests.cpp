@@ -1018,20 +1018,62 @@ TEST_CASE("Double dash errors", "[double-dash][errors]") {
 }
 
 struct custom_struct { int a; int b; };
+union  custom_union  { int a; int b; };
+class  custom_class  { public: int a; int b; };
+enum   custom_enum   { ENUM1, ENUM2 };
+enum class  custom_enum_class  { ENUM1, ENUM2 };
+enum struct custom_enum_struct { ENUM1, ENUM2 };
+
 
 TEST_CASE("Custom typename", "[typename][custom-type]") {
-    auto parseCustom = [] (const std::string_view arg, custom_struct& out) -> bool {
-        if (arg == "hello") {
-            out = { .a = 10, .b = 20 };
-            return true;
-        }
-        return false;
+    auto parseCustomStruct = [] (const std::string_view arg, custom_struct& out) -> bool {
+        if (arg == "hello") { out = { .a = 10, .b = 20 }; return true; } else { return false; };
+    };
+    auto parseCustomUnion = [] (const std::string_view arg, custom_union& out) -> bool {
+        if (arg == "hello") { out = { .a = 10 }; return true; } else { return false; };
+    };
+    auto parseCustomClass = [] (const std::string_view arg, custom_class& out) -> bool {
+        if (arg == "hello") { out = { .a = 10, .b = 20 }; return true; } else { return false; };
+    };
+    auto parseCustomEnum = [] (const std::string_view arg, custom_enum& out) -> bool {
+        if (arg == "hello") { out = ENUM2; return true; } else { return false; };
+    };
+    auto parseCustomEnumClass = [] (const std::string_view arg, custom_enum_class& out) -> bool {
+        if (arg == "hello") { out = custom_enum_class::ENUM2; return true; } else { return false; };
+    };
+    auto parseCustomEnumStruct = [] (const std::string_view arg, custom_enum_struct& out) -> bool {
+        if (arg == "hello") { out = custom_enum_struct::ENUM2; return true; } else { return false; };
     };
 
-    custom_struct c;
-    auto parser = Parser(Option(&c)["--custom"].withConversionFn(parseCustom));
-    parser.parse("--custom hi");
-    CHECK(parser.hasErrors());
-    const auto& errors = CheckGroup(parser.getAnalysisErrors(), "Analysis Errors", -1, -1, 1);
-    CheckMessage(RequireMsg(errors.getErrors()[0]), {"custom_struct"}, 9, ErrorType::Analysis_ConversionError);
+    auto parser = Option<custom_struct>()["--struct"].withConversionFn(parseCustomStruct)
+                | Option<custom_union>()["--union"].withConversionFn(parseCustomUnion)
+                | Option<custom_class>()["--class"].withConversionFn(parseCustomClass)
+                | Option<custom_enum>()["--enum"].withConversionFn(parseCustomEnum)
+                | Option<custom_enum_class>()["--enum-class"].withConversionFn(parseCustomEnumClass)
+                | Option<custom_enum_struct>()["--enum-struct"].withConversionFn(parseCustomEnumStruct);
+
+    SECTION("Valid parsing") {
+        parser.parse("--struct hello --union hello --class hello --enum hello --enum-class hello --enum-struct hello");
+        CHECK(!parser.hasErrors());
+        CHECK(parser.getOptionValue<custom_struct>("--struct").a    == 10);
+        CHECK(parser.getOptionValue<custom_struct>("--struct").b    == 20);
+        CHECK(parser.getOptionValue<custom_union>("--union").a      == 10);
+        CHECK(parser.getOptionValue<custom_class>("--class").a      == 10);
+        CHECK(parser.getOptionValue<custom_class>("--class").b      == 20);
+        CHECK(parser.getOptionValue<custom_enum>("--enum")          == ENUM2);
+        CHECK(parser.getOptionValue<custom_enum_class>("--enum-class")   == custom_enum_class::ENUM2);
+        CHECK(parser.getOptionValue<custom_enum_struct>("--enum-struct") == custom_enum_struct::ENUM2);
+    }
+
+    SECTION("Invalid parsing") {
+        parser.parse("--struct 1 --union 2 --class 3 --enum 4 --enum-class 5 --enum-struct 6");
+        CHECK(parser.hasErrors());
+        const auto& errors = CheckGroup(parser.getAnalysisErrors(), "Analysis Errors", -1, -1, 6);
+        CheckMessage(RequireMsg(errors.getErrors()[0]), {"custom_struct"},      9,  ErrorType::Analysis_ConversionError);
+        CheckMessage(RequireMsg(errors.getErrors()[1]), {"custom_union"},       19, ErrorType::Analysis_ConversionError);
+        CheckMessage(RequireMsg(errors.getErrors()[2]), {"custom_class"},       29, ErrorType::Analysis_ConversionError);
+        CheckMessage(RequireMsg(errors.getErrors()[3]), {"custom_enum"},        38, ErrorType::Analysis_ConversionError);
+        CheckMessage(RequireMsg(errors.getErrors()[4]), {"custom_enum_class"},  53, ErrorType::Analysis_ConversionError);
+        CheckMessage(RequireMsg(errors.getErrors()[5]), {"custom_enum_struct"}, 69, ErrorType::Analysis_ConversionError);
+    }
 }

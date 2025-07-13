@@ -470,7 +470,7 @@ inline auto Parser::getNextValidFlag(
     const bool isIdentifier     = flag.kind == TokenKind::IDENTIFIER;
     const bool hasFlagPrefix    = detail::startsWithAny(flag.image, context.config.getFlagPrefixes());
     const bool inContext        = context.containsLocalFlag(flag.image);
-    const bool isPositional     = detail::isValue(flag) && !hasFlagPrefix;
+    const bool isPositional     = (flag.kind == TokenKind::IDENTIFIER && !hasFlagPrefix) || flag.kind == TokenKind::STRING_LITERAL;
 
     // Is a positional arg
     if (isPositional) {

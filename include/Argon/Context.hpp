@@ -98,7 +98,7 @@ namespace Argon {
 
         auto validate(const FlagPath& pathSoFar, ErrorGroup& validationErrors) const -> void;
 
-        auto checkPrefixes(ErrorGroup& validationErrors) const -> void;
+        auto checkPrefixes(ErrorGroup& validationErrors, const std::string& groupSoFar) const -> void;
     };
 }
 
@@ -473,7 +473,7 @@ inline auto Context::validate( // NOLINT (misc-no-recursion)
     const FlagPath& pathSoFar, ErrorGroup& validationErrors
 ) const -> void {
     const auto allFlags = collectAllFlags();
-    checkPrefixes(validationErrors);
+    checkPrefixes(validationErrors, pathSoFar.getString());
     std::set<std::string> flags;
     std::set<std::string> duplicateFlags;
     for (const auto& flag : allFlags) {
@@ -495,11 +495,11 @@ inline auto Context::validate( // NOLINT (misc-no-recursion)
     for (const auto& flag : duplicateFlags) {
         if (pathSoFar.flag.empty()) {
             validationErrors.addErrorMessage(
-                std::format("Multiple flags found with the value of '{}'", flag),
+                std::format(R"(Multiple flags found with the value of "{}")", flag),
                 -1, ErrorType::Validation_DuplicateFlag);
         } else {
             validationErrors.addErrorMessage(std::format(
-                "Multiple flags found with the value of '{}' within group '{}'", flag, pathSoFar.getString()),
+                R"(Multiple flags found with the value of "{}" within group "{}")", flag, pathSoFar.getString()),
                 -1, ErrorType::Validation_DuplicateFlag);
         }
     }
@@ -514,19 +514,43 @@ inline auto Context::validate( // NOLINT (misc-no-recursion)
     }
 }
 
-inline auto Context::checkPrefixes(ErrorGroup& validationErrors) const -> void {
-    for (const auto& holder : m_options) {
-        const auto flag = detail::getIFlag(holder);
-        if (!detail::startsWithAny(flag->getFlag().mainFlag, config.getFlagPrefixes())) {
+inline auto Context::checkPrefixes(ErrorGroup& validationErrors, const std::string& groupSoFar) const -> void {
+    auto addErrorNoPrefix = [&](const std::string& flag) {
+        if (groupSoFar.empty()) {
             validationErrors.addErrorMessage(
-                std::format("Flag '{}' does not start with a flag prefix", flag->getFlag().mainFlag),
+                std::format(R"(Flag "{}" does not start with a flag prefix)", flag),
+                -1, ErrorType::Validation_NoPrefix);
+        } else {
+            validationErrors.addErrorMessage(
+                std::format(R"(Flag "{}" inside group "{}" does not start with a flag prefix)", flag, groupSoFar),
                 -1, ErrorType::Validation_NoPrefix);
         }
+    };
+
+    auto addErrorEmptyFlag = [&] {
+        if (groupSoFar.empty()) {
+            validationErrors.addErrorMessage("Empty flag found at top-level. Flag cannot be the empty string",
+                        -1, ErrorType::Validation_EmptyFlag);
+        } else {
+            validationErrors.addErrorMessage(
+                    std::format(R"(Empty flag found within group "{}". Flag cannot be the empty string)",
+                        groupSoFar), -1, ErrorType::Validation_EmptyFlag);
+        }
+    };
+
+    for (const auto& holder : m_options) {
+        const auto flag = detail::getIFlag(holder);
+        const auto& mainFlag = flag->getFlag().mainFlag;
+        if (mainFlag.empty()) {
+            addErrorEmptyFlag();
+        } else if (!detail::startsWithAny(mainFlag, config.getFlagPrefixes())) {
+            addErrorNoPrefix(mainFlag);
+        }
         for (const auto& alias : flag->getFlag().aliases) {
-            if (!detail::startsWithAny(alias, config.getFlagPrefixes())) {
-                validationErrors.addErrorMessage(
-                std::format("Flag '{}' does not start with a flag prefix", alias),
-                -1, ErrorType::Validation_NoPrefix);
+            if (alias.empty()) {
+                addErrorEmptyFlag();
+            } else if (!detail::startsWithAny(alias, config.getFlagPrefixes())) {
+                addErrorNoPrefix(alias);
             }
         }
     }

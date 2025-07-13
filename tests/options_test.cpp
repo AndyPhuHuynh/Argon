@@ -1222,3 +1222,32 @@ TEST_CASE("Double dash with groups", "[positionals][double-dash][option-group]")
         CHECK(parser.getOptionValue<bool>({"--group1", "--group2", "--option3"})        == true);
     }
 }
+
+TEST_CASE("String literals", "[strings]") {
+    auto parser
+        = Positional(std::string("Positional1"))
+        | Positional(std::string("Positional2"))
+        | Option(std::string("Option1"))["--opt1"]
+        | Option(std::string("Option2"))["--opt2"]
+        | (
+            OptionGroup()["--group"]
+            + Positional(std::string("Positional3"))
+            + Positional(std::string("Positional4"))
+            + Option(std::string("Option3"))["--opt3"]
+            + Option(std::string("Option4"))["--opt4"]
+        );
+
+    parser.parse(R"(--opt1 "Hello world!" "--" "--opt1" --opt2 "String with spaces!" )"
+                 R"(--group ["Goodbye world!" "This is a positional" --opt3 "Two words" --opt4 "Hello"])");
+    CHECK(!parser.hasErrors());
+    parser.printErrors();
+    CHECK(parser.getPositionalValue<std::string, 0>() == "--");
+    CHECK(parser.getPositionalValue<std::string, 1>() == "--opt1");
+    CHECK(parser.getOptionValue<std::string>("--opt1") == "Hello world!");
+    CHECK(parser.getOptionValue<std::string>("--opt2") == "String with spaces!");
+
+    CHECK(parser.getPositionalValue<std::string, 0>("--group") == "Goodbye world!");
+    CHECK(parser.getPositionalValue<std::string, 1>("--group") == "This is a positional");
+    CHECK(parser.getOptionValue<std::string>({"--group", "--opt3"}) == "Two words");
+    CHECK(parser.getOptionValue<std::string>({"--group", "--opt4"}) == "Hello");
+}

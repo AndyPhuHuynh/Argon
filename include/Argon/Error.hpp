@@ -19,6 +19,7 @@ namespace Argon {
 
         Validation_NoPrefix,
         Validation_DuplicateFlag,
+        Validation_EmptyFlag,
 
         Syntax_MissingFlagName,
         Syntax_MissingValue,

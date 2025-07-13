@@ -84,7 +84,7 @@ inline auto parseBool(const std::string_view arg, bool& out) -> bool {
     return false;
 }
 
-template <typename T> requires is_numeric_char_type<T>
+template <typename T> requires detail::is_numeric_char_type<T>
 auto parseNumericChar(const OptionConfig<T>& config, const std::string_view arg, T& out) -> bool {
     if (config.charMode == CharMode::ExpectInteger) {
         return parseIntegralType(config, arg, out);
@@ -94,7 +94,7 @@ auto parseNumericChar(const OptionConfig<T>& config, const std::string_view arg,
         return true;
     }
     if (arg.length() == 3) {
-        if ((arg[0] == '\'' && arg[2] == '\'') || arg[0] == '\"' && arg[2] == '\"') {
+        if ((arg[0] == '\'' && arg[2] == '\'') || (arg[0] == '\"' && arg[2] == '\"')) {
             out = static_cast<T>(arg[1]);
             return true;
         }
@@ -158,7 +158,7 @@ protected:
             ss << std::format(R"(Invalid value for "{}": )", optionName);
         }
 
-        if constexpr (is_numeric_char_type<T>) {
+        if constexpr (detail::is_numeric_char_type<T>) {
             if (config.charMode == CharMode::ExpectAscii) {
                 ss << "expected ASCII character";
             } else {
@@ -167,7 +167,7 @@ protected:
                     detail::format_with_commas(config.min),
                     detail::format_with_commas(config.max));
             }
-        } else if constexpr (is_non_bool_integral<T>) {
+        } else if constexpr (detail::is_non_bool_integral<T>) {
             ss << std::format(
                 "expected integer between {} and {} inclusive",
                 detail::format_with_commas(config.min),
@@ -189,7 +189,7 @@ protected:
                 ss << "expected floating point number";
             }
         } else {
-            ss << std::format("expected {}", type_name<T>());
+            ss << std::format("expected {}", detail::getTypeName<T>());
         }
 
         // Actual value
@@ -213,7 +213,7 @@ public:
         }
         // Fallback to generic parsing
         // Parse as a character
-        else if constexpr (is_numeric_char_type<T>) {
+        else if constexpr (detail::is_numeric_char_type<T>) {
             success = parseNumericChar<T>(config, value, outValue);
         }
         // Parse as a floating point
@@ -221,7 +221,7 @@ public:
             success = parseFloatingPoint<T>(config, value, outValue);
         }
         // Parse as non-bool integral if valid
-        else if constexpr (is_non_bool_integral<T>) {
+        else if constexpr (detail::is_non_bool_integral<T>) {
             success = parseIntegralType<T>(config, value, outValue);
         }
         // Parse as boolean if T is a boolean
@@ -234,7 +234,7 @@ public:
             success = true;
         }
         // Use stream extraction if custom conversion not supplied and type is not integral
-        else if constexpr (has_stream_extraction<T>::value) {
+        else if constexpr (detail::has_stream_extraction<T>::value) {
             auto iss = std::istringstream(std::string(value));
             iss >> outValue;
             success = !iss.fail() && iss.eof();

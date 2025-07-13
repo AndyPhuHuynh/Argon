@@ -67,7 +67,7 @@ namespace Argon {
         auto dependsOn(const FlagPath& flagPath, std::initializer_list<FlagPath> dependentFlags,
             const GenerateConstraintErrorMsgFn& errorFn) -> Constraints&;
 
-        auto validate(Context& rootContext, std::vector<std::string>& errorMsgs) const -> void;
+        auto validate(const Context& rootContext, std::vector<std::string>& errorMsgs) const -> void;
 
     private:
         std::vector<Requirement> m_requiredFlags;
@@ -101,7 +101,7 @@ inline MutuallyExclusive::MutuallyExclusive(const FlagPath& flagPath, const std:
 inline MutuallyExclusive::MutuallyExclusive(const FlagPath& flagPath, const std::initializer_list<FlagPath> exclusives,
     const std::string_view errorMsg) : flagPath(flagPath), exclusives(exclusives), errorMsg(errorMsg) {}
 
-inline MutuallyExclusive::MutuallyExclusive(const FlagPath& flagPath, std::initializer_list<FlagPath> exclusives,
+inline MutuallyExclusive::MutuallyExclusive(const FlagPath& flagPath, const std::initializer_list<FlagPath> exclusives,
     const GenerateConstraintErrorMsgFn& genErrorMsg)
     : flagPath(flagPath), exclusives(exclusives), genErrorMsg(genErrorMsg) {}
 
@@ -111,7 +111,7 @@ inline DependentOptions::DependentOptions(const FlagPath& flagPath, const std::i
 inline DependentOptions::DependentOptions(const FlagPath& flagPath, const std::initializer_list<FlagPath> exclusives,
     const std::string_view errorMsg) : flagPath(flagPath), exclusives(exclusives), errorMsg(errorMsg) {}
 
-inline DependentOptions::DependentOptions(const FlagPath& flagPath, std::initializer_list<FlagPath> exclusives,
+inline DependentOptions::DependentOptions(const FlagPath& flagPath, const std::initializer_list<FlagPath> exclusives,
     const GenerateConstraintErrorMsgFn& genErrorMsg)
     : flagPath(flagPath), exclusives(exclusives), genErrorMsg(genErrorMsg) {}
 
@@ -162,7 +162,7 @@ inline auto Constraints::dependsOn(const FlagPath& flagPath, std::initializer_li
     return *this;
 }
 
-inline auto Constraints::validate(Context& rootContext, std::vector<std::string>& errorMsgs) const -> void {
+inline auto Constraints::validate(const Context& rootContext, std::vector<std::string>& errorMsgs) const -> void {
     const auto setOptions = rootContext.collectAllSetOptions();
 
     checkMultiOptionStdArray(setOptions, errorMsgs);

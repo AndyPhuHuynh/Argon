@@ -4,7 +4,7 @@
 #include "Argon/Config/Types.hpp"
 #include "Argon/Traits.hpp"
 
-namespace Argon {
+namespace Argon::detail {
 
 struct OptionConfigChar {
     CharMode charMode = CharMode::UseDefault;
@@ -16,16 +16,20 @@ struct OptionConfigIntegral {
     T max;
 };
 
+} // End namespace Argon::detail
+
+namespace Argon {
+
 struct IOptionConfig {};
 
 template <typename T>
 struct OptionConfig
     : IOptionConfig,
-      std::conditional_t<is_numeric_char_type<T>, OptionConfigChar, EmptyBase<0>>,
-      std::conditional_t<is_non_bool_number<T>, OptionConfigIntegral<T>, EmptyBase<1>> {
+      std::conditional_t<detail::is_numeric_char_type<T>, detail::OptionConfigChar, detail::EmptyBase<0>>,
+      std::conditional_t<detail::is_non_bool_number<T>, detail::OptionConfigIntegral<T>, detail::EmptyBase<1>> {
     const DefaultConversionFn *conversionFn = nullptr;
 };
 
-} // End namespace Argon::detail
+} // End namespace Argon
 
 #endif // ARGON_OPTION_CONFIG_INCLUDE

@@ -4,7 +4,6 @@
 #include <ranges>
 #include <string>
 #include <string_view>
-#include <type_traits>
 #include <vector>
 
 #include "Argon/Config/ContextConfig.hpp"
@@ -35,7 +34,7 @@ namespace Argon {
         Context(Context&&) noexcept = default;
         auto operator=(Context&&) noexcept -> Context& = default;
 
-        template <typename T> requires DerivesFrom<T, IOption>
+        template <typename T> requires detail::DerivesFrom<T, IOption>
         auto addOption(T&& option) -> void;
 
         auto getFlagOption(std::string_view flag) -> IOption *;
@@ -80,10 +79,10 @@ namespace Argon {
 
         [[nodiscard]] auto getConfigImpl() const -> const ContextConfig& override;
 
-        template <typename T> requires DerivesFrom<T, IsPositional>
+        template <typename T> requires detail::DerivesFrom<T, IsPositional>
         auto addPositionalOption(T&& option) -> void;
 
-        template <typename T> requires DerivesFrom<T, IOption>
+        template <typename T> requires detail::DerivesFrom<T, IOption>
         auto addNonPositionalOption(T&& option) -> void;
 
         [[nodiscard]] auto collectAllFlags() const -> std::vector<const Flag*>;
@@ -213,21 +212,21 @@ inline auto resolveAllChildContextConfigs(Context *context) -> void { // NOLINT 
 
 namespace Argon {
 
-template<typename T> requires DerivesFrom<T, IOption>
+template<typename T> requires detail::DerivesFrom<T, IOption>
 auto Context::addOption(T&& option) -> void {
-    if constexpr (DerivesFrom<T, IsPositional>) {
+    if constexpr (detail::DerivesFrom<T, IsPositional>) {
         addPositionalOption(std::forward<T>(option));
     } else {
         addNonPositionalOption(std::forward<T>(option));
     }
 }
 
-template<typename T> requires DerivesFrom<T, IsPositional>
+template<typename T> requires detail::DerivesFrom<T, IsPositional>
 auto Context::addPositionalOption(T&&option) -> void {
     m_positionals.emplace_back(std::forward<T>(option));
 }
 
-template<typename T> requires DerivesFrom<T, IOption>
+template<typename T> requires detail::DerivesFrom<T, IOption>
 auto Context::addNonPositionalOption(T&& option) -> void {
     m_options.emplace_back(std::forward<T>(option));
 }
@@ -385,11 +384,11 @@ inline auto Context::getHelpMessageForOption(
     const auto inputSections = detail::wrapString(inputHint, maxLineWidth - inputPadding.length());
     ss << namePadding << name;
     if (inputSections.empty()) {
-        const auto width = static_cast<std::streamsize>(maxFlagWidthBeforeWrapping - name.length());
+        const auto width = static_cast<int>(maxFlagWidthBeforeWrapping - name.length());
         ss << std::left << std::setw(width) << ':';
     } else {
         for (size_t i = 0; i < inputSections.size(); i++) {
-            const auto width = static_cast<std::streamsize>(maxFlagWidthBeforeWrapping - name.length());
+            const auto width = static_cast<int>(maxFlagWidthBeforeWrapping - name.length());
             std::string buffer = " " + inputSections[i];
             buffer += i == inputSections.size() - 1 ? ':' : '\n';
             if (i != 0) {

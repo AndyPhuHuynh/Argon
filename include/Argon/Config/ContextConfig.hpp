@@ -40,16 +40,16 @@ public:
 
     [[nodiscard]] auto getBounds() const -> const detail::BoundsMap&;
 
-    template <typename T> requires is_non_bool_number<T>
+    template <typename T> requires detail::is_non_bool_number<T>
     [[nodiscard]] auto getMin() const -> T;
 
-    template <typename T> requires is_non_bool_number<T>
+    template <typename T> requires detail::is_non_bool_number<T>
     auto setMin(T min) -> ContextConfig&;
 
-    template <typename T> requires is_non_bool_number<T>
+    template <typename T> requires detail::is_non_bool_number<T>
     [[nodiscard]] auto getMax() const -> T;
 
-    template <typename T> requires is_non_bool_number<T>
+    template <typename T> requires detail::is_non_bool_number<T>
     auto setMax(T max) -> ContextConfig&;
 
     [[nodiscard]] auto getFlagPrefixes() const -> const std::vector<std::string>&;
@@ -141,7 +141,7 @@ inline auto ContextConfig::setFlagPrefixes(const std::initializer_list<std::stri
     m_flagPrefixes.assign(prefixes.begin(), prefixes.end());
 }
 
-template<typename T> requires is_non_bool_number<T>
+template<typename T> requires detail::is_non_bool_number<T>
 auto ContextConfig::getMin() const -> T {
     if (const auto it = m_bounds.map.find(std::type_index(typeid(T))); it != m_bounds.map.end()) {
         return static_cast<detail::IntegralBounds<T>*>(it->second.get())->min;
@@ -149,7 +149,7 @@ auto ContextConfig::getMin() const -> T {
     return std::numeric_limits<T>::lowest();
 }
 
-template<typename T> requires is_non_bool_number<T>
+template<typename T> requires detail::is_non_bool_number<T>
 auto ContextConfig::setMin(T min) -> ContextConfig& {
     const auto id = std::type_index(typeid(T));
     if (!m_bounds.map.contains(id)) {
@@ -159,7 +159,7 @@ auto ContextConfig::setMin(T min) -> ContextConfig& {
     return *this;
 }
 
-template<typename T> requires is_non_bool_number<T>
+template<typename T> requires detail::is_non_bool_number<T>
 auto ContextConfig::getMax() const -> T {
     if (const auto it = m_bounds.map.find(std::type_index(typeid(T))); it != m_bounds.map.end()) {
         return static_cast<detail::IntegralBounds<T>*>(it->second.get())->max;
@@ -167,7 +167,7 @@ auto ContextConfig::getMax() const -> T {
     return std::numeric_limits<T>::max();
 }
 
-template<typename T> requires is_non_bool_number<T>
+template<typename T> requires detail::is_non_bool_number<T>
 auto ContextConfig::setMax(T max) -> ContextConfig& {
     const auto id = std::type_index(typeid(T));
     if (!m_bounds.map.contains(id)) {

@@ -56,9 +56,9 @@ namespace Argon {
     // MultiOption with std::array<T, N>
 
     template<typename T, size_t N>
-    class MultiOption<std::array<T, N>>
-        : public MultiOptionArrayBase<MultiOption<std::array<T, N>>, T, N>,
-          public OptionTypeExtensions<MultiOption<std::array<T, N>>, T> {
+    class MultiOption<std::array<T, N>> final
+            : public MultiOptionArrayBase<MultiOption<std::array<T, N>>, T, N>,
+              public detail::OptionTypeExtensions<MultiOption<std::array<T, N>>, T> {
         using ISetValue::setValue;
     public:
         MultiOption() = default;
@@ -99,9 +99,9 @@ namespace Argon {
     // MultiOption with std::vector
 
     template<typename T>
-    class MultiOption<std::vector<T>>
-        : public MultiOptionVectorBase<MultiOption<std::vector<T>>, T>,
-          public OptionTypeExtensions<MultiOption<std::vector<T>>, T> {
+    class MultiOption<std::vector<T>> final
+            : public MultiOptionVectorBase<MultiOption<std::vector<T>>, T>,
+              public detail::OptionTypeExtensions<MultiOption<std::vector<T>>, T> {
         using ISetValue::setValue;
     public:
         MultiOption() = default;

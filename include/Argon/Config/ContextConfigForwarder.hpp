@@ -64,35 +64,35 @@ public:
 
     template <typename T> requires is_non_bool_number<T>
     auto getMin() const -> T {
-        return getConfigImpl().getMin<T>();
+        return getConfigImpl().template getMin<T>();
     }
 
     template <typename T> requires is_non_bool_number<T>
     auto withMin(T min) & -> Derived& {
-        getConfigImpl().setMin<T>(min);
+        getConfigImpl().template setMin<T>(min);
         return static_cast<Derived&>(*this);
     }
 
     template <typename T> requires is_non_bool_number<T>
     auto withMin(T min) && -> Derived&& {
-        getConfigImpl().setMin<T>(min);
+        getConfigImpl().template setMin<T>(min);
         return static_cast<Derived&&>(*this);
     }
 
     template <typename T> requires is_non_bool_number<T>
     auto getMax() const -> T {
-        return getConfigImpl().getMax<T>();
+        return getConfigImpl().template getMax<T>();
     }
 
     template <typename T> requires is_non_bool_number<T>
     auto withMax(T max) & -> Derived& {
-        getConfigImpl().setMax<T>(max);
+        getConfigImpl().template setMax<T>(max);
         return static_cast<Derived&>(*this);
     }
 
     template <typename T> requires is_non_bool_number<T>
     auto withMax(T max) && -> Derived&& {
-        getConfigImpl().setMax<T>(max);
+        getConfigImpl().template setMax<T>(max);
         return static_cast<Derived&&>(*this);
     }
 

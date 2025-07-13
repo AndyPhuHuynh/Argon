@@ -48,10 +48,10 @@ namespace Argon {
         Parser(Parser&&) = default;
         auto operator=(Parser&&) -> Parser& = default;
 
-        template<typename T> requires DerivesFrom<T, IOption>
+        template<typename T> requires detail::DerivesFrom<T, IOption>
         explicit Parser(T&& option);
 
-        template<typename T> requires DerivesFrom<T, IOption>
+        template<typename T> requires detail::DerivesFrom<T, IOption>
         auto addOption(T&& option) -> void;
 
         auto addSyntaxError(std::string_view error, int pos, ErrorType type) -> void;
@@ -76,7 +76,7 @@ namespace Argon {
 
         auto parse(std::string_view str) -> bool;
 
-        template<typename T> requires DerivesFrom<T, IOption>
+        template<typename T> requires detail::DerivesFrom<T, IOption>
         auto operator|(T&& option) -> Parser&;
 
         template<typename ValueType>
@@ -153,7 +153,7 @@ namespace Argon {
         [[nodiscard]] auto getConfigImpl() const -> const ContextConfig& override;
     };
 
-    template<typename Left, typename Right> requires DerivesFrom<Left, IOption> && DerivesFrom<Right, IOption>
+    template<typename Left, typename Right> requires detail::DerivesFrom<Left, IOption> && detail::DerivesFrom<Right, IOption>
     auto operator|(Left&& left, Right&& right) -> Parser;
 }
 
@@ -173,12 +173,12 @@ inline auto isValue(const Token& token) {
 
 
 namespace Argon {
-template<typename T> requires DerivesFrom<T, IOption>
+template<typename T> requires detail::DerivesFrom<T, IOption>
 Parser::Parser(T&& option) {
     addOption(std::forward<T>(option));
 }
 
-template<typename T> requires DerivesFrom<T, IOption>
+template<typename T> requires detail::DerivesFrom<T, IOption>
 auto Parser::addOption(T&& option) -> void {
     m_context->addOption(std::forward<T>(option));
 }
@@ -537,7 +537,7 @@ inline auto Parser::skipToNextValidFlag(const Ast& parentAst, const Context& con
     }
 }
 
-template <typename T> requires DerivesFrom<T, IOption>
+template <typename T> requires detail::DerivesFrom<T, IOption>
 auto Parser::operator|(T&& option) -> Parser& {
     addOption(std::forward<T>(option));
     return *this;
@@ -735,7 +735,7 @@ inline auto Parser::validateConstraints() -> void {
 }
 
 template<typename Left, typename Right> requires
-    Argon::DerivesFrom<Left, IOption> && Argon::DerivesFrom<Right, IOption>
+    Argon::detail::DerivesFrom<Left, IOption> && Argon::detail::DerivesFrom<Right, IOption>
 auto operator|(Left&& left, Right&& right) -> Parser {
     Parser parser;
     parser.addOption(std::forward<Left>(left));

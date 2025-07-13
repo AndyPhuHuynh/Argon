@@ -5,7 +5,7 @@
 #include "Argon/Options/OptionIntegralBaseImpl.hpp"
 #include "Argon/Traits.hpp"
 
-namespace Argon {
+namespace Argon::detail {
 
 template <typename Derived, typename T>
 class OptionTypeExtensions

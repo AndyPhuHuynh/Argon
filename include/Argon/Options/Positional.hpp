@@ -18,7 +18,7 @@ class Positional
     : public IsPositional,
       public SetSingleValueImpl<Positional<T>, T>,
       public OptionComponent<Positional<T>>,
-      public OptionTypeExtensions<Positional<T>, T> {
+      public detail::OptionTypeExtensions<Positional<T>, T> {
     using SetSingleValueImpl<Positional, T>::setValue;
 public:
     Positional() = default;

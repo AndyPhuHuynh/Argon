@@ -1016,3 +1016,22 @@ TEST_CASE("Double dash errors", "[double-dash][errors]") {
         CheckMessage(RequireMsg(syntaxErrors.getErrors()[0]), 39, ErrorType::Syntax_MultipleDoubleDash);
     }
 }
+
+struct custom_struct { int a; int b; };
+
+TEST_CASE("Custom typename", "[typename][custom-type]") {
+    auto parseCustom = [] (const std::string_view arg, custom_struct& out) -> bool {
+        if (arg == "hello") {
+            out = { .a = 10, .b = 20 };
+            return true;
+        }
+        return false;
+    };
+
+    custom_struct c;
+    auto parser = Parser(Option(&c)["--custom"].withConversionFn(parseCustom));
+    parser.parse("--custom hi");
+    CHECK(parser.hasErrors());
+    const auto& errors = CheckGroup(parser.getAnalysisErrors(), "Analysis Errors", -1, -1, 1);
+    CheckMessage(RequireMsg(errors.getErrors()[0]), {"custom_struct"}, 9, ErrorType::Analysis_ConversionError);
+}

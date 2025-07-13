@@ -17,7 +17,7 @@ class Option
       public HasFlag<Option<T>>,
       public SetSingleValueImpl<Option<T>, T>,
       public OptionComponent<Option<T>>,
-      public OptionTypeExtensions<Option<T>, T> {
+      public detail::OptionTypeExtensions<Option<T>, T> {
     using SetSingleValueImpl<Option, T>::setValue;
 public:
     Option() = default;

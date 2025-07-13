@@ -24,13 +24,13 @@ public:
     OptionGroup(OptionGroup&&) = default;
     auto operator=(OptionGroup&&) -> OptionGroup& = default;
 
-    template <typename T> requires DerivesFrom<T, IOption>
+    template <typename T> requires detail::DerivesFrom<T, IOption>
     auto operator+(T&& other) & -> OptionGroup&;
 
-    template <typename T> requires DerivesFrom<T, IOption>
+    template <typename T> requires detail::DerivesFrom<T, IOption>
     auto operator+(T&& other) && -> OptionGroup;
 
-    template <typename T> requires DerivesFrom<T, IOption>
+    template <typename T> requires detail::DerivesFrom<T, IOption>
     auto addOption(T&& option) -> void;
 
     [[nodiscard]] auto getOption(std::string_view flag) -> IOption *;
@@ -68,19 +68,19 @@ inline auto OptionGroup::operator=(const OptionGroup& other) -> OptionGroup& {
     return *this;
 }
 
-template<typename T> requires DerivesFrom<T, IOption>
+template<typename T> requires detail::DerivesFrom<T, IOption>
 auto OptionGroup::operator+(T&& other) & -> OptionGroup& {
     m_context->addOption(std::forward<T>(other));
     return *this;
 }
 
-template <typename T> requires DerivesFrom<T, IOption>
+template <typename T> requires detail::DerivesFrom<T, IOption>
 auto OptionGroup::operator+(T&& other) && -> OptionGroup {
     m_context->addOption(std::forward<T>(other));
     return *this;
 }
 
-template<typename T> requires DerivesFrom<T, IOption>
+template<typename T> requires detail::DerivesFrom<T, IOption>
 auto OptionGroup::addOption(T&& option) -> void {
     m_context->addOption(std::forward<T>(option));
 }

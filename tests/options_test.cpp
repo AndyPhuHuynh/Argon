@@ -1243,19 +1243,11 @@ TEST_CASE("String literals", "[strings]") {
     parser.printErrors();
     CHECK(parser.getPositionalValue<std::string, 0>() == "--");
     CHECK(parser.getPositionalValue<std::string, 1>() == "--opt1");
-    CHECK(parser.getOptionValue<std::string>("--opt1") == "Hello world!");
-    CHECK(parser.getOptionValue<std::string>("--opt2") == "String with spaces!");
+    CHECK(parser.getOptionValue<std::string>({"--opt1"}) == "Hello world!");
+    CHECK(parser.getOptionValue<std::string>({"--opt2"}) == "String with spaces!");
 
-    CHECK(parser.getPositionalValue<std::string, 0>("--group") == "Goodbye world!");
-    CHECK(parser.getPositionalValue<std::string, 1>("--group") == "This is a positional");
+    CHECK(parser.getPositionalValue<std::string, 0>({"--group"}) == "Goodbye world!");
+    CHECK(parser.getPositionalValue<std::string, 1>({"--group"}) == "This is a positional");
     CHECK(parser.getOptionValue<std::string>({"--group", "--opt3"}) == "Two words");
     CHECK(parser.getOptionValue<std::string>({"--group", "--opt4"}) == "Hello");
-}
-
-TEST_CASE("", "[group-test]") {
-    auto parser = Parser(OptionGroup()["--group"]
-                    + Positional(std::string("Positional1"))
-                    + Positional(std::string("Positional2")));
-    parser.parse("--group [val1 val2]");
-    parser.printErrors();
 }

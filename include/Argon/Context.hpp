@@ -22,7 +22,7 @@ namespace Argon {
 
     class Context final : public detail::ContextConfigForwarder<Context>{
         std::vector<OptionHolder<IOption>> m_options;
-        std::vector<OptionHolder<IOption>> m_groups;
+        std::vector<OptionHolder<OptionGroup>> m_groups;
         std::vector<OptionHolder<IOption>> m_positionals;
     public:
         ContextConfig config = ContextConfig(true);
@@ -73,9 +73,9 @@ namespace Argon {
 
         [[nodiscard]] auto getOptions() const -> const std::vector<OptionHolder<IOption>>&;
 
-        [[nodiscard]] auto getGroups() -> std::vector<OptionHolder<IOption>>&;
+        [[nodiscard]] auto getGroups() -> std::vector<OptionHolder<OptionGroup>>&;
 
-        [[nodiscard]] auto getGroups() const -> const std::vector<OptionHolder<IOption>>&;
+        [[nodiscard]] auto getGroups() const -> const std::vector<OptionHolder<OptionGroup>>&;
 
         [[nodiscard]] auto getPositionals() -> std::vector<OptionHolder<IOption>>&;
 
@@ -211,7 +211,7 @@ namespace Argon {
 
 template<typename T> requires detail::DerivesFrom<T, IOption>
 auto Context::addOption(T&& option) -> void {
-    if constexpr (detail::DerivesFrom<T, IsPositional>) {
+    if (dynamic_cast<IsPositional *>(&option)) {
         m_positionals.emplace_back(std::forward<T>(option));
     } else if (dynamic_cast<OptionGroup *>(&option)) {
         m_groups.emplace_back(std::forward<T>(option));
@@ -227,9 +227,8 @@ inline auto Context::getFlagOption(const std::string_view flag) -> IOption * {
     });
     if (optIt != m_options.end()) return optIt->getPtr();
 
-    const auto groupIt = std::ranges::find_if(m_groups, [&flag](const OptionHolder<IOption>& holder) {
-        const auto iFlag = detail::getIFlag(holder);
-        return iFlag->getFlag().containsFlag(flag);
+    const auto groupIt = std::ranges::find_if(m_groups, [&flag](const OptionHolder<OptionGroup>& holder) {
+        return holder.getRef().getFlag().containsFlag(flag);
     });
     return groupIt == m_groups.end() ? nullptr : groupIt->getPtr();
 }
@@ -243,11 +242,11 @@ inline auto Context::getFlagOption(const FlagPath& flagPath) -> IOption * {
 }
 
 inline auto Context::getOptionGroup(std::string_view flag) -> OptionGroup * {
-    const auto it = std::ranges::find_if(m_groups, [&flag](const OptionHolder<IOption>& holder) {
-        return detail::getIFlag(holder)->getFlag().containsFlag(flag);
+    const auto it = std::ranges::find_if(m_groups, [&flag](const OptionHolder<OptionGroup>& holder) {
+        return holder.getRef().getFlag().containsFlag(flag);
     });
 
-    return it == m_groups.end() ? nullptr : dynamic_cast<OptionGroup *>(it->getPtr());
+    return it == m_groups.end() ? nullptr : it->getPtr();
 }
 
 inline auto Context::getOptionGroup(const FlagPath& flagPath) -> OptionGroup * {
@@ -338,11 +337,11 @@ inline auto Context::getOptions() const -> const std::vector<OptionHolder<IOptio
     return m_options;
 }
 
-inline auto Context::getGroups() -> std::vector<OptionHolder<IOption>>& {
+inline auto Context::getGroups() -> std::vector<OptionHolder<OptionGroup>>& {
     return m_groups;
 }
 
-inline auto Context::getGroups() const -> const std::vector<OptionHolder<IOption>>& {
+inline auto Context::getGroups() const -> const std::vector<OptionHolder<OptionGroup>>& {
     return m_groups;
 }
 
@@ -365,15 +364,10 @@ inline auto Context::collectAllSetOptions(OptionMap& map, //NOLINT (recursion)
     }
 
     for (const auto& holder : m_groups) {
-        const auto group = dynamic_cast<const OptionGroup *>(holder.getPtr());
-        if (group == nullptr) {
-            assert(group != nullptr && "Non option group found in m_groups");
-            continue;
-        }
-
+        const auto& group = holder.getRef();
         auto newVec = pathSoFar;
-        newVec.emplace_back(detail::getIFlag(holder)->getFlag());
-        group->getContext().collectAllSetOptions(map, newVec);
+        newVec.emplace_back(holder.getRef().getFlag());
+        group.getContext().collectAllSetOptions(map, newVec);
     }
 }
 
@@ -457,15 +451,14 @@ inline auto Context::checkPrefixes(ErrorGroup& validationErrors, const std::stri
         }
     };
 
-    auto check = [&](const OptionHolder<IOption>& holder) {
-        const auto flag = detail::getIFlag(holder);
-        const auto& mainFlag = flag->getFlag().mainFlag;
+    auto check = [&](const Flag& flag) {
+        const auto& mainFlag = flag.mainFlag;
         if (mainFlag.empty()) {
             addErrorEmptyFlag();
         } else if (!detail::startsWithAny(mainFlag, config.getFlagPrefixes())) {
             addErrorNoPrefix(mainFlag);
         }
-        for (const auto& alias : flag->getFlag().aliases) {
+        for (const auto& alias : flag.aliases) {
             if (alias.empty()) {
                 addErrorEmptyFlag();
             } else if (!detail::startsWithAny(alias, config.getFlagPrefixes())) {
@@ -475,10 +468,10 @@ inline auto Context::checkPrefixes(ErrorGroup& validationErrors, const std::stri
     };
 
     for (const auto& holder : m_options) {
-        check(holder);
+        check(detail::getIFlag(holder)->getFlag());
     }
     for (const auto& holder : m_groups) {
-        check(holder);
+        check(holder.getRef().getFlag());
     }
 }
 
@@ -489,8 +482,7 @@ inline auto Context::collectAllFlags() const -> std::vector<const Flag*> {
         result.emplace_back(&iFlag->getFlag());
     }
     for (const auto& holder : m_groups) {
-        const auto iFlag = detail::getIFlag(holder);
-        result.emplace_back(&iFlag->getFlag());
+        result.emplace_back(&holder.getRef().getFlag());
     }
     return result;
 }
@@ -499,8 +491,8 @@ inline auto Context::resolveFlagGroup(const FlagPath& flagPath) -> OptionGroup *
     OptionGroup *group = nullptr;
     for (const auto& groupFlag : flagPath.groupPath) {
         auto& groups = group == nullptr ? m_groups : group->getContext().m_groups;
-        auto it = std::ranges::find_if(groups, [&groupFlag](const OptionHolder<IOption>& holder) {
-            return detail::getIFlag(holder)->getFlag().containsFlag(groupFlag);
+        auto it = std::ranges::find_if(groups, [&groupFlag](const OptionHolder<OptionGroup>& holder) {
+            return holder.getRef().getFlag().containsFlag(groupFlag);
         });
 
         if (it == groups.end()) {

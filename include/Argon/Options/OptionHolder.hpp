@@ -4,21 +4,29 @@
 #include <cassert>
 #include <memory>
 
-#include "Argon/Options/IOption.hpp"
+#include <Argon/Options/IOption.hpp>
 
 namespace Argon {
 
 template <typename OptionType>
 class OptionHolder {
-    std::unique_ptr<OptionType> m_ownedOption = nullptr;
-    OptionType *m_externalOption = nullptr;
+    std::unique_ptr<IOption> m_ownedOption = nullptr;
+    IOption *m_externalOption = nullptr;
 
 public:
     OptionHolder() = default;
 
-    explicit OptionHolder(OptionType& opt) : m_externalOption(&opt) {}
+    explicit OptionHolder(IOption& opt) : m_externalOption(&opt) {
+        if (!dynamic_cast<OptionType *>(&opt)) {
+            throw std::runtime_error("OptionHolder was given an incorrect type");
+        }
+    }
 
-    explicit OptionHolder(OptionType&& opt) : m_ownedOption(opt.clone()) {}
+    explicit OptionHolder(IOption&& opt) : m_ownedOption(opt.clone()) {
+        if (!dynamic_cast<OptionType *>(&opt)) {
+            throw std::runtime_error("OptionHolder was given an incorrect type");
+        }
+    }
 
     OptionHolder(const OptionHolder& other) {
         if (other.m_ownedOption) {
@@ -53,24 +61,32 @@ public:
         return newHolder;
     }
 
-    [[nodiscard]] auto getRef() -> IOption& {
-        assert((m_ownedOption != nullptr || m_externalOption != nullptr)
-            && "Attempting to get use getRef without a valid reference");
-        return m_ownedOption ? *m_ownedOption : *m_externalOption;
+    [[nodiscard]] auto getRef() -> OptionType& {
+        if (m_ownedOption != nullptr) {
+            return dynamic_cast<OptionType&>(*m_ownedOption);
+        }
+        if (m_externalOption != nullptr) {
+            return dynamic_cast<OptionType&>(*m_externalOption);
+        }
+        throw std::runtime_error("Unable to get reference of a null OptionHolder");
     }
 
-    [[nodiscard]] auto getRef() const -> const IOption& {
-        assert((m_ownedOption != nullptr || m_externalOption != nullptr)
-            && "Attempting to get use getRef without a valid reference");
-        return m_ownedOption ? *m_ownedOption : *m_externalOption;
+    [[nodiscard]] auto getRef() const -> const OptionType& {
+        if (m_ownedOption != nullptr) {
+            return dynamic_cast<OptionType&>(*m_ownedOption);
+        }
+        if (m_externalOption != nullptr) {
+            return dynamic_cast<OptionType&>(*m_externalOption);
+        }
+        throw std::runtime_error("Unable to get reference of a null OptionHolder");
     }
 
-    [[nodiscard]] auto getPtr() -> IOption * {
-        return m_ownedOption ? m_ownedOption.get() : m_externalOption;
+    [[nodiscard]] auto getPtr() -> OptionType * {
+        return dynamic_cast<OptionType *>(m_ownedOption ? m_ownedOption.get() : m_externalOption);
     }
 
-    [[nodiscard]] auto getPtr() const -> const IOption * {
-        return m_ownedOption ? m_ownedOption.get() : m_externalOption;
+    [[nodiscard]] auto getPtr() const -> const OptionType * {
+        return dynamic_cast<OptionType *>(m_ownedOption ? m_ownedOption.get() : m_externalOption);
     }
 };
 

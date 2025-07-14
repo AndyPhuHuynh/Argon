@@ -1251,3 +1251,11 @@ TEST_CASE("String literals", "[strings]") {
     CHECK(parser.getOptionValue<std::string>({"--group", "--opt3"}) == "Two words");
     CHECK(parser.getOptionValue<std::string>({"--group", "--opt4"}) == "Hello");
 }
+
+TEST_CASE("", "[group-test]") {
+    auto parser = Parser(OptionGroup()["--group"]
+                    + Positional(std::string("Positional1"))
+                    + Positional(std::string("Positional2")));
+    parser.parse("--group [val1 val2]");
+    parser.printErrors();
+}

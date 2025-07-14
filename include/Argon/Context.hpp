@@ -14,6 +14,7 @@
 
 namespace Argon {
     class IOption;
+    class OptionGroup;
     template <typename OptionType> class OptionHolder;
     class IsPositional;
 
@@ -21,6 +22,7 @@ namespace Argon {
 
     class Context final : public detail::ContextConfigForwarder<Context>{
         std::vector<OptionHolder<IOption>> m_options;
+        std::vector<OptionHolder<IOption>> m_groups;
         std::vector<OptionHolder<IOption>> m_positionals;
     public:
         ContextConfig config = ContextConfig(true);
@@ -37,9 +39,13 @@ namespace Argon {
         template <typename T> requires detail::DerivesFrom<T, IOption>
         auto addOption(T&& option) -> void;
 
-        auto getFlagOption(std::string_view flag) -> IOption *;
+        [[nodiscard]] auto getFlagOption(std::string_view flag) -> IOption *;
 
-        auto getFlagOption(const FlagPath& flagPath) -> IOption *;
+        [[nodiscard]] auto getFlagOption(const FlagPath& flagPath) -> IOption *;
+
+        [[nodiscard]] auto getOptionGroup(std::string_view flag) -> OptionGroup *;
+
+        [[nodiscard]] auto getOptionGroup(const FlagPath& flagPath) -> OptionGroup *;
 
         [[nodiscard]] auto getPositional(size_t position) -> IsPositional *;
 
@@ -48,29 +54,32 @@ namespace Argon {
 
         [[nodiscard]] auto containsLocalFlag(std::string_view flag) const -> bool;
 
-        [[nodiscard]] auto getHelpMessage(size_t maxLineWidth, PositionalPolicy defaultPolicy) const -> std::string;
-
         template<typename ValueType>
-        auto getOptionValue(const FlagPath& flagPath) -> const ValueType&;
+        [[nodiscard]] auto getOptionValue(const FlagPath& flagPath) -> const ValueType&;
 
         template<typename Container>
-        auto getMultiValue(const FlagPath& flagPath) -> const Container&;
+        [[nodiscard]] auto getMultiValue(const FlagPath& flagPath) -> const Container&;
+
 
         template <typename ValueType, size_t Pos>
-        auto getPositionalValue() -> const ValueType&;
+        [[nodiscard]] auto getPositionalValue() -> const ValueType&;
 
         template <typename ValueType, size_t Pos>
-        auto getPositionalValue(const FlagPath& groupPath) -> const ValueType&;
+        [[nodiscard]] auto getPositionalValue(const FlagPath& groupPath) -> const ValueType&;
 
         [[nodiscard]] auto collectAllSetOptions() const -> OptionMap;
 
-        [[nodiscard]] auto getOptionsVector() -> std::vector<OptionHolder<IOption>>&;
+        [[nodiscard]] auto getOptions() -> std::vector<OptionHolder<IOption>>&;
 
-        [[nodiscard]] auto getOptionsVector() const -> const std::vector<OptionHolder<IOption>>&;
+        [[nodiscard]] auto getOptions() const -> const std::vector<OptionHolder<IOption>>&;
 
-        [[nodiscard]] auto getPositionalsVector() -> std::vector<OptionHolder<IOption>>&;
+        [[nodiscard]] auto getGroups() -> std::vector<OptionHolder<IOption>>&;
 
-        [[nodiscard]] auto getPositionalsVector() const -> const std::vector<OptionHolder<IOption>>&;
+        [[nodiscard]] auto getGroups() const -> const std::vector<OptionHolder<IOption>>&;
+
+        [[nodiscard]] auto getPositionals() -> std::vector<OptionHolder<IOption>>&;
+
+        [[nodiscard]] auto getPositionals() const -> const std::vector<OptionHolder<IOption>>&;
 
         auto validate(ErrorGroup& errorGroup) const -> void;
 
@@ -79,19 +88,9 @@ namespace Argon {
 
         [[nodiscard]] auto getConfigImpl() const -> const ContextConfig& override;
 
-        template <typename T> requires detail::DerivesFrom<T, IsPositional>
-        auto addPositionalOption(T&& option) -> void;
-
-        template <typename T> requires detail::DerivesFrom<T, IOption>
-        auto addNonPositionalOption(T&& option) -> void;
-
         [[nodiscard]] auto collectAllFlags() const -> std::vector<const Flag*>;
 
-        auto resolveFlagGroup(const FlagPath& flagPath) -> Context&;
-
-        auto getHelpMessage(std::stringstream& ss, size_t leadingSpaces, size_t maxLineWidth, PositionalPolicy defaultPolicy) const -> void;
-
-        static auto getHelpMessageForOption(std::stringstream& ss, size_t leadingSpaces, size_t maxLineWidth, const IOption *option, PositionalPolicy defaultPolicy) -> void;
+        auto resolveFlagGroup(const FlagPath& flagPath) -> OptionGroup *;
 
         auto collectAllSetOptions(OptionMap& map, const std::vector<Flag>& pathSoFar) const -> void;
 
@@ -174,7 +173,7 @@ inline auto getFullInputHint(const IOption *option, const PositionalPolicy defau
     std::stringstream name;
 
     if (const auto group = dynamic_cast<const OptionGroup *>(option); group != nullptr) {
-        const auto positionals = group->getContext().getPositionalsVector();
+        const auto positionals = group->getContext().getPositionals();
         const auto policy = resolvePositionalPolicy(defaultPositionalPolicy, group->getContext().getDefaultPositionalPolicy());
         switch (policy) {
             case PositionalPolicy::BeforeFlags:
@@ -196,13 +195,11 @@ inline auto getFullInputHint(const IOption *option, const PositionalPolicy defau
 }
 
 inline auto resolveAllChildContextConfigs(Context *context) -> void { // NOLINT (misc-no-recursion)
-    for (auto& optionHolder : context->getOptionsVector()) {
-        const auto ptr = optionHolder.getPtr();
-        if (const auto group = dynamic_cast<OptionGroup *>(ptr)) {
-            auto& groupContext = group->getContext();
-            groupContext.config = resolveContextConfig(context->config, groupContext.config);
-            resolveAllChildContextConfigs(&groupContext);
-        }
+    for (auto& optionHolder : context->getGroups()) {
+        const auto group = dynamic_cast<OptionGroup *>(optionHolder.getPtr());
+        auto& groupContext = group->getContext();
+        groupContext.config = resolveContextConfig(context->config, groupContext.config);
+        resolveAllChildContextConfigs(&groupContext);
     }
 }
 
@@ -215,34 +212,50 @@ namespace Argon {
 template<typename T> requires detail::DerivesFrom<T, IOption>
 auto Context::addOption(T&& option) -> void {
     if constexpr (detail::DerivesFrom<T, IsPositional>) {
-        addPositionalOption(std::forward<T>(option));
+        m_positionals.emplace_back(std::forward<T>(option));
+    } else if (dynamic_cast<OptionGroup *>(&option)) {
+        m_groups.emplace_back(std::forward<T>(option));
     } else {
-        addNonPositionalOption(std::forward<T>(option));
+        m_options.emplace_back(std::forward<T>(option));
     }
 }
 
-template<typename T> requires detail::DerivesFrom<T, IsPositional>
-auto Context::addPositionalOption(T&&option) -> void {
-    m_positionals.emplace_back(std::forward<T>(option));
-}
-
-template<typename T> requires detail::DerivesFrom<T, IOption>
-auto Context::addNonPositionalOption(T&& option) -> void {
-    m_options.emplace_back(std::forward<T>(option));
-}
-
 inline auto Context::getFlagOption(const std::string_view flag) -> IOption * {
-    const auto it = std::ranges::find_if(m_options, [&flag](const OptionHolder<IOption>& holder) {
+    const auto optIt = std::ranges::find_if(m_options, [&flag](const OptionHolder<IOption>& holder) {
         const auto iFlag = detail::getIFlag(holder);
         return iFlag->getFlag().containsFlag(flag);
     });
+    if (optIt != m_options.end()) return optIt->getPtr();
 
-    return it == m_options.end() ? nullptr : it->getPtr();
+    const auto groupIt = std::ranges::find_if(m_groups, [&flag](const OptionHolder<IOption>& holder) {
+        const auto iFlag = detail::getIFlag(holder);
+        return iFlag->getFlag().containsFlag(flag);
+    });
+    return groupIt == m_groups.end() ? nullptr : groupIt->getPtr();
 }
 
 inline auto Context::getFlagOption(const FlagPath& flagPath) -> IOption * {
-    auto& context = resolveFlagGroup(flagPath);
-    return context.getFlagOption(flagPath.flag);
+    const auto group = resolveFlagGroup(flagPath);
+    if (group == nullptr) {
+        return getFlagOption(flagPath.flag);
+    }
+    return group->getOption(flagPath.flag);
+}
+
+inline auto Context::getOptionGroup(std::string_view flag) -> OptionGroup * {
+    const auto it = std::ranges::find_if(m_groups, [&flag](const OptionHolder<IOption>& holder) {
+        return detail::getIFlag(holder)->getFlag().containsFlag(flag);
+    });
+
+    return it == m_groups.end() ? nullptr : dynamic_cast<OptionGroup *>(it->getPtr());
+}
+
+inline auto Context::getOptionGroup(const FlagPath& flagPath) -> OptionGroup * {
+    const auto group = resolveFlagGroup(flagPath);
+    if (group == nullptr) {
+        return getOptionGroup(flagPath.flag);
+    }
+    return group->getContext().getOptionGroup(flagPath.flag);
 }
 
 inline auto Context::getPositional(const size_t position) -> IsPositional * {
@@ -259,8 +272,10 @@ auto Context::getOptionDynamic(const std::string_view flag) -> T * {
 
 template<typename ValueType>
 auto Context::getOptionValue(const FlagPath& flagPath) -> const ValueType& {
-    auto& context = resolveFlagGroup(flagPath);
-    const auto opt = context.getOptionDynamic<Option<ValueType>>(flagPath.flag);
+    const auto group = resolveFlagGroup(flagPath);
+    const auto opt = group == nullptr ?
+        getOptionDynamic<Option<ValueType>>(flagPath.flag) :
+        group->getContext().getOptionDynamic<Option<ValueType>>(flagPath.flag);
     if (opt == nullptr) {
         throw InvalidFlagPathException(flagPath);
     }
@@ -269,8 +284,10 @@ auto Context::getOptionValue(const FlagPath& flagPath) -> const ValueType& {
 
 template<typename Container>
 auto Context::getMultiValue(const FlagPath& flagPath) -> const Container& {
-    auto& context = resolveFlagGroup(flagPath);
-    const auto opt = context.getOptionDynamic<MultiOption<Container>>(flagPath.flag);
+    const auto group = resolveFlagGroup(flagPath);
+    const auto opt = group == nullptr ?
+        getOptionDynamic<MultiOption<Container>>(flagPath.flag) :
+        group->getContext().getOptionDynamic<MultiOption<Container>>(flagPath.flag);
     if (opt == nullptr) {
         throw InvalidFlagPathException(flagPath);
     }
@@ -293,15 +310,11 @@ auto Context::getPositionalValue() -> const ValueType& {
 
 template<typename ValueType, size_t Pos>
 auto Context::getPositionalValue(const FlagPath& groupPath) -> const ValueType& {
-    const auto iOption = getFlagOption(groupPath);
-    if (iOption == nullptr) {
-        throw InvalidFlagPathException(groupPath);
+    const auto group = getOptionGroup(groupPath);
+    if (group == nullptr) {
+        return getPositionalValue<ValueType, Pos>();
     }
-    const auto groupPtr = dynamic_cast<OptionGroup*>(iOption);
-    if (groupPtr == nullptr) {
-        throw InvalidFlagPathException(std::format("Given flag path is not an Option Group: '{}'", groupPath.getString()));
-    }
-    return groupPtr->getContext().getPositionalValue<ValueType, Pos>();
+    return group->getContext().getPositionalValue<ValueType, Pos>();
 }
 
 inline auto Context::containsLocalFlag(const std::string_view flag) const -> bool {
@@ -311,132 +324,33 @@ inline auto Context::containsLocalFlag(const std::string_view flag) const -> boo
     });
 }
 
-inline auto Context::getHelpMessage(const size_t maxLineWidth, const PositionalPolicy defaultPolicy) const -> std::string {
-    std::stringstream ss;
-    ss << "Usage: [options]\n\n" << "Options:\n" << std::string(maxLineWidth, '-') << "\n";
-    getHelpMessage(ss, 0, maxLineWidth, defaultPolicy);
-    return ss.str();
-}
-
-inline auto Context::getHelpMessage( // NOLINT (misc-no-recursion)
-    std::stringstream& ss, const size_t leadingSpaces, const size_t maxLineWidth, const PositionalPolicy defaultPolicy
-) const -> void {
-    std::vector<const OptionGroup*> groups;
-    auto leading = std::string(leadingSpaces, ' ');
-    bool sectionBeforeSet = false;
-
-    if (!m_options.empty()) {
-        ss << leading << "Options:\n";
-        sectionBeforeSet = true;
-    }
-    for (const auto& holder : m_options) {
-        const auto optPtr = holder.getPtr();
-        detail::assertHasFlag(optPtr);
-        if (const auto groupPtr = dynamic_cast<const OptionGroup*>(optPtr); groupPtr != nullptr) {
-            groups.push_back(groupPtr);
-            continue;
-        }
-        getHelpMessageForOption(ss, leadingSpaces, maxLineWidth, optPtr, defaultPolicy);
-    }
-
-    if (!m_positionals.empty()) {
-        if (sectionBeforeSet) ss << "\n";
-        ss << leading << "Positionals:\n";
-        sectionBeforeSet = true;
-    }
-    for (const auto& holder : m_positionals) {
-        getHelpMessageForOption(ss, leadingSpaces, maxLineWidth, holder.getPtr(), defaultPolicy);
-    }
-
-    // Print group messages
-    if (!groups.empty()) {
-        if (sectionBeforeSet) ss << "\n";
-        ss << leading << "Groups:\n";
-        leading += "    ";
-    }
-    for (const auto& group : groups) {
-        getHelpMessageForOption(ss, leadingSpaces, maxLineWidth, group, defaultPolicy);
-        ss << "\n" << leading;
-
-        if (const auto& inputHint = group->getInputHint(); !inputHint.empty()) {
-            ss << inputHint;
-        } else {
-            ss << std::format("[{}]", group->getFlag().getString());
-        }
-
-        ss << "\n" << leading << std::string(maxLineWidth - leadingSpaces - 4, '-') << "\n";
-        group->getContext().getHelpMessage(ss, leadingSpaces + 4, maxLineWidth, defaultPolicy);
-    }
-}
-
-inline auto Context::getHelpMessageForOption(
-    std::stringstream& ss, size_t leadingSpaces, const size_t maxLineWidth, const IOption *option,
-    const PositionalPolicy defaultPolicy
-) -> void {
-    leadingSpaces += 2;
-    constexpr size_t maxFlagWidthBeforeWrapping = 32;
-
-    // Print name
-    const auto namePadding = std::string(leadingSpaces, ' ');
-    const auto name = detail::getOptionName(option);
-    const auto inputPadding = std::string(leadingSpaces + name.length(), ' ');
-    const auto inputHint = detail::getFullInputHint(option, defaultPolicy);
-    const auto inputSections = detail::wrapString(inputHint, maxLineWidth - inputPadding.length());
-    ss << namePadding << name;
-    if (inputSections.empty()) {
-        const auto width = static_cast<int>(maxFlagWidthBeforeWrapping - name.length());
-        ss << std::left << std::setw(width) << ':';
-    } else {
-        for (size_t i = 0; i < inputSections.size(); i++) {
-            const auto width = static_cast<int>(maxFlagWidthBeforeWrapping - name.length());
-            std::string buffer = " " + inputSections[i];
-            buffer += i == inputSections.size() - 1 ? ':' : '\n';
-            if (i != 0) {
-                ss << inputPadding;
-            }
-            ss << std::left << std::setw(width) << buffer;
-        }
-    }
-
-    // Print description with line wrapping
-    const std::string& description = option->getDescription();
-
-    const size_t maxDescLength = maxLineWidth - maxFlagWidthBeforeWrapping;
-    const std::vector<std::string> sections = detail::wrapString(description, maxDescLength);
-
-    // +1 in flag length is for the semicolon
-    if (const auto flagLength = name.length() + inputHint.length() + 1; flagLength > maxFlagWidthBeforeWrapping) {
-        ss << "\n" << std::string(leadingSpaces + maxFlagWidthBeforeWrapping, ' ') << sections[0];
-    } else {
-        ss << sections[0];
-    }
-    ss << "\n";
-
-    for (size_t i = 1; i < sections.size(); i++) {
-        if (sections[i].empty()) continue;
-        ss << std::string(leadingSpaces + maxFlagWidthBeforeWrapping, ' ') << sections[i] << "\n";
-    }
-}
-
 inline auto Context::collectAllSetOptions() const -> OptionMap {
     OptionMap result;
     collectAllSetOptions(result, std::vector<Flag>());
     return result;
 }
 
-inline auto Context::getOptionsVector() -> std::vector<OptionHolder<IOption>>& {
+inline auto Context::getOptions() -> std::vector<OptionHolder<IOption>>& {
     return m_options;
 }
 
-inline auto Context::getOptionsVector() const -> const std::vector<OptionHolder<IOption>>& {
+inline auto Context::getOptions() const -> const std::vector<OptionHolder<IOption>>& {
     return m_options;
 }
 
-inline auto Context::getPositionalsVector() -> std::vector<OptionHolder<IOption>>& {
+inline auto Context::getGroups() -> std::vector<OptionHolder<IOption>>& {
+    return m_groups;
+}
+
+inline auto Context::getGroups() const -> const std::vector<OptionHolder<IOption>>& {
+    return m_groups;
+}
+
+inline auto Context::getPositionals() -> std::vector<OptionHolder<IOption>>& {
     return m_positionals;
 }
 
-inline auto Context::getPositionalsVector() const -> const std::vector<OptionHolder<IOption>>& {
+inline auto Context::getPositionals() const -> const std::vector<OptionHolder<IOption>>& {
     return m_positionals;
 }
 
@@ -445,14 +359,21 @@ inline auto Context::collectAllSetOptions(OptionMap& map, //NOLINT (recursion)
     for (const auto& holder : m_options) {
         const IOption *optPtr = holder.getPtr();
         auto *flagPtr = detail::getIFlag(holder);
-        if (const auto groupPtr = dynamic_cast<const OptionGroup*>(optPtr); groupPtr != nullptr) {
-            auto newVec = pathSoFar;
-            newVec.emplace_back(flagPtr->getFlag());
-            groupPtr->getContext().collectAllSetOptions(map, newVec);
-            continue;
-        }
+
         if (!optPtr->isSet()) continue;
         map[FlagPathWithAlias(pathSoFar, flagPtr->getFlag())] = optPtr;
+    }
+
+    for (const auto& holder : m_groups) {
+        const auto group = dynamic_cast<const OptionGroup *>(holder.getPtr());
+        if (group == nullptr) {
+            assert(group != nullptr && "Non option group found in m_groups");
+            continue;
+        }
+
+        auto newVec = pathSoFar;
+        newVec.emplace_back(detail::getIFlag(holder)->getFlag());
+        group->getContext().collectAllSetOptions(map, newVec);
     }
 }
 
@@ -503,13 +424,12 @@ inline auto Context::validate( // NOLINT (misc-no-recursion)
         }
     }
 
-    for (const auto& holder : m_options) {
+    for (const auto& holder : m_groups) {
         const IOption& ref = holder.getRef();
-        if (const auto groupPtr = dynamic_cast<const OptionGroup*>(&ref); groupPtr != nullptr) {
-            FlagPath newPath = pathSoFar;
-            newPath.extendPath(groupPtr->getFlag().mainFlag);
-            groupPtr->getContext().validate(newPath, validationErrors);
-        }
+        const auto& group = dynamic_cast<const OptionGroup&>(ref);
+        FlagPath newPath = pathSoFar;
+        newPath.extendPath(group.getFlag().mainFlag);
+        group.getContext().validate(newPath, validationErrors);
     }
 }
 
@@ -537,7 +457,7 @@ inline auto Context::checkPrefixes(ErrorGroup& validationErrors, const std::stri
         }
     };
 
-    for (const auto& holder : m_options) {
+    auto check = [&](const OptionHolder<IOption>& holder) {
         const auto flag = detail::getIFlag(holder);
         const auto& mainFlag = flag->getFlag().mainFlag;
         if (mainFlag.empty()) {
@@ -552,6 +472,13 @@ inline auto Context::checkPrefixes(ErrorGroup& validationErrors, const std::stri
                 addErrorNoPrefix(alias);
             }
         }
+    };
+
+    for (const auto& holder : m_options) {
+        check(holder);
+    }
+    for (const auto& holder : m_groups) {
+        check(holder);
     }
 }
 
@@ -561,21 +488,29 @@ inline auto Context::collectAllFlags() const -> std::vector<const Flag*> {
         const auto iFlag = detail::getIFlag(holder);
         result.emplace_back(&iFlag->getFlag());
     }
+    for (const auto& holder : m_groups) {
+        const auto iFlag = detail::getIFlag(holder);
+        result.emplace_back(&iFlag->getFlag());
+    }
     return result;
 }
 
-inline auto Context::resolveFlagGroup(const FlagPath& flagPath) -> Context& {
-    auto context = this;
-    // Loop through all the flags that represent groups
+inline auto Context::resolveFlagGroup(const FlagPath& flagPath) -> OptionGroup * {
+    OptionGroup *group = nullptr;
     for (const auto& groupFlag : flagPath.groupPath) {
-        const auto optGroup = context->getOptionDynamic<OptionGroup>(groupFlag);
-        if (optGroup == nullptr) {
+        auto& groups = group == nullptr ? m_groups : group->getContext().m_groups;
+        auto it = std::ranges::find_if(groups, [&groupFlag](const OptionHolder<IOption>& holder) {
+            return detail::getIFlag(holder)->getFlag().containsFlag(groupFlag);
+        });
+
+        if (it == groups.end()) {
             throw InvalidFlagPathException(flagPath);
         }
-        context = &optGroup->getContext();
+        group = dynamic_cast<OptionGroup *>(it->getPtr());
     }
-    return *context;
+    return group;
 }
+
 } // End namespace Argon
 
 #endif // ARGON_CONTEXT_INCLUDE

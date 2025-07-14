@@ -161,6 +161,7 @@ namespace Argon {
 
 #include "Argon/Ast.hpp"
 #include "Argon/Attributes.hpp"
+#include "Argon/HelpMessage.hpp"
 #include "Argon/Options/MultiOption.hpp"
 
 namespace Argon::detail {
@@ -218,14 +219,17 @@ inline auto Parser::getAnalysisErrors() const -> const ErrorGroup& {
 }
 
 inline auto Parser::hasErrors() const -> bool {
-    return m_validationErrors.hasErrors() ||
-           m_syntaxErrors.hasErrors() ||
-           m_analysisErrors.hasErrors() ||
-           !m_constraintErrors.empty();
+    return
+        m_scanner.hasErrors() ||
+        m_validationErrors.hasErrors() ||
+        m_syntaxErrors.hasErrors() ||
+        m_analysisErrors.hasErrors() ||
+        !m_constraintErrors.empty();
 }
 
 inline auto Parser::getHelpMessage(const size_t maxLineWidth) const -> std::string {
-    return m_context->getHelpMessage(maxLineWidth, m_context->config.getDefaultPositionalPolicy());
+    detail::resolveAllChildContextConfigs(m_context.get());
+    return detail::getHelpMessage(m_context.get(), maxLineWidth);
 }
 
 inline auto Parser::printErrors() const -> void {
@@ -233,6 +237,12 @@ inline auto Parser::printErrors() const -> void {
         std::cerr << "Argon::Parser is in an invalid state. "
                      "Please fix the following errors in order for the library to function: \n";
         m_validationErrors.printErrors();
+        return;
+    }
+    if (m_scanner.hasErrors()) {
+        for (const auto& err : m_scanner.getErrors()) {
+            std::cout << err << "\n";
+        }
         return;
     }
     if (m_syntaxErrors.hasErrors()) {
@@ -260,6 +270,7 @@ inline auto Parser::parse(const int argc, const char **argv) -> bool {
 }
 
 inline auto Parser::parse(const std::string_view str) -> bool {
+    detail::resolveAllChildContextConfigs(m_context.get());
     m_context->validate(m_validationErrors);
     if (m_validationErrors.hasErrors()) {
         std::cerr << "Argon::Parser is in an invalid state. "
@@ -267,8 +278,6 @@ inline auto Parser::parse(const std::string_view str) -> bool {
         m_validationErrors.printErrors();
         return false;
     }
-
-    detail::resolveAllChildContextConfigs(m_context.get());
 
     reset();
     m_scanner = Scanner(str);

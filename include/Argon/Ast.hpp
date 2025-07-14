@@ -280,7 +280,7 @@ inline Argon::PositionalAst::PositionalAst(const Token& flagToken) {
 inline void Argon::PositionalAst::analyze(Parser&, Context&) {}
 
 inline void Argon::PositionalAst::analyze(Parser& parser, Context& context, const size_t position) {
-    if (const auto maxSize = context.getPositionalsVector().size(); position >= maxSize) {
+    if (const auto maxSize = context.getPositionals().size(); position >= maxSize) {
         if (m_parent == nullptr) {
             parser.addAnalysisError(
                 std::format(R"(Too many positional arguments: "{}" was parsed as positional argument #{}, but a max of )"

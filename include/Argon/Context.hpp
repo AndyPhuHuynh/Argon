@@ -143,57 +143,6 @@ inline auto getIFlag(const OptionHolder<IOption>& holder) -> const IFlag * {
     return iFlag;
 }
 
-inline auto getOptionName(const IOption *option) -> std::string {
-    if (const auto flag = dynamic_cast<const IFlag *>(option)) {
-        return flag->getFlag().getString();
-    }
-    return option->getInputHint();
-}
-
-inline auto getFullInputHint(const IOption *option, const PositionalPolicy defaultPositionalPolicy) -> std::string {
-    auto concatPositionals = [](std::stringstream& ss, const std::vector<OptionHolder<IOption>>& positionals) {
-        if (positionals.empty()) return;
-        ss << ' ';
-        for (size_t i = 0; i < positionals.size(); ++i) {
-            ss << positionals[i].getRef().getInputHint();
-            if (i < positionals.size() - 1) {
-                ss << ' ';
-            }
-        }
-    };
-
-    auto concatTypeHint = [](std::stringstream& ss, const IOption *opt) {
-        if (const auto& typeHint = opt->getInputHint(); !typeHint.empty()) {
-            ss << ' ' << typeHint;
-        } else if (const auto group = dynamic_cast<const OptionGroup *>(opt); group != nullptr) {
-            ss << " [" << group->getFlag().mainFlag << "]";
-        }
-    };
-
-    std::stringstream name;
-
-    if (const auto group = dynamic_cast<const OptionGroup *>(option); group != nullptr) {
-        const auto positionals = group->getContext().getPositionals();
-        const auto policy = resolvePositionalPolicy(defaultPositionalPolicy, group->getContext().getDefaultPositionalPolicy());
-        switch (policy) {
-            case PositionalPolicy::BeforeFlags:
-                concatPositionals(name, positionals);
-                concatTypeHint(name, option);
-                break;
-            case PositionalPolicy::Interleaved:
-            case PositionalPolicy::AfterFlags:
-                concatTypeHint(name, option);
-                concatPositionals(name, positionals);
-                break;
-            case PositionalPolicy::UseDefault:
-                std::unreachable();
-        };
-    } else if (dynamic_cast<const IFlag *>(option)) {
-        concatTypeHint(name, option);
-    }
-    return name.str();
-}
-
 inline auto resolveAllChildContextConfigs(Context *context) -> void { // NOLINT (misc-no-recursion)
     for (auto& optionHolder : context->getGroups()) {
         const auto group = dynamic_cast<OptionGroup *>(optionHolder.getPtr());

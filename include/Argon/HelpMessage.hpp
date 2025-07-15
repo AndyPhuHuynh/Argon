@@ -8,137 +8,225 @@
 
 namespace Argon::detail {
 
-// Gets the help message for all options and positionals
-inline auto getHelpMessage( // NOLINT (misc-no-recursion)
-    const Context *context, std::stringstream& ss, size_t leadingSpaces, size_t maxLineWidth
-) -> void;
+class HelpMessage {
+public:
+    HelpMessage(const Context *context, size_t maxLineWidth);
 
+    auto get() const -> std::string;
+private:
+    std::stringstream m_message;
+    const size_t m_maxLineWidth;
+    static constexpr size_t m_maxFlagWidthBeforeWrapping = 32;
 
-// Gets a help message for an option/positional
-inline auto getHelpMessageForIOption(
-    std::stringstream& ss, size_t leadingSpaces, const size_t maxLineWidth, const IOption *option,
-    const PositionalPolicy defaultPolicy
-) -> void {
-    leadingSpaces += 2;
-    constexpr size_t maxFlagWidthBeforeWrapping = 32;
+    auto indent(size_t leadingSpaces);
 
-    // Print name
-    const auto namePadding = std::string(leadingSpaces, ' ');
-    const auto name = getOptionName(option);
-    const auto inputPadding = std::string(leadingSpaces + name.length(), ' ');
-    const auto inputHint = getFullInputHint(option, defaultPolicy);
-    const auto inputSections = wrapString(inputHint, maxLineWidth - inputPadding.length());
-    ss << namePadding << name;
-    if (inputSections.empty()) {
-        const auto width = static_cast<int>(maxFlagWidthBeforeWrapping - name.length());
-        ss << std::left << std::setw(width) << ':';
-    } else {
-        for (size_t i = 0; i < inputSections.size(); i++) {
-            const auto width = static_cast<int>(maxFlagWidthBeforeWrapping - name.length());
-            std::string buffer = " " + inputSections[i];
-            buffer += i == inputSections.size() - 1 ? ':' : '\n';
-            if (i != 0) {
-                ss << inputPadding;
-            }
-            ss << std::left << std::setw(width) << buffer;
+    auto appendHeader(const Context *context) -> void;
+
+    auto appendBody(const Context *context, size_t leadingSpaces) -> void;
+
+    auto appendOptions(const Context *context, size_t leadingSpaces) -> bool;
+
+    auto appendPositionals(const Context *context, size_t leadingSpaces, bool printNewLine) -> bool;
+
+    auto appendGroups(const Context *context, size_t leadingSpaces, bool printNewLine) -> void;
+
+    auto appendName(size_t leadingSpaces, const IOption *option) -> size_t;
+
+    auto appendInputHint(size_t leadingSpaces, const IOption *option) -> size_t;
+
+    auto appendIOption(size_t leadingSpaces, const IOption *option) -> void;
+};
+
+inline auto getOptionName(const IOption *option) -> std::string {
+    if (const auto flag = dynamic_cast<const IFlag *>(option)) {
+        return flag->getFlag().getString();
+    }
+    return option->getInputHint();
+}
+
+inline auto concatPositionalsToInputHint(std::stringstream& ss, const std::vector<OptionHolder<IOption>>& positionals) {
+    if (positionals.empty()) return;
+    ss << ' ';
+    for (size_t i = 0; i < positionals.size(); ++i) {
+        ss << positionals[i].getRef().getInputHint();
+        if (i < positionals.size() - 1) {
+            ss << ' ';
         }
     }
+};
 
-    // Print description with line wrapping
-    const std::string& description = option->getDescription();
-
-    const size_t maxDescLength = maxLineWidth - maxFlagWidthBeforeWrapping;
-    const std::vector<std::string> sections = wrapString(description, maxDescLength);
-
-    // +1 in flag length is for the semicolon
-    if (const auto flagLength = name.length() + inputHint.length() + 1; flagLength > maxFlagWidthBeforeWrapping) {
-        ss << "\n" << std::string(leadingSpaces + maxFlagWidthBeforeWrapping, ' ') << sections[0];
-    } else {
-        ss << sections[0];
+inline auto getBasicInputHint(const IOption *opt) -> std::string {
+    if (const auto group = dynamic_cast<const OptionGroup *>(opt); group != nullptr) {
+        return std::format("[{}]", group->getFlag().mainFlag);
     }
-    ss << "\n";
+    return opt->getInputHint();
+};
 
-    for (size_t i = 1; i < sections.size(); i++) {
-        if (sections[i].empty()) continue;
-        ss << std::string(leadingSpaces + maxFlagWidthBeforeWrapping, ' ') << sections[i] << "\n";
+inline auto getContextInputHint(const Context *context, const std::string_view nameOfOptions) -> std::string {
+    std::stringstream ss;
+    const auto& positionals = context->getPositionals();
+    switch (context->getDefaultPositionalPolicy()) {
+        case PositionalPolicy::BeforeFlags:
+            concatPositionalsToInputHint(ss, positionals);
+            ss << ' ' << nameOfOptions;
+            break;
+        case PositionalPolicy::Interleaved:
+        case PositionalPolicy::AfterFlags:
+            ss << ' ' << nameOfOptions;
+            concatPositionalsToInputHint(ss, positionals);
+            break;
+        case PositionalPolicy::UseDefault:
+            std::unreachable();
+    };
+    return ss.str();
+}
+
+// Get the input hint for an option. InputHint means the names of the types that the user has to input after the option
+inline auto getFullInputHint(const IOption *option) -> std::string {
+    if (const auto group = dynamic_cast<const OptionGroup *>(option); group != nullptr) {
+        return getContextInputHint(&group->getContext(), getBasicInputHint(group));
+    }
+    if (dynamic_cast<const IFlag *>(option)) {
+        return getBasicInputHint(option);
+    }
+    return "";
+}
+
+inline HelpMessage::HelpMessage(const Context *context, const size_t maxLineWidth) : m_maxLineWidth(maxLineWidth) {
+    appendHeader(context);
+    appendBody(context, 0);
+}
+
+inline auto HelpMessage::get() const -> std::string {
+    return m_message.str();
+}
+
+inline auto HelpMessage::indent(const size_t leadingSpaces) {
+    for (size_t i = 0; i < leadingSpaces; i++) {
+        m_message << ' ';
     }
 }
 
+// Prints the usage header and help messages for all options and positionals
+inline auto HelpMessage::appendHeader(const Context *context) -> void {
+    const auto inputHint = getContextInputHint(context, "[options]");
 
-// Get help message for the Options vector of a context
-inline auto getHelpMessageForOptions(
-    const Context *context, std::stringstream& ss, const size_t leadingSpaces, const size_t maxLineWidth
-) -> bool {
+    m_message << "Usage:" << inputHint << "\n\n"
+        << "Options:\n" << std::string(m_maxLineWidth, '-') << "\n";
+}
+
+// Gets the help message for all options and positionals
+inline auto HelpMessage::appendBody( // NOLINT (misc-no-recursion)
+    const Context *context, const size_t leadingSpaces
+) -> void {
+    bool sectionBeforeSet = appendOptions(context, leadingSpaces);
+    sectionBeforeSet |= appendPositionals(context, leadingSpaces, sectionBeforeSet);
+    appendGroups(context, leadingSpaces, sectionBeforeSet);
+}
+
+
+inline auto HelpMessage::appendOptions(const Context *context, const size_t leadingSpaces) -> bool {
     const auto& options = context->getOptions();
     if (options.empty()) return false;
-    for (size_t i = 0; i < leadingSpaces; i++)
-        ss << ' ';
-    ss << "Options:\n";
-
+    indent(leadingSpaces);
+    m_message << "Options:\n";
     for (const auto& holder : options) {
-        getHelpMessageForIOption(ss, leadingSpaces, maxLineWidth, holder.getPtr(), context->getDefaultPositionalPolicy());
+        appendIOption(leadingSpaces, holder.getPtr());
     }
     return true;
 }
 
-inline auto getHelpMessageForPositionals(
-    const Context *context, std::stringstream& ss, const size_t leadingSpaces,
-    const size_t maxLineWidth, const bool printNewLine
+inline auto HelpMessage::appendPositionals(
+    const Context *context, const size_t leadingSpaces, const bool printNewLine
 ) -> bool {
     const auto& positionals = context->getPositionals();
     if (positionals.empty()) return false;
-    if (printNewLine) ss << "\n";
-    for (size_t i = 0; i < leadingSpaces; i++)
-        ss << ' ';
-    ss << "Positionals:\n";
+    if (printNewLine) m_message << "\n";
+    indent(leadingSpaces);
+    m_message << "Positionals:\n";
     for (const auto& holder : positionals) {
-        getHelpMessageForIOption(ss, leadingSpaces, maxLineWidth, holder.getPtr(), context->getDefaultPositionalPolicy());
+        appendIOption(leadingSpaces, holder.getPtr());
     }
     return true;
 }
 
-inline auto getHelpMessageForGroups( // NOLINT (misc-no-recursion)
-    const Context *context, std::stringstream& ss, const size_t leadingSpaces,
-    const size_t maxLineWidth, const bool printNewLine
+inline auto HelpMessage::appendGroups( // NOLINT (misc-no-recursion)
+    const Context *context, const size_t leadingSpaces, const bool printNewLine
 ) -> void {
     const auto& groups = context->getGroups();
     // Print group headers
     if (groups.empty()) return;
-    if (printNewLine) ss << "\n";
+    if (printNewLine) m_message << "\n";
     auto leading = std::string(leadingSpaces, ' ');
-    ss << leading << "Groups:\n";
+    m_message << leading << "Groups:\n";
     leading += "    ";
     for (const auto& holder : groups) {
         const auto& group = holder.getRef();
-        getHelpMessageForIOption(ss, leadingSpaces, maxLineWidth, &group, context->getDefaultPositionalPolicy());
-        ss << "\n" << leading;
+        appendIOption(leadingSpaces, holder.getPtr());
+        m_message << "\n" << leading;
 
         if (const auto& inputHint = group.getInputHint(); !inputHint.empty()) {
-            ss << inputHint;
+            m_message << inputHint;
         } else {
-            ss << std::format("[{}]", group.getFlag().getString());
+            m_message << std::format("[{}]", group.getFlag().getString());
         }
 
-        ss << "\n" << leading << std::string(maxLineWidth - leadingSpaces - 4, '-') << "\n";
-        getHelpMessage(&group.getContext(), ss, leadingSpaces + 4, maxLineWidth);
+        m_message << "\n" << leading << std::string(m_maxLineWidth - leadingSpaces - 4, '-') << "\n";
+        appendBody(&group.getContext(), leadingSpaces + 4);
     }
 }
 
-// Gets the help message for all options and positionals
-inline auto getHelpMessage( // NOLINT (misc-no-recursion)
-    const Context *context, std::stringstream& ss, const size_t leadingSpaces, const size_t maxLineWidth
-) -> void {
-    bool sectionBeforeSet = getHelpMessageForOptions(context, ss, leadingSpaces, maxLineWidth);
-    sectionBeforeSet |= getHelpMessageForPositionals(context, ss, leadingSpaces, maxLineWidth, sectionBeforeSet);
-    getHelpMessageForGroups(context, ss, leadingSpaces, maxLineWidth, sectionBeforeSet);
+inline auto HelpMessage::appendName(const size_t leadingSpaces, const IOption *option) -> size_t {
+    indent(leadingSpaces);
+    const auto name = getOptionName(option);
+    m_message << name;
+    return name.length();
 }
 
-// Prints the usage header and help messages for all options and positionals
-inline auto getHelpMessage(const Context *context, const size_t maxLineWidth) -> std::string {
-    std::stringstream ss;
-    ss << "Usage: [options]\n\n" << "Options:\n" << std::string(maxLineWidth, '-') << "\n";
-    getHelpMessage(context, ss, 0, maxLineWidth);
-    return ss.str();
+inline auto HelpMessage::appendInputHint(const size_t leadingSpaces, const IOption *option) -> size_t {
+    const auto inputHint = getFullInputHint(option);
+    if (const auto inputSections = wrapString(inputHint, m_maxLineWidth - leadingSpaces);
+        inputSections.empty()) {
+        const auto width = static_cast<int>(m_maxFlagWidthBeforeWrapping - leadingSpaces);
+        m_message << std::left << std::setw(width) << ':';
+    } else {
+        for (size_t i = 0; i < inputSections.size(); i++) {
+            const auto width = static_cast<int>(m_maxFlagWidthBeforeWrapping - leadingSpaces);
+            std::string buffer = " " + inputSections[i];
+            buffer += i == inputSections.size() - 1 ? ':' : '\n';
+            if (i != 0) {
+                indent(leadingSpaces);
+            }
+            m_message << std::left << std::setw(width) << buffer;
+        }
+    }
+    return inputHint.length();
+}
+
+// Gets a help message for an option/positional
+inline auto HelpMessage::appendIOption(const size_t leadingSpaces, const IOption *option) -> void {
+    constexpr size_t extraNameIndent = 2;
+    const size_t nameLen = appendName(leadingSpaces + extraNameIndent, option);
+    const size_t inputHintLen = appendInputHint(leadingSpaces + nameLen + extraNameIndent, option);
+
+    // Print description with line wrapping
+    const std::string& description = option->getDescription();
+
+    const size_t maxDescLength = m_maxLineWidth - m_maxFlagWidthBeforeWrapping;
+    const std::vector<std::string> sections = wrapString(description, maxDescLength);
+
+    constexpr size_t semicolonLen = 1;
+    if (const auto flagLength = nameLen + inputHintLen + semicolonLen; flagLength > m_maxFlagWidthBeforeWrapping) {
+        m_message << "\n" << std::string(leadingSpaces + m_maxFlagWidthBeforeWrapping, ' ') << sections[0];
+    } else {
+        m_message << sections[0];
+    }
+    m_message << "\n";
+
+    for (size_t i = 1; i < sections.size(); i++) {
+        if (sections[i].empty()) continue;
+        m_message << std::string(leadingSpaces + m_maxFlagWidthBeforeWrapping, ' ') << sections[i] << "\n";
+    }
 }
 
 }

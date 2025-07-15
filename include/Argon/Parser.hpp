@@ -229,7 +229,7 @@ inline auto Parser::hasErrors() const -> bool {
 
 inline auto Parser::getHelpMessage(const size_t maxLineWidth) const -> std::string {
     detail::resolveAllChildContextConfigs(m_context.get());
-    return detail::getHelpMessage(m_context.get(), maxLineWidth);
+    return detail::HelpMessage(m_context.get(), maxLineWidth).get();
 }
 
 inline auto Parser::printErrors() const -> void {

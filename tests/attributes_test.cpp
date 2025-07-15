@@ -101,7 +101,7 @@ TEST_CASE("Help message") {
     // std::cout << msg;
 }
 
-TEST_CASE("Help message 2") {
+TEST_CASE("Help message 2", "[help]") {
     const auto parser =
         Option<int>()["--xcoord"]["-x"]("<int>", "x coordinate of the location. This is a really long description to test how overflow works :D. Wow this is a very amazing feature.")
         | Option<int>()["--ycoord"]["-y"]("<int>", "y coordinate of the location ycoordinateofthelocation ycoordinateofthelocationycoordinateofthelocation")

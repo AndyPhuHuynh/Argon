@@ -17,6 +17,8 @@ private:
     std::stringstream m_message;
     const size_t m_maxLineWidth;
     static constexpr size_t m_maxFlagWidthBeforeWrapping = 32;
+    static constexpr size_t m_nameIndent = 2;
+    static constexpr size_t m_nextLevelIndent = 4;
 
     auto indent(size_t leadingSpaces);
 
@@ -28,11 +30,11 @@ private:
 
     auto appendPositionals(const Context *context, size_t leadingSpaces, bool printNewLine) -> bool;
 
-    auto appendGroups(const Context *context, size_t leadingSpaces, bool printNewLine) -> void;
+    auto appendGroups(const Context *context, size_t leadingSpaces, bool printNewLine) -> bool;
 
     auto appendName(size_t leadingSpaces, const IOption *option) -> size_t;
 
-    auto appendInputHint(size_t leadingSpaces, const IOption *option) -> size_t;
+    auto appendInputHint(size_t leadingSpaces, size_t nameLength, const IOption *option) -> size_t;
 
     auto appendIOption(size_t leadingSpaces, const IOption *option) -> void;
 };
@@ -57,6 +59,9 @@ inline auto concatPositionalsToInputHint(std::stringstream& ss, const std::vecto
 
 inline auto getBasicInputHint(const IOption *opt) -> std::string {
     if (const auto group = dynamic_cast<const OptionGroup *>(opt); group != nullptr) {
+        if (const auto hint = group->getInputHint(); !hint.empty()) {
+            return hint;
+        }
         return std::format("[{}]", group->getFlag().mainFlag);
     }
     return opt->getInputHint();
@@ -152,28 +157,25 @@ inline auto HelpMessage::appendPositionals(
 
 inline auto HelpMessage::appendGroups( // NOLINT (misc-no-recursion)
     const Context *context, const size_t leadingSpaces, const bool printNewLine
-) -> void {
+) -> bool {
     const auto& groups = context->getGroups();
-    // Print group headers
-    if (groups.empty()) return;
+    if (groups.empty()) return false;
     if (printNewLine) m_message << "\n";
-    auto leading = std::string(leadingSpaces, ' ');
-    m_message << leading << "Groups:\n";
-    leading += "    ";
-    for (const auto& holder : groups) {
-        const auto& group = holder.getRef();
-        appendIOption(leadingSpaces, holder.getPtr());
-        m_message << "\n" << leading;
+    indent(leadingSpaces);
+    m_message << "Groups:\n";
 
-        if (const auto& inputHint = group.getInputHint(); !inputHint.empty()) {
-            m_message << inputHint;
-        } else {
-            m_message << std::format("[{}]", group.getFlag().getString());
-        }
-
-        m_message << "\n" << leading << std::string(m_maxLineWidth - leadingSpaces - 4, '-') << "\n";
+    for (size_t i = 0; i < groups.size(); i++) {
+        const auto& group = groups[i].getRef();
+        appendIOption(leadingSpaces, &group); m_message << "\n";
+        indent(leadingSpaces + m_nextLevelIndent); m_message << getBasicInputHint(&group) << "\n";
+        indent(leadingSpaces + m_nextLevelIndent); m_message << std::string(m_maxLineWidth - leadingSpaces -m_nextLevelIndent, '-') << "\n";
         appendBody(&group.getContext(), leadingSpaces + 4);
+        if (i + 1 < groups.size()) {
+            m_message << "\n";
+            indent(leadingSpaces + 2); m_message << std::string(m_maxLineWidth - leadingSpaces - 2, '-') << "\n";
+        }
     }
+    return true;
 }
 
 inline auto HelpMessage::appendName(const size_t leadingSpaces, const IOption *option) -> size_t {
@@ -183,15 +185,15 @@ inline auto HelpMessage::appendName(const size_t leadingSpaces, const IOption *o
     return name.length();
 }
 
-inline auto HelpMessage::appendInputHint(const size_t leadingSpaces, const IOption *option) -> size_t {
+inline auto HelpMessage::appendInputHint(const size_t leadingSpaces, const size_t nameLength, const IOption *option) -> size_t {
     const auto inputHint = getFullInputHint(option);
     if (const auto inputSections = wrapString(inputHint, m_maxLineWidth - leadingSpaces);
         inputSections.empty()) {
-        const auto width = static_cast<int>(m_maxFlagWidthBeforeWrapping - leadingSpaces);
+        const auto width = static_cast<int>(m_maxFlagWidthBeforeWrapping - nameLength);
         m_message << std::left << std::setw(width) << ':';
     } else {
         for (size_t i = 0; i < inputSections.size(); i++) {
-            const auto width = static_cast<int>(m_maxFlagWidthBeforeWrapping - leadingSpaces);
+            const auto width = static_cast<int>(m_maxFlagWidthBeforeWrapping - nameLength);
             std::string buffer = " " + inputSections[i];
             buffer += i == inputSections.size() - 1 ? ':' : '\n';
             if (i != 0) {
@@ -205,9 +207,8 @@ inline auto HelpMessage::appendInputHint(const size_t leadingSpaces, const IOpti
 
 // Gets a help message for an option/positional
 inline auto HelpMessage::appendIOption(const size_t leadingSpaces, const IOption *option) -> void {
-    constexpr size_t extraNameIndent = 2;
-    const size_t nameLen = appendName(leadingSpaces + extraNameIndent, option);
-    const size_t inputHintLen = appendInputHint(leadingSpaces + nameLen + extraNameIndent, option);
+    const size_t nameLen = appendName(leadingSpaces + m_nameIndent, option);
+    const size_t inputHintLen = appendInputHint(leadingSpaces + nameLen + m_nameIndent, nameLen, option);
 
     // Print description with line wrapping
     const std::string& description = option->getDescription();

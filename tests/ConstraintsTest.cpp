@@ -340,6 +340,235 @@ TEST_CASE("Required options", "[constraints][requirement]") {
     }
 }
 
+TEST_CASE("Mutually exclusive options", "[constraints][mutual-exclusion][error]") {
+    auto parser = Option<int>()[{"--xcoord", "-x"}]
+                | Option<int>()[{"--ycoord", "-y"}]
+                |  (
+                    OptionGroup()[{"--group", "-g"}]
+                    + Option<int>()[{"--xcoord", "-x"}]
+                    + Option<int>()[{"--ycoord", "-y"}]
+                    + (
+                        OptionGroup()[{"--group2", "-g2"}]
+                        + Option<int>()[{"--xcoord", "-x"}]
+                        + Option<int>()[{"--ycoord", "-y"}]
+                    )
+                );
+
+    SECTION("Top level errors") {
+        parser.constraints().mutuallyExclusive({"-x"}, {FlagPath{"-y"}});
+        parser.parse("-x 10 -y 20");
+        CHECK(parser.hasErrors());
+        const auto& errors = CheckGroup(parser.getConstraintErrors(), "Constraint Errors", -1, -1, 1);
+        CheckMessage(RequireMsg(errors.getErrors()[0]), {"--xcoord", "--ycoord"}, -1, ErrorType::Constraint_MutuallyExclusive);
+    }
+
+    SECTION("Top level no errors") {
+        parser.constraints().mutuallyExclusive({"-x"}, {FlagPath{"-y"}});
+        parser.parse("-x 10 --group [-y 20]");
+        CHECK(!parser.hasErrors());
+        CHECK(parser.getOptionValue<int>("--xcoord") == 10);
+        CHECK(parser.getOptionValue<int>({"--group", "--ycoord"}) == 20);
+    }
+
+    SECTION("Nested one level errors") {
+        parser.constraints()
+            .mutuallyExclusive({"-x"}, {FlagPath{"-g", "-x"}})
+            .mutuallyExclusive({"-y"}, {FlagPath{"-g", "-y"}});
+
+        parser.parse("-x 10 -y 20 --group [-x 10 -y 20]");
+        const auto& errors = CheckGroup(parser.getConstraintErrors(), "Constraint Errors", -1, -1, 2);
+        CheckMessage(RequireMsg(errors.getErrors()[0]), {"--xcoord", "--group > --xcoord"}, -1, ErrorType::Constraint_MutuallyExclusive);
+        CheckMessage(RequireMsg(errors.getErrors()[1]), {"--ycoord", "--group > --ycoord"}, -1, ErrorType::Constraint_MutuallyExclusive);
+    }
+
+    SECTION("Nested one level no errors") {
+        parser.constraints()
+            .mutuallyExclusive({"-x"}, {FlagPath{"-g", "-x"}})
+            .mutuallyExclusive({"-y"}, {FlagPath{"-g", "-y"}});
+        parser.parse("-x 10 --group [-y 20]");
+        CHECK(!parser.hasErrors());
+        CHECK(parser.getOptionValue<int>("--xcoord") == 10);
+        CHECK(parser.getOptionValue<int>({"--group", "--ycoord"}) == 20);
+    }
+
+    SECTION("Nested two levels errors") {
+        parser.constraints()
+            .mutuallyExclusive({"-x"}, {FlagPath{"-g", "-x"}, FlagPath{"-g", "-g2", "-x"}})
+            .mutuallyExclusive({"-y"}, {FlagPath{"-g", "-y"}, FlagPath{"-g", "-g2", "-y"}});
+
+        parser.parse("-x 10 -y 20 --group [-x 10 -y 20 -g2 [-x 10 -y 20]]");
+        const auto& errors = CheckGroup(parser.getConstraintErrors(), "Constraint Errors", -1, -1, 2);
+        CheckMessage(RequireMsg(errors.getErrors()[0]), {"--xcoord", "--group > --xcoord", "--group > --group2 > --xcoord"},
+            -1, ErrorType::Constraint_MutuallyExclusive);
+        CheckMessage(RequireMsg(errors.getErrors()[1]), {"--ycoord", "--group > --ycoord", "--group > --group2 > --ycoord"},
+            -1, ErrorType::Constraint_MutuallyExclusive);
+    }
+
+    SECTION("Nested two levels no errors") {
+        parser.constraints()
+            .mutuallyExclusive({"-x"}, {FlagPath{"-g", "-x"}, FlagPath{"-g", "-g2", "-x"}})
+            .mutuallyExclusive({"-y"}, {FlagPath{"-g", "-y"}, FlagPath{"-g", "-g2", "-y"}});
+
+        parser.parse("--group [-g2 [-x 10 -y 20]]");
+        CHECK(!parser.hasErrors());
+        CHECK(parser.getOptionValue<int>({"--group", "--group2", "--xcoord"}) == 10);
+        CHECK(parser.getOptionValue<int>({"--group", "--group2", "--ycoord"}) == 20);
+    }
+ }
+
+TEST_CASE("Dependent options", "[constraints][dependent][error]") {
+    auto parser = Option<int>()[{"--xcoord", "-x"}]
+                | Option<int>()[{"--ycoord", "-y"}]
+                |  (
+                    OptionGroup()[{"--group", "-g"}]
+                    + Option<int>()[{"--xcoord", "-x"}]
+                    + Option<int>()[{"--ycoord", "-y"}]
+                    + (
+                        OptionGroup()[{"--group2", "-g2"}]
+                        + Option<int>()[{"--xcoord", "-x"}]
+                        + Option<int>()[{"--ycoord", "-y"}]
+                    )
+                );
+
+    SECTION("Top level no errors test 1") {
+        parser.constraints().dependsOn({"-x"}, {FlagPath{"-y"}});
+        parser.parse("--group [-x 10 -y 20]");
+        CHECK(!parser.hasErrors());
+        CHECK(parser.getOptionValue<int>({"--group", "-x"}) == 10);
+        CHECK(parser.getOptionValue<int>({"--group", "-y"}) == 20);
+    }
+
+    SECTION("Top level no errors test 2") {
+        parser.constraints().dependsOn({"-x"}, {FlagPath{"-y"}});
+        parser.parse("-x 10 -y 20");
+        CHECK(!parser.hasErrors());
+        CHECK(parser.getOptionValue<int>({"-x"}) == 10);
+        CHECK(parser.getOptionValue<int>({"-y"}) == 20);
+    }
+
+    SECTION("Top level with errors test 1") {
+        parser.constraints().dependsOn({"-x"}, {FlagPath{"-y"}});
+        parser.constraints().dependsOn({"-y"}, {FlagPath{"-x"}});
+        parser.parse("-x 10 --group [-y 20]");
+        CHECK(parser.hasErrors());
+        const auto& errors = CheckGroup(parser.getConstraintErrors(), "Constraint Errors", -1, -1, 1);
+        CheckMessage(RequireMsg(errors.getErrors()[0]), {"--xcoord", "--ycoord"}, -1, ErrorType::Constraint_DependentOption);
+    }
+
+    SECTION("Top level with errors test 2") {
+        parser.constraints().dependsOn({"-x"}, {FlagPath{"-y"}});
+        parser.constraints().dependsOn({"-y"}, {FlagPath{"-x"}});
+        parser.parse("-y 10 --group [-x 20]");
+        CHECK(parser.hasErrors());
+        const auto& errors = CheckGroup(parser.getConstraintErrors(), "Constraint Errors", -1, -1, 1);
+        CheckMessage(RequireMsg(errors.getErrors()[0]), {"--xcoord", "--ycoord"}, -1, ErrorType::Constraint_DependentOption);
+    }
+
+    SECTION("Each level no y") {
+        parser.constraints()
+            .dependsOn({"-x"}, {FlagPath{"-y"}}).dependsOn({"-y"}, {FlagPath{"-x"}})
+            .dependsOn({"-g", "-x"}, {FlagPath{"-g", "-y"}}).dependsOn({"-g", "-y"}, {FlagPath{"-g", "-x"}})
+            .dependsOn({"-g", "-g2", "-x"}, {FlagPath{"-g", "-g2", "-y"}}).dependsOn({"-g", "-g2", "-y"}, {FlagPath{"-g", "-g2", "-x"}});
+        parser.parse("-x 10 -g [-x 20 -g2 [-x 30]]");
+        const auto& errors = CheckGroup(parser.getConstraintErrors(), "Constraint Errors", -1, -1, 3);
+        CheckMessage(RequireMsg(errors.getErrors()[0]), {"--xcoord", "--ycoord"}, -1, ErrorType::Constraint_DependentOption);
+        CheckMessage(RequireMsg(errors.getErrors()[1]), {"--group > --xcoord", "--group > --ycoord"}, -1, ErrorType::Constraint_DependentOption);
+        CheckMessage(RequireMsg(errors.getErrors()[2]), {"--group > --group2 > --xcoord", "--group > --group2 > --ycoord"}, -1, ErrorType::Constraint_DependentOption);
+    }
+
+    SECTION("Each level no x") {
+        parser.constraints()
+            .dependsOn({"-x"}, {FlagPath{"-y"}}).dependsOn({"-y"}, {FlagPath{"-x"}})
+            .dependsOn({"-g", "-x"}, {FlagPath{"-g", "-y"}}).dependsOn({"-g", "-y"}, {FlagPath{"-g", "-x"}})
+            .dependsOn({"-g", "-g2", "-x"}, {FlagPath{"-g", "-g2", "-y"}}).dependsOn({"-g", "-g2", "-y"}, {FlagPath{"-g", "-g2", "-x"}});
+        parser.parse("-y 10 -g [-y 20 -g2 [-y 30]]");
+        const auto& errors = CheckGroup(parser.getConstraintErrors(), "Constraint Errors", -1, -1, 3);
+        CheckMessage(RequireMsg(errors.getErrors()[0]), {"--xcoord", "--ycoord"}, -1, ErrorType::Constraint_DependentOption);
+        CheckMessage(RequireMsg(errors.getErrors()[1]), {"--group > --xcoord", "--group > --ycoord"}, -1, ErrorType::Constraint_DependentOption);
+        CheckMessage(RequireMsg(errors.getErrors()[2]), {"--group > --group2 > --xcoord", "--group > --group2 > --ycoord"}, -1, ErrorType::Constraint_DependentOption);
+    }
+}
+
+TEST_CASE("Requirement custom error message", "[constraints][requirement][error][error-msg]") {
+    auto parser = Option<int>()[{"--xcoord", "-x"}]
+                | Option<int>()[{"--ycoord", "-y"}];
+
+    const auto xMsg = "You MUST specify the x coordinate";
+    const auto yMsg = "You MUST specify the y coordinate";
+    parser.constraints()
+        .require({"-x"}, xMsg)
+        .require({"-y"}, yMsg);
+    parser.parse("");
+    CHECK(parser.hasErrors());
+    const auto& errors = CheckGroup(parser.getConstraintErrors(), "Constraint Errors", -1, -1, 2);
+    CheckMessage(RequireMsg(errors.getErrors()[0]), {xMsg}, -1, ErrorType::Constraint_RequiredFlag);
+    CheckMessage(RequireMsg(errors.getErrors()[1]), {yMsg}, -1, ErrorType::Constraint_RequiredFlag);
+}
+
+TEST_CASE("Mutual exclusion custom error message", "[constraints][mutual-exclusion][error][error-msg]") {
+    auto parser = Option<int>()[{"--xcoord", "-x"}]
+                | Option<int>()[{"--ycoord", "-y"}]
+                | Option<int>()[{"--zcoord", "-z"}];
+
+    SECTION("Flat message") {
+        const auto msg = "You must not specify the x coordinate with the y or z coordinates";
+        parser.constraints().mutuallyExclusive({"-x"}, {FlagPath{"-y"}, FlagPath{"-z"}}, msg);
+        parser.parse("-x 10 -y 20 -z 30");
+        CHECK(parser.hasErrors());
+        const auto& errors = CheckGroup(parser.getConstraintErrors(), "Constraint Errors", -1, -1, 1);
+        CheckMessage(RequireMsg(errors.getErrors()[0]), {msg}, -1, ErrorType::Constraint_MutuallyExclusive);
+    }
+
+    SECTION("Message function") {
+        auto genMsg = [](const std::vector<std::string>& flags) -> std::string {
+            std::string result = "You must not specify this flag with the flags: ";
+            for (size_t i = 0; i < flags.size(); ++i) {
+                if (i != 0) result += ", ";
+                result += flags[i];
+            }
+            return result;
+        };
+        parser.constraints().mutuallyExclusive({"-x"}, {FlagPath{"-y"}, FlagPath{"-z"}}, genMsg);
+        parser.parse("-x 10 -y 20 -z 30");
+        CHECK(parser.hasErrors());
+        const auto& errors = CheckGroup(parser.getConstraintErrors(), "Constraint Errors", -1, -1, 1);
+        CheckMessage(RequireMsg(errors.getErrors()[0]), {"You must not specify this flag with the flags: --ycoord, --zcoord"},
+            -1, ErrorType::Constraint_MutuallyExclusive);
+    }
+}
+
+TEST_CASE("Dependent option custom error message", "[constraints][dependent][error][error-msg]") {
+    auto parser = Option<int>()[{"--xcoord", "-x"}]
+                | Option<int>()[{"--ycoord", "-y"}]
+                | Option<int>()[{"--zcoord", "-z"}];
+
+    SECTION("Flat message") {
+        const auto msg = "If x is specified, both y and z must also be given";
+        parser.constraints().dependsOn({"-x"}, {FlagPath{"-y"}, FlagPath{"-z"}}, msg);
+        parser.parse("-x 10 -z 30");
+        CHECK(parser.hasErrors());
+        const auto& errors = CheckGroup(parser.getConstraintErrors(), "Constraint Errors", -1, -1, 1);
+        CheckMessage(RequireMsg(errors.getErrors()[0]), {msg}, -1, ErrorType::Constraint_DependentOption);
+    }
+
+    SECTION("Message function") {
+        auto genMsg = [](const std::vector<std::string>& flags) -> std::string {
+            std::string result = "You must also specify this flag with the flags: ";
+            for (size_t i = 0; i < flags.size(); ++i) {
+                if (i != 0) result += ", ";
+                result += flags[i];
+            }
+            return result;
+        };
+        parser.constraints().dependsOn({"-x"}, {FlagPath{"-y"}, FlagPath{"-z"}}, genMsg);
+        parser.parse("-x 10 -z 30");
+        CHECK(parser.hasErrors());
+        const auto& errors = CheckGroup(parser.getConstraintErrors(), "Constraint Errors", -1, -1, 1);
+        CheckMessage(RequireMsg(errors.getErrors()[0]), {"You must also specify this flag with the flags: --ycoord"},
+            -1, ErrorType::Constraint_DependentOption);
+    }
+}
+
 TEST_CASE("Help message 2", "[help][test]") {
     const auto parser =
         Option<int>()["--xcoord"]["-x"]("<int>", "x coordinate of the location. This is a really long description to test how overflow works :D. Wow this is a very amazing feature.")

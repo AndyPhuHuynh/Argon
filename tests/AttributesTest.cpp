@@ -5,19 +5,6 @@
 
 using namespace Argon;
 
-TEST_CASE("Attributes test 1", "[attributes]") {
-    Constraints c;
-
-    c.require(FlagPath("hello"));
-    c.require(FlagPath("world"));
-    c.require(FlagPath("hello"));
-    c.require(FlagPath("hello"));
-
-    c.mutuallyExclusive(FlagPath("hello"), {FlagPath("world"), FlagPath("what!")});
-    c.mutuallyExclusive(FlagPath("hello"), {FlagPath("world"), FlagPath("add2")});
-    c.mutuallyExclusive(FlagPath("world"), {FlagPath("world"), FlagPath("add3")});
-}
-
 TEST_CASE("Attributes test 2", "[attributes]") {
     auto parser = Option<int>()[{"-x", "-x2"}]
                 | Option<int>()["-y"]
@@ -93,12 +80,147 @@ TEST_CASE("Add default dashes") {
     // CHECK(y == 4);
 }
 
-TEST_CASE("Help message") {
-    const auto parser = Option<int>()["--xcoord"]["x"].description("X coordinate")
-                      | Option<int>()["--ycoord"]["y"].description("Y coordinate")
-                      | Option<int>()["--zcoord"]["z"].description("Z coordinate");
-    // const auto msg = parser.getHelpMessage();
-    // std::cout << msg;
+TEST_CASE("Duplicate requirement", "[constraints][duplicate]") {
+    auto parser = Option<int>()[{"--xcoord", "--xcoordinate", "-x"}]
+                | Option<int>()[{"--ycoord", "--ycoordinate", "-y"}]
+                | (
+                    OptionGroup()[{"--group", "-g"}]
+                    + Option<int>()[{"--xcoord", "--xcoordinate", "-x"}]
+                    + Option<int>()[{"--ycoord", "--ycoordinate", "-y"}]
+                );
+
+    SECTION("Duplicated more than twice") {
+        parser.constraints()
+            .require({"-x"}).require({"-x"}).require({"-x"})
+            .require({"-y"}).require({"-y"}).require({"-y"});
+
+        parser.parse("");
+        CHECK(parser.hasErrors());
+        const auto& errors = CheckGroup(parser.getValidationErrors(), "Validation Errors", -1, -1, 2);
+        CheckMessage(RequireMsg(errors.getErrors()[0]), {"--xcoord"} ,-1, ErrorType::Validation_DuplicateRequirement);
+        CheckMessage(RequireMsg(errors.getErrors()[1]), {"--ycoord"} ,-1, ErrorType::Validation_DuplicateRequirement);
+   }
+
+    SECTION("Using aliases") {
+        parser.constraints()
+             .require({"--xcoordinate"}).require({"-x"}).require({"--xcoord"})
+             .require({"--ycoordinate"}).require({"-y"}).require({"--ycoord"});
+
+        parser.parse("");
+        CHECK(parser.hasErrors());
+        const auto& errors = CheckGroup(parser.getValidationErrors(), "Validation Errors", -1, -1, 2);
+        CheckMessage(RequireMsg(errors.getErrors()[0]), {"--xcoord"} ,-1, ErrorType::Validation_DuplicateRequirement);
+        CheckMessage(RequireMsg(errors.getErrors()[1]), {"--ycoord"} ,-1, ErrorType::Validation_DuplicateRequirement);
+    }
+
+    SECTION("Group no errors") {
+        parser.constraints()
+            .require({"--xcoord"})
+            .require({"--ycoord"})
+            .require({"--group", "-x"})
+            .require({"--group", "-y"});
+        parser.parse("-x 10 -y 20 --group [-x 30 -y 40]");
+
+        CHECK(!parser.hasErrors());
+        CHECK(parser.getOptionValue<int>("-x") == 10);
+        CHECK(parser.getOptionValue<int>("-y") == 20);
+        CHECK(parser.getOptionValue<int>({"--group", "-x"}) == 30);
+        CHECK(parser.getOptionValue<int>({"--group", "-y"}) == 40);
+    }
+
+    SECTION("Group errors") {
+        parser.constraints()
+            .require({"--xcoord"})
+            .require({"--ycoord"})
+            .require({"--group", "-x"}).require({"-g", "--xcoord"}).require({"-g", "-x"})
+            .require({"--group", "-y"}).require({"-g", "--ycoord"}).require({"-g", "-y"});
+        parser.parse("-x 10 -y 20 --group [-x 30 -y 40]");
+
+        CHECK(parser.hasErrors());
+        const auto& errors = CheckGroup(parser.getValidationErrors(), "Validation Errors", -1, -1, 2);
+        CheckMessage(RequireMsg(errors.getErrors()[0]), {"--group > --xcoord"} ,-1, ErrorType::Validation_DuplicateRequirement);
+        CheckMessage(RequireMsg(errors.getErrors()[1]), {"--group > --ycoord"} ,-1, ErrorType::Validation_DuplicateRequirement);
+    }
+}
+
+TEST_CASE("Mutual exclusion cycle", "[constraints][mutual-exclusion]") {
+    auto parser = Option<int>()[{"--xcoord", "--xcoordinate", "-x"}]
+                | Option<int>()[{"--ycoord", "--ycoordinate", "-y"}]
+                | (
+                    OptionGroup()[{"--group", "-g"}]
+                    + Option<int>()[{"--xcoord", "--xcoordinate", "-x"}]
+                    + Option<int>()[{"--ycoord", "--ycoordinate", "-y"}]
+                );
+
+    SECTION("Top level") {
+        parser.constraints()
+            .mutuallyExclusive(FlagPath{"-x"}, {FlagPath{"-x"}, FlagPath{"-y"}})
+            .mutuallyExclusive(FlagPath{"-y"}, {FlagPath{"-x"}, FlagPath{"-y"}});
+        parser.parse("");
+        CHECK(parser.hasErrors());
+        const auto& errors = CheckGroup(parser.getValidationErrors(), "Validation Errors", -1, -1, 2);
+        CheckMessage(RequireMsg(errors.getErrors()[0]), {"--xcoord"} ,-1, ErrorType::Validation_MutualExclusionCycle);
+        CheckMessage(RequireMsg(errors.getErrors()[1]), {"--ycoord"} ,-1, ErrorType::Validation_MutualExclusionCycle);
+    }
+
+    SECTION("Group no errors") {
+        parser.constraints()
+            .mutuallyExclusive(FlagPath{"-x"}, {FlagPath{"--group", "-x"}, FlagPath{"-y"}})
+            .mutuallyExclusive(FlagPath{"-y"}, {FlagPath{"-x"}, FlagPath{"--group", "-y"}});
+        parser.parse("");
+        CHECK(!parser.hasErrors());
+    }
+
+    SECTION("Group errors") {
+        parser.constraints()
+            .mutuallyExclusive(FlagPath{"--group", "-x"}, {FlagPath{"--group", "-x"}, FlagPath{"-y"}})
+            .mutuallyExclusive(FlagPath{"--group", "-y"}, {FlagPath{"-x"}, FlagPath{"--group", "-y"}});
+        parser.parse("");
+        CHECK(parser.hasErrors());
+        const auto& errors = CheckGroup(parser.getValidationErrors(), "Validation Errors", -1, -1, 2);
+        CheckMessage(RequireMsg(errors.getErrors()[0]), {"--group > --xcoord"} ,-1, ErrorType::Validation_MutualExclusionCycle);
+        CheckMessage(RequireMsg(errors.getErrors()[1]), {"--group > --ycoord"} ,-1, ErrorType::Validation_MutualExclusionCycle);
+    }
+}
+
+TEST_CASE("Dependent cycle", "[constraints][dependent]") {
+    auto parser = Option<int>()[{"--xcoord", "--xcoordinate", "-x"}]
+                | Option<int>()[{"--ycoord", "--ycoordinate", "-y"}]
+                | (
+                    OptionGroup()[{"--group", "-g"}]
+                    + Option<int>()[{"--xcoord", "--xcoordinate", "-x"}]
+                    + Option<int>()[{"--ycoord", "--ycoordinate", "-y"}]
+                );
+
+    SECTION("Top level") {
+        parser.constraints()
+            .dependsOn(FlagPath{"-x"}, {FlagPath{"-x"}, FlagPath{"-y"}})
+            .dependsOn(FlagPath{"-y"}, {FlagPath{"-x"}, FlagPath{"-y"}});
+        parser.parse("");
+        CHECK(parser.hasErrors());
+        const auto& errors = CheckGroup(parser.getValidationErrors(), "Validation Errors", -1, -1, 2);
+        CheckMessage(RequireMsg(errors.getErrors()[0]), {"--xcoord"} ,-1, ErrorType::Validation_DependentCycle);
+        CheckMessage(RequireMsg(errors.getErrors()[1]), {"--ycoord"} ,-1, ErrorType::Validation_DependentCycle);
+    }
+
+    SECTION("Group no errors") {
+        parser.constraints()
+            .dependsOn(FlagPath{"-x"}, {FlagPath{"--group", "-x"}, FlagPath{"-y"}})
+            .dependsOn(FlagPath{"-y"}, {FlagPath{"-x"}, FlagPath{"--group", "-y"}});
+        parser.parse("");
+        CHECK(!parser.hasErrors());
+    }
+
+    SECTION("Group errors") {
+        parser.constraints()
+            .dependsOn(FlagPath{"--group", "-x"}, {FlagPath{"--group", "-x"}, FlagPath{"-y"}})
+            .dependsOn(FlagPath{"--group", "-y"}, {FlagPath{"-x"}, FlagPath{"--group", "-y"}});
+        parser.parse("");
+        CHECK(parser.hasErrors());
+        const auto& errors = CheckGroup(parser.getValidationErrors(), "Validation Errors", -1, -1, 2);
+        CheckMessage(RequireMsg(errors.getErrors()[0]), {"--group > --xcoord"} ,-1, ErrorType::Validation_DependentCycle);
+        CheckMessage(RequireMsg(errors.getErrors()[1]), {"--group > --ycoord"} ,-1, ErrorType::Validation_DependentCycle);
+    }
 }
 
 TEST_CASE("Help message 2", "[help]") {

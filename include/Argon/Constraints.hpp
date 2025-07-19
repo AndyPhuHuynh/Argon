@@ -4,6 +4,7 @@
 #include <format>
 #include <string>
 #include <unordered_map>
+#include <utility>
 #include <vector>
 
 #include "Flag.hpp"
@@ -15,18 +16,17 @@ namespace Argon {
     using GenerateConstraintErrorMsgFn = std::function<std::string(std::vector<std::string>)>;
 
     struct Requirement {
-        FlagPath flagPath;
+        FlagPathWithAlias flagPath;
         std::string errorMsg;
 
         Requirement() = default;
         explicit Requirement(const FlagPath& flagPath);
         Requirement(const FlagPath& flagPath, std::string_view errorMsg);
-
     };
 
     struct MutuallyExclusive {
-        FlagPath flagPath;
-        std::vector<FlagPath> exclusives;
+        FlagPathWithAlias flagPath;
+        std::vector<FlagPathWithAlias> exclusives;
         std::string errorMsg;
         GenerateConstraintErrorMsgFn genErrorMsg;
 
@@ -34,20 +34,20 @@ namespace Argon {
         MutuallyExclusive(const FlagPath& flagPath, std::initializer_list<FlagPath> exclusives);
         MutuallyExclusive(const FlagPath& flagPath, std::initializer_list<FlagPath> exclusives, std::string_view errorMsg);
         MutuallyExclusive(const FlagPath& flagPath, std::initializer_list<FlagPath> exclusives,
-            const GenerateConstraintErrorMsgFn& genErrorMsg);
+            GenerateConstraintErrorMsgFn  genErrorMsg);
     };
 
     struct DependentOptions {
-        FlagPath flagPath;
-        std::vector<FlagPath> exclusives;
+        FlagPathWithAlias flagPath;
+        std::vector<FlagPathWithAlias> dependents;
         std::string errorMsg;
         GenerateConstraintErrorMsgFn genErrorMsg;
 
         DependentOptions() = default;
-        DependentOptions(const FlagPath& flagPath, std::initializer_list<FlagPath> exclusives);
-        DependentOptions(const FlagPath& flagPath, std::initializer_list<FlagPath> exclusives, std::string_view errorMsg);
-        DependentOptions(const FlagPath& flagPath, std::initializer_list<FlagPath> exclusives,
-            const GenerateConstraintErrorMsgFn& genErrorMsg);
+        DependentOptions(const FlagPath& flagPath, std::initializer_list<FlagPath> dependents);
+        DependentOptions(const FlagPath& flagPath, std::initializer_list<FlagPath> dependents, std::string_view errorMsg);
+        DependentOptions(const FlagPath& flagPath, std::initializer_list<FlagPath> dependents,
+            GenerateConstraintErrorMsgFn  genErrorMsg);
     };
 
     class Constraints {
@@ -67,12 +67,25 @@ namespace Argon {
         auto dependsOn(const FlagPath& flagPath, std::initializer_list<FlagPath> dependentFlags,
             const GenerateConstraintErrorMsgFn& errorFn) -> Constraints&;
 
+        auto validateSetup(const Context& rootContext, ErrorGroup& validationErrors) -> void;
+
         auto validate(const Context& rootContext, std::vector<std::string>& errorMsgs) const -> void;
 
     private:
         std::vector<Requirement> m_requiredFlags;
         std::vector<MutuallyExclusive> m_mutuallyExclusiveFlags;
         std::vector<DependentOptions> m_dependentFlags;
+
+        friend class Parser;
+        Constraints() = default;
+
+        auto resolveAliases(const std::vector<FlagPathWithAlias>& allFlags, ErrorGroup& validationErrors) -> void;
+
+        auto validateRequirementSetup(ErrorGroup& validationErrors) const -> void;
+
+        auto validateMutuallyExclusiveSetup(ErrorGroup& validationErrors) const -> void;
+
+        auto validateDependenciesSetup(ErrorGroup& validationErrors) const -> void;
 
         static auto checkMultiOptionStdArray    (const OptionMap& setOptions, std::vector<std::string>& errorMsgs) -> void;
 
@@ -84,10 +97,32 @@ namespace Argon {
     };
 }
 
-//---------------------------------------------------Implementations----------------------------------------------------
+//---------------------------------------------------Free Functions-----------------------------------------------------
 
 #include "Argon/Context.hpp"
 #include "Argon/Options/Option.hpp"
+
+namespace Argon::detail {
+
+inline auto containsFlagPath(const OptionMap& map, const FlagPath& flagPath) -> const FlagPathWithAlias * {
+    for (const auto& flagWithAlias : map | std::views::keys) {
+        if (isAlias(flagWithAlias, flagPath)) return &flagWithAlias;
+    }
+    return nullptr;
+}
+
+inline auto containsFlagPath(const OptionMap& map, const FlagPathWithAlias& flagPath) -> const FlagPathWithAlias * {
+    for (const auto& flag : map | std::views::keys) {
+        if (isAlias(flag, flagPath)) {
+            return &flag;
+        }
+    }
+    return nullptr;
+}
+
+} // End namespace Argon::detail
+
+//---------------------------------------------------Implementations----------------------------------------------------
 
 namespace Argon {
 inline Requirement::Requirement(const FlagPath& flagPath) : flagPath(flagPath) {}
@@ -96,25 +131,48 @@ inline Requirement::Requirement(const FlagPath& flagPath, const std::string_view
     : flagPath(flagPath), errorMsg(errorMsg) {}
 
 inline MutuallyExclusive::MutuallyExclusive(const FlagPath& flagPath, const std::initializer_list<FlagPath> exclusives)
-    : flagPath(flagPath), exclusives(exclusives) {}
+    : flagPath(flagPath) {
+    for (const auto& flag : exclusives) {
+        this->exclusives.emplace_back(flag);
+    }
+}
 
 inline MutuallyExclusive::MutuallyExclusive(const FlagPath& flagPath, const std::initializer_list<FlagPath> exclusives,
-    const std::string_view errorMsg) : flagPath(flagPath), exclusives(exclusives), errorMsg(errorMsg) {}
+    const std::string_view errorMsg) : flagPath(flagPath), errorMsg(errorMsg) {
+    for (const auto& flag : exclusives) {
+        this->exclusives.emplace_back(flag);
+    }
+}
 
 inline MutuallyExclusive::MutuallyExclusive(const FlagPath& flagPath, const std::initializer_list<FlagPath> exclusives,
-    const GenerateConstraintErrorMsgFn& genErrorMsg)
-    : flagPath(flagPath), exclusives(exclusives), genErrorMsg(genErrorMsg) {}
+    GenerateConstraintErrorMsgFn  genErrorMsg)
+    : flagPath(flagPath), genErrorMsg(std::move(genErrorMsg)) {
+    for (const auto& flag : exclusives) {
+        this->exclusives.emplace_back(flag);
+    }
+}
 
-inline DependentOptions::DependentOptions(const FlagPath& flagPath, const std::initializer_list<FlagPath> exclusives)
-    : flagPath(flagPath), exclusives(exclusives) {}
+inline DependentOptions::DependentOptions(const FlagPath& flagPath, const std::initializer_list<FlagPath> dependents)
+    : flagPath(flagPath) {
+    for (const auto& flag: dependents) {
+        this->dependents.emplace_back(flag);
+    }
+}
 
-inline DependentOptions::DependentOptions(const FlagPath& flagPath, const std::initializer_list<FlagPath> exclusives,
-    const std::string_view errorMsg) : flagPath(flagPath), exclusives(exclusives), errorMsg(errorMsg) {}
+inline DependentOptions::DependentOptions(const FlagPath& flagPath, const std::initializer_list<FlagPath> dependents,
+    const std::string_view errorMsg) : flagPath(flagPath), errorMsg(errorMsg) {
+    for (const auto& flag: dependents) {
+        this->dependents.emplace_back(flag);
+    }
+}
 
-inline DependentOptions::DependentOptions(const FlagPath& flagPath, const std::initializer_list<FlagPath> exclusives,
-    const GenerateConstraintErrorMsgFn& genErrorMsg)
-    : flagPath(flagPath), exclusives(exclusives), genErrorMsg(genErrorMsg) {}
-
+inline DependentOptions::DependentOptions(const FlagPath& flagPath, const std::initializer_list<FlagPath> dependents,
+    GenerateConstraintErrorMsgFn  genErrorMsg)
+    : flagPath(flagPath), genErrorMsg(std::move(genErrorMsg)) {
+    for (const auto& flag: dependents) {
+        this->dependents.emplace_back(flag);
+    }
+}
 
 inline auto Constraints::require(const FlagPath& flagPath) -> Constraints& {
     m_requiredFlags.emplace_back(flagPath);
@@ -162,6 +220,13 @@ inline auto Constraints::dependsOn(const FlagPath& flagPath, std::initializer_li
     return *this;
 }
 
+inline auto Constraints::validateSetup(const Context& rootContext, ErrorGroup& validationErrors) -> void {
+    resolveAliases(rootContext.collectAllFlagsRecursive(), validationErrors);
+    validateRequirementSetup(validationErrors);
+    validateMutuallyExclusiveSetup(validationErrors);
+    validateDependenciesSetup(validationErrors);
+}
+
 inline auto Constraints::validate(const Context& rootContext, std::vector<std::string>& errorMsgs) const -> void {
     const auto setOptions = rootContext.collectAllSetOptions();
 
@@ -169,6 +234,86 @@ inline auto Constraints::validate(const Context& rootContext, std::vector<std::s
     checkRequiredFlags      (setOptions, errorMsgs);
     checkMutuallyExclusive  (setOptions, errorMsgs);
     checkDependentFlags     (setOptions, errorMsgs);
+}
+
+inline auto Constraints::resolveAliases(const std::vector<FlagPathWithAlias>& allFlags, ErrorGroup& validationErrors) -> void {
+    auto resolve = [&allFlags, &validationErrors](FlagPathWithAlias& flagToResolve) {
+        for (const auto& flagPath : allFlags) {
+            if (isAlias(flagToResolve, flagPath)) {
+                flagToResolve = flagPath;
+                return;
+            }
+        }
+        validationErrors.addErrorMessage(
+            std::format(R"(Flag passed into constraint "{}" does not exist.)", flagToResolve.getString()),
+            -1, ErrorType::Validation_FlagDoesNotExist);
+    };
+    for (auto& requirement : m_requiredFlags) {
+        resolve(requirement.flagPath);
+    }
+    for (auto& me : m_mutuallyExclusiveFlags) {
+        resolve(me.flagPath);
+        for (auto& flag : me.exclusives) {
+            resolve(flag);
+        }
+    }
+    for (auto& dependent : m_dependentFlags) {
+        resolve(dependent.flagPath);
+        for (auto& flag : dependent.dependents) {
+            resolve(flag);
+        }
+    }
+}
+
+inline auto Constraints::validateRequirementSetup(ErrorGroup& validationErrors) const -> void {
+    std::vector<FlagPathWithAlias> duplicatedFlags;
+    for (size_t i = 0; i < m_requiredFlags.size(); i++) {
+        for (size_t j = i + 1; j < m_requiredFlags.size(); j++) {
+            if (m_requiredFlags[i].flagPath == m_requiredFlags[j].flagPath &&
+                !std::ranges::contains(duplicatedFlags, m_requiredFlags[j].flagPath)) {
+                duplicatedFlags.push_back(m_requiredFlags[i].flagPath);
+                validationErrors.addErrorMessage(
+                    std::format(R"(Flag "{}" was specified as a duplicate requirement.)",
+                        m_requiredFlags[i].flagPath.getString()), -1, ErrorType::Validation_DuplicateRequirement);
+            }
+        }
+    }
+}
+
+inline auto Constraints::validateMutuallyExclusiveSetup(ErrorGroup& validationErrors) const -> void {
+    std::vector<FlagPathWithAlias> alreadyErrored;
+    auto validateSelfExclusion = [&](const MutuallyExclusive& me) {
+        for (const auto& flag : me.exclusives) {
+            if (me.flagPath == flag && !std::ranges::contains(alreadyErrored, flag)) {
+                alreadyErrored.push_back(flag);
+                validationErrors.addErrorMessage(
+                    std::format(R"(Flag "{}" was declare mutually exclusive with itself.)", me.flagPath.getString()),
+                    -1, ErrorType::Validation_MutualExclusionCycle);
+            }
+        }
+    };
+
+    for (const auto& me : m_mutuallyExclusiveFlags) {
+        validateSelfExclusion(me);
+    }
+}
+
+inline auto Constraints::validateDependenciesSetup(ErrorGroup& validationErrors) const -> void {
+    std::vector<FlagPathWithAlias> alreadyErrored;
+    auto validateSelfExclusion = [&](const DependentOptions& dependent) {
+        for (const auto& flag : dependent.dependents) {
+            if (dependent.flagPath == flag && !std::ranges::contains(alreadyErrored, flag)) {
+                alreadyErrored.push_back(flag);
+                validationErrors.addErrorMessage(
+                    std::format(R"(Flag "{}" was declare dependent with itself.)", dependent.flagPath.getString()),
+                    -1, ErrorType::Validation_DependentCycle);
+            }
+        }
+    };
+
+    for (const auto& dependent : m_dependentFlags) {
+        validateSelfExclusion(dependent);
+    }
 }
 
 inline auto Constraints::checkMultiOptionStdArray(const OptionMap& setOptions, std::vector<std::string>& errorMsgs) -> void {

@@ -20,6 +20,10 @@ namespace Argon {
         Validation_NoPrefix,
         Validation_DuplicateFlag,
         Validation_EmptyFlag,
+        Validation_FlagDoesNotExist,
+        Validation_DuplicateRequirement,
+        Validation_MutualExclusionCycle,
+        Validation_DependentCycle,
 
         Syntax_MissingFlagName,
         Syntax_MissingValue,

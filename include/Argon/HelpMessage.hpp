@@ -1,42 +1,48 @@
 #ifndef ARGON_HELP_MESSAGE_INCLUDE
 #define ARGON_HELP_MESSAGE_INCLUDE
 
+#include <iomanip>
 #include <string>
 #include <sstream>
 
+#include "Argon/Constraints.hpp"
 #include "Argon/Context.hpp"
 
 namespace Argon::detail {
 
 class HelpMessage {
 public:
-    HelpMessage(const Context *context, size_t maxLineWidth);
+    HelpMessage(const Context *context, const Constraints *constraints, size_t maxLineWidth);
 
-    auto get() const -> std::string;
+    [[nodiscard]] auto get() const -> std::string;
 private:
-    std::stringstream m_message;
-    const size_t m_maxLineWidth;
     static constexpr size_t m_maxFlagWidthBeforeWrapping = 32;
     static constexpr size_t m_nameIndent = 2;
     static constexpr size_t m_nextLevelIndent = 4;
+
+    std::stringstream m_message;
+    const size_t m_maxLineWidth;
+    const Constraints *m_constraints;
 
     auto indent(size_t leadingSpaces);
 
     auto appendHeader(const Context *context) -> void;
 
-    auto appendBody(const Context *context, size_t leadingSpaces) -> void;
+    auto appendBody(const Context *context, size_t leadingSpaces, const FlagPath& groupPath) -> void;
 
-    auto appendOptions(const Context *context, size_t leadingSpaces) -> bool;
+    auto appendOptions(const Context *context, size_t leadingSpaces, const FlagPath& groupPath) -> bool;
 
-    auto appendPositionals(const Context *context, size_t leadingSpaces, bool printNewLine) -> bool;
+    auto appendPositionals(const Context *context, size_t leadingSpaces, bool printNewLine, const FlagPath& groupPath) -> bool;
 
-    auto appendGroups(const Context *context, size_t leadingSpaces, bool printNewLine) -> bool;
+    auto appendGroups(const Context *context, size_t leadingSpaces, bool printNewLine, const FlagPath& groupPath) -> bool;
 
     auto appendName(size_t leadingSpaces, const IOption *option) -> size_t;
 
     auto appendInputHint(size_t leadingSpaces, size_t nameLength, const IOption *option) -> size_t;
 
-    auto appendIOption(size_t leadingSpaces, const IOption *option) -> void;
+    void appendDescription(size_t leadingSpaces, const IOption *option, size_t nameLen, size_t inputHintLen, FlagPath groupPath);
+
+    auto appendIOption(size_t leadingSpaces, const IOption *option, FlagPath groupPath) -> void;
 };
 
 inline auto getOptionName(const IOption *option) -> std::string {
@@ -97,9 +103,11 @@ inline auto getFullInputHint(const IOption *option) -> std::string {
     return "";
 }
 
-inline HelpMessage::HelpMessage(const Context *context, const size_t maxLineWidth) : m_maxLineWidth(maxLineWidth) {
+inline HelpMessage::HelpMessage(
+    const Context *context, const Constraints *constraints, const size_t maxLineWidth
+) : m_maxLineWidth(maxLineWidth), m_constraints(constraints) {
     appendHeader(context);
-    appendBody(context, 0);
+    appendBody(context, 0, FlagPath());
 }
 
 inline auto HelpMessage::get() const -> std::string {
@@ -122,27 +130,27 @@ inline auto HelpMessage::appendHeader(const Context *context) -> void {
 
 // Gets the help message for all options and positionals
 inline auto HelpMessage::appendBody( // NOLINT (misc-no-recursion)
-    const Context *context, const size_t leadingSpaces
+    const Context *context, const size_t leadingSpaces, const FlagPath& groupPath
 ) -> void {
-    bool sectionBeforeSet = appendOptions(context, leadingSpaces);
-    sectionBeforeSet |= appendPositionals(context, leadingSpaces, sectionBeforeSet);
-    appendGroups(context, leadingSpaces, sectionBeforeSet);
+    bool sectionBeforeSet = appendOptions(context, leadingSpaces, groupPath);
+    sectionBeforeSet |= appendPositionals(context, leadingSpaces, sectionBeforeSet, groupPath);
+    appendGroups(context, leadingSpaces, sectionBeforeSet, groupPath);
 }
 
 
-inline auto HelpMessage::appendOptions(const Context *context, const size_t leadingSpaces) -> bool {
+inline auto HelpMessage::appendOptions(const Context *context, const size_t leadingSpaces, const FlagPath& groupPath) -> bool {
     const auto& options = context->getOptions();
     if (options.empty()) return false;
     indent(leadingSpaces);
     m_message << "Options:\n";
     for (const auto& holder : options) {
-        appendIOption(leadingSpaces, holder.getPtr());
+        appendIOption(leadingSpaces, holder.getPtr(), groupPath);
     }
     return true;
 }
 
 inline auto HelpMessage::appendPositionals(
-    const Context *context, const size_t leadingSpaces, const bool printNewLine
+    const Context *context, const size_t leadingSpaces, const bool printNewLine, const FlagPath& groupPath
 ) -> bool {
     const auto& positionals = context->getPositionals();
     if (positionals.empty()) return false;
@@ -150,13 +158,13 @@ inline auto HelpMessage::appendPositionals(
     indent(leadingSpaces);
     m_message << "Positionals:\n";
     for (const auto& holder : positionals) {
-        appendIOption(leadingSpaces, holder.getPtr());
+        appendIOption(leadingSpaces, holder.getPtr(), groupPath);
     }
     return true;
 }
 
 inline auto HelpMessage::appendGroups( // NOLINT (misc-no-recursion)
-    const Context *context, const size_t leadingSpaces, const bool printNewLine
+    const Context *context, const size_t leadingSpaces, const bool printNewLine, const FlagPath& groupPath
 ) -> bool {
     const auto& groups = context->getGroups();
     if (groups.empty()) return false;
@@ -166,10 +174,12 @@ inline auto HelpMessage::appendGroups( // NOLINT (misc-no-recursion)
 
     for (size_t i = 0; i < groups.size(); i++) {
         const auto& group = groups[i].getRef();
-        appendIOption(leadingSpaces, &group); m_message << "\n";
+        appendIOption(leadingSpaces, &group, groupPath); m_message << "\n";
         indent(leadingSpaces + m_nextLevelIndent); m_message << getBasicInputHint(&group) << "\n";
         indent(leadingSpaces + m_nextLevelIndent); m_message << std::string(m_maxLineWidth - leadingSpaces -m_nextLevelIndent, '-') << "\n";
-        appendBody(&group.getContext(), leadingSpaces + 4);
+        auto newPath = groupPath;
+        newPath.extendPath(group.getFlag().mainFlag);
+        appendBody(&group.getContext(), leadingSpaces + 4, newPath);
         if (i + 1 < groups.size()) {
             m_message << "\n";
             indent(leadingSpaces + 2); m_message << std::string(m_maxLineWidth - leadingSpaces - 2, '-') << "\n";
@@ -205,13 +215,11 @@ inline auto HelpMessage::appendInputHint(const size_t leadingSpaces, const size_
     return inputHint.length();
 }
 
-// Gets a help message for an option/positional
-inline auto HelpMessage::appendIOption(const size_t leadingSpaces, const IOption *option) -> void {
-    const size_t nameLen = appendName(leadingSpaces + m_nameIndent, option);
-    const size_t inputHintLen = appendInputHint(leadingSpaces + nameLen + m_nameIndent, nameLen, option);
-
-    // Print description with line wrapping
-    const std::string& description = option->getDescription();
+inline auto HelpMessage::appendDescription(
+    const size_t leadingSpaces, const IOption *option,
+    const size_t nameLen, const size_t inputHintLen, FlagPath groupPath
+) -> void {
+    std::string description = option->getDescription();
 
     const size_t maxDescLength = m_maxLineWidth - m_maxFlagWidthBeforeWrapping;
     const std::vector<std::string> sections = wrapString(description, maxDescLength);
@@ -228,6 +236,15 @@ inline auto HelpMessage::appendIOption(const size_t leadingSpaces, const IOption
         if (sections[i].empty()) continue;
         m_message << std::string(leadingSpaces + m_maxFlagWidthBeforeWrapping, ' ') << sections[i] << "\n";
     }
+}
+
+// Gets a help message for an option/positional
+inline auto HelpMessage::appendIOption(size_t leadingSpaces, const IOption *option, FlagPath groupPath) -> void {
+    leadingSpaces += m_nameIndent;
+    const size_t nameLen = appendName(leadingSpaces, option);
+    const size_t inputHintLen = appendInputHint(leadingSpaces + nameLen, nameLen, option);
+
+    appendDescription(leadingSpaces, option, nameLen, inputHintLen, groupPath);
 }
 
 }

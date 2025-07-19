@@ -38,9 +38,9 @@ namespace Argon {
         std::vector<Token> m_poppedBrackets;
         bool m_mismatchedRBRACK = false;
 
-        std::unique_ptr<Constraints> m_constraints = std::make_unique<Constraints>();
+        std::unique_ptr<Constraints> m_constraints;
     public:
-        Parser() = default;
+        Parser();
 
         Parser(const Parser&);
         auto operator=(const Parser&) -> Parser&;
@@ -61,6 +61,8 @@ namespace Argon {
         auto addAnalysisErrorGroup(std::string_view groupName, int startPos, int endPos) -> void;
 
         auto removeErrorGroup(int startPos) -> void;
+
+        [[nodiscard]] auto getValidationErrors() const -> const ErrorGroup&;
 
         [[nodiscard]] auto getSyntaxErrors() const -> const ErrorGroup&;
 
@@ -160,7 +162,7 @@ namespace Argon {
 //---------------------------------------------------Free Functions----------------------------------------------------
 
 #include "Argon/Ast.hpp"
-#include "Argon/Attributes.hpp"
+#include "Argon/Constraints.hpp"
 #include "Argon/HelpMessage.hpp"
 #include "Argon/Options/MultiOption.hpp"
 
@@ -174,8 +176,14 @@ inline auto isValue(const Token& token) {
 
 
 namespace Argon {
+
+inline Parser::Parser() {
+    m_constraints = std::unique_ptr<Constraints>(new Constraints());
+}
+
 template<typename T> requires detail::DerivesFrom<T, IOption>
 Parser::Parser(T&& option) {
+    m_constraints = std::unique_ptr<Constraints>(new Constraints());
     addOption(std::forward<T>(option));
 }
 
@@ -210,6 +218,10 @@ inline auto Parser::removeErrorGroup(const int startPos) -> void {
     m_analysisErrors.removeErrorGroup(startPos);
 }
 
+inline auto Parser::getValidationErrors() const -> const ErrorGroup& {
+    return m_validationErrors;
+}
+
 inline auto Parser::getSyntaxErrors() const -> const ErrorGroup& {
     return m_syntaxErrors;
 }
@@ -229,7 +241,7 @@ inline auto Parser::hasErrors() const -> bool {
 
 inline auto Parser::getHelpMessage(const size_t maxLineWidth) const -> std::string {
     detail::resolveAllChildContextConfigs(m_context.get());
-    return detail::HelpMessage(m_context.get(), maxLineWidth).get();
+    return detail::HelpMessage(m_context.get(), m_constraints.get(), maxLineWidth).get();
 }
 
 inline auto Parser::printErrors() const -> void {
@@ -270,16 +282,15 @@ inline auto Parser::parse(const int argc, const char **argv) -> bool {
 }
 
 inline auto Parser::parse(const std::string_view str) -> bool {
+    reset();
+
     detail::resolveAllChildContextConfigs(m_context.get());
-    m_context->validate(m_validationErrors);
+    m_context->validateSetup(m_validationErrors);
+    m_constraints->validateSetup(*m_context, m_validationErrors);
     if (m_validationErrors.hasErrors()) {
-        std::cerr << "Argon::Parser is in an invalid state. "
-                     "Please fix the following errors in order for the library to function: \n";
-        m_validationErrors.printErrors();
         return false;
     }
 
-    reset();
     m_scanner = Scanner(str);
     StatementAst ast = parseStatement();
     ast.checkPositionals(*this, *m_context);

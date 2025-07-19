@@ -60,7 +60,6 @@ namespace Argon {
         template<typename Container>
         [[nodiscard]] auto getMultiValue(const FlagPath& flagPath) -> const Container&;
 
-
         template <typename ValueType, size_t Pos>
         [[nodiscard]] auto getPositionalValue() -> const ValueType&;
 
@@ -81,7 +80,9 @@ namespace Argon {
 
         [[nodiscard]] auto getPositionals() const -> const std::vector<OptionHolder<IOption>>&;
 
-        auto validate(ErrorGroup& errorGroup) const -> void;
+        [[nodiscard]] auto collectAllFlagsRecursive() const -> std::vector<FlagPathWithAlias>;
+
+        auto validateSetup(ErrorGroup& errorGroup) const -> void;
 
     private:
         [[nodiscard]] auto getConfigImpl() -> ContextConfig& override;
@@ -90,11 +91,13 @@ namespace Argon {
 
         [[nodiscard]] auto collectAllFlags() const -> std::vector<const Flag*>;
 
+        auto collectAllFlagsRecursive(std::vector<FlagPathWithAlias>& flags, const std::vector<Flag>& pathSoFar) const -> void;
+
         auto resolveFlagGroup(const FlagPath& flagPath) -> OptionGroup *;
 
         auto collectAllSetOptions(OptionMap& map, const std::vector<Flag>& pathSoFar) const -> void;
 
-        auto validate(const FlagPath& pathSoFar, ErrorGroup& validationErrors) const -> void;
+        auto validateSetup(const FlagPath& pathSoFar, ErrorGroup& validationErrors) const -> void;
 
         auto checkPrefixes(ErrorGroup& validationErrors, const std::string& groupSoFar) const -> void;
     };
@@ -103,7 +106,6 @@ namespace Argon {
 //---------------------------------------------------Free Functions-----------------------------------------------------
 
 #include <algorithm>
-#include <iomanip>
 #include <set>
 
 #include "Argon/Options/Option.hpp"
@@ -113,13 +115,6 @@ namespace Argon {
 #include "Argon/Options/Positional.hpp"
 
 namespace Argon::detail {
-
-inline auto containsFlagPath(const OptionMap& map, const FlagPath& flag) -> const FlagPathWithAlias * {
-    for (const auto& flagWithAlias : map | std::views::keys) {
-        if (flagWithAlias == flag) return &flagWithAlias;
-    }
-    return nullptr;
-}
 
 inline auto startsWithAny(const std::string_view str, const std::vector<std::string>& prefixes) -> bool {
     return std::ranges::any_of(prefixes, [str](const std::string_view prefix) {
@@ -302,6 +297,31 @@ inline auto Context::getPositionals() const -> const std::vector<OptionHolder<IO
     return m_positionals;
 }
 
+inline auto Context::collectAllFlagsRecursive() const -> std::vector<FlagPathWithAlias> {
+    std::vector<FlagPathWithAlias> result;
+    collectAllFlagsRecursive(result, std::vector<Flag>());
+    return result;
+}
+
+inline auto Context::collectAllFlagsRecursive( // NOLINT (misc-no-recursion)
+    std::vector<FlagPathWithAlias>& flags, const std::vector<Flag>& pathSoFar
+) const -> void {
+    for (const auto& holder : m_options) {
+        const auto& flag = detail::getIFlag(holder)->getFlag();
+        flags.emplace_back(pathSoFar, flag);
+        auto newPath = pathSoFar;
+        newPath.emplace_back();
+    }
+    for (const auto& holder : m_groups) {
+        const auto& group = holder.getRef();
+        const auto& flag = group.getFlag();
+        flags.emplace_back(pathSoFar, flag);
+        auto newPath = pathSoFar;
+        newPath.emplace_back(flag);
+        group.getContext().collectAllFlagsRecursive(flags, newPath);
+    }
+}
+
 inline auto Context::collectAllSetOptions(OptionMap& map, //NOLINT (recursion)
                                           const std::vector<Flag>& pathSoFar) const -> void {
     for (const auto& holder : m_options) {
@@ -320,8 +340,8 @@ inline auto Context::collectAllSetOptions(OptionMap& map, //NOLINT (recursion)
     }
 }
 
-inline auto Context::validate(ErrorGroup& errorGroup) const -> void {
-    validate(FlagPath(), errorGroup);
+inline auto Context::validateSetup(ErrorGroup& errorGroup) const -> void {
+    validateSetup(FlagPath(), errorGroup);
 }
 
 inline auto Context::getConfigImpl() -> ContextConfig& {
@@ -332,7 +352,7 @@ inline auto Context::getConfigImpl() const -> const ContextConfig& {
     return config;
 }
 
-inline auto Context::validate( // NOLINT (misc-no-recursion)
+inline auto Context::validateSetup( // NOLINT (misc-no-recursion)
     const FlagPath& pathSoFar, ErrorGroup& validationErrors
 ) const -> void {
     const auto allFlags = collectAllFlags();
@@ -372,7 +392,7 @@ inline auto Context::validate( // NOLINT (misc-no-recursion)
         const auto& group = dynamic_cast<const OptionGroup&>(ref);
         FlagPath newPath = pathSoFar;
         newPath.extendPath(group.getFlag().mainFlag);
-        group.getContext().validate(newPath, validationErrors);
+        group.getContext().validateSetup(newPath, validationErrors);
     }
 }
 

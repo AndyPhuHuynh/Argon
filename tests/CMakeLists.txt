@@ -8,11 +8,10 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(Catch2)
 
 set (SOURCE_FILES
-    ${CMAKE_CURRENT_SOURCE_DIR}/attributes_test.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/error_tests.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/main_test.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/scanner_test.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/options_test.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/AttributesTest.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/ErrorTests.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/ScannerTest.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/OptionsTest.cpp
 )
 
 add_executable(ArgonTests ${SOURCE_FILES})

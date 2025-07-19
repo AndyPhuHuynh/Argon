@@ -11,6 +11,11 @@
 
 namespace Argon {
 
+struct Flag;
+struct FlagPathWithAlias;
+struct FlagPath;
+
+
 struct Flag {
     std::string mainFlag;
     std::vector<std::string> aliases;
@@ -35,6 +40,8 @@ struct FlagPathWithAlias {
     Flag flag;
 
     FlagPathWithAlias() = default;
+
+    explicit FlagPathWithAlias(const FlagPath& flagPath);
 
     FlagPathWithAlias(std::initializer_list<Flag> flags);
 
@@ -142,7 +149,20 @@ struct std::hash<Argon::FlagPath> {
 //---------------------------------------------------Free Functions-----------------------------------------------------
 
 namespace Argon {
-inline auto operator==(const FlagPathWithAlias& flagPathWithAlias, const FlagPath& flagPath) {
+
+inline auto isAlias(const Flag& flag1, const Flag& flag2) -> bool {
+    const auto matches = [&](const std::string& alias) {
+        return flag2.mainFlag == alias || std::ranges::contains(flag2.aliases, alias);
+    };
+
+    if (!matches(flag1.mainFlag)) {
+        return false;
+    }
+
+    return std::ranges::all_of(flag1.aliases, matches);
+}
+
+inline auto isAlias(const FlagPathWithAlias& flagPathWithAlias, const FlagPath& flagPath) -> bool {
     if (flagPathWithAlias.groupPath.size() != flagPath.groupPath.size()) return false;
     for (size_t i = 0; i < flagPath.groupPath.size(); i++) {
         if (!flagPathWithAlias.groupPath[i].containsFlag(flagPath.flag)) return false;
@@ -150,12 +170,14 @@ inline auto operator==(const FlagPathWithAlias& flagPathWithAlias, const FlagPat
     return flagPathWithAlias.flag.containsFlag(flagPath.flag);
 }
 
-inline auto operator==(const FlagPath& flagPath, const FlagPathWithAlias& flagPathWithAlias) {
-    if (flagPathWithAlias.groupPath.size() != flagPath.groupPath.size()) return false;
-    for (size_t i = 0; i < flagPath.groupPath.size(); i++) {
-        if (!flagPathWithAlias.groupPath[i].containsFlag(flagPath.flag)) return false;
+inline auto isAlias(const FlagPathWithAlias& flagPath1, const FlagPathWithAlias& flagPath2) -> bool {
+    if (flagPath1.groupPath.size() != flagPath2.groupPath.size()) return false;
+    for (size_t i = 0; i < flagPath1.groupPath.size(); i++) {
+        if (!isAlias(flagPath1.groupPath[i], flagPath2.groupPath[i])) {
+            return false;
+        }
     }
-    return flagPathWithAlias.flag.containsFlag(flagPath.flag);
+    return isAlias(flagPath1.flag, flagPath2.flag);
 }
 
 } // End namespace Argon
@@ -183,6 +205,13 @@ inline auto Flag::isEmpty() const -> bool {
 }
 
 inline FlagPathWithAlias::FlagPathWithAlias(std::vector<Flag> path, Flag flag) : groupPath(std::move(path)), flag(std::move(flag)) {}
+
+inline FlagPathWithAlias::FlagPathWithAlias(const FlagPath& flagPath) {
+    for (const auto& path : flagPath.groupPath) {
+        groupPath.emplace_back(path);
+    }
+    flag = Flag(flagPath.flag);
+}
 
 inline FlagPathWithAlias::FlagPathWithAlias(const std::initializer_list<Flag> flags) {
     if (flags.size() == 0) {

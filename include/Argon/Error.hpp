@@ -36,7 +36,12 @@ namespace Argon {
         Analysis_UnknownFlag,
         Analysis_IncorrectOptionType,
         Analysis_ConversionError,
-        Analysis_UnexpectedToken
+        Analysis_UnexpectedToken,
+
+        Constraint_MultiOptionCount,
+        Constraint_RequiredFlag,
+        Constraint_MutuallyExclusive,
+        Constraint_DependentOption,
     };
     
     struct ErrorMessage {
@@ -71,6 +76,7 @@ namespace Argon {
         [[nodiscard]] auto hasErrors() const -> bool;
         [[nodiscard]] auto getStartPosition() const -> int;
         [[nodiscard]] auto getEndPosition() const -> int;
+        [[nodiscard]] auto toString() const -> std::string;
 
         void printErrors() const;
     private:
@@ -327,7 +333,7 @@ inline auto Argon::ErrorGroup::getEndPosition() const -> int {
     return m_endPos;
 }
 
-inline void Argon::ErrorGroup::printErrors() const {
+inline auto Argon::ErrorGroup::toString() const -> std::string {
     constexpr auto printRecursive = [](std::stringstream& stream, const ErrorGroup& group, const std::string& prefix,
                                        auto&& printRecursiveRef) -> void {
         const auto& errors = group.getErrors();
@@ -352,12 +358,16 @@ inline void Argon::ErrorGroup::printErrors() const {
     };
 
     if (!m_hasErrors) {
-        return;
+        return "";
     }
 
     std::stringstream ss;
     printRecursive(ss, *this, "", printRecursive);
-    std::cout << ss.str();
+    return ss.str();
+}
+
+inline void Argon::ErrorGroup::printErrors() const {
+    std::cout << toString();
 }
 
 #endif // ARGON_ERROR_INCLUDE

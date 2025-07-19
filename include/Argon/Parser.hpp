@@ -32,7 +32,7 @@ namespace Argon {
         ErrorGroup m_validationErrors = ErrorGroup("Validation Errors", -1, -1);
         ErrorGroup m_syntaxErrors = ErrorGroup("Syntax Errors", -1, -1);
         ErrorGroup m_analysisErrors = ErrorGroup("Analysis Errors", -1, -1);
-        std::vector<std::string> m_constraintErrors;
+        ErrorGroup m_constraintErrors = ErrorGroup("Constraint Errors", -1, -1);
 
         std::vector<Token> m_brackets;
         std::vector<Token> m_poppedBrackets;
@@ -67,6 +67,8 @@ namespace Argon {
         [[nodiscard]] auto getSyntaxErrors() const -> const ErrorGroup&;
 
         [[nodiscard]] auto getAnalysisErrors() const -> const ErrorGroup&;
+
+        [[nodiscard]] auto getConstraintErrors() const -> const ErrorGroup&;
 
         [[nodiscard]] auto hasErrors() const -> bool;
 
@@ -148,8 +150,6 @@ namespace Argon {
 
         auto getDoubleDashInScope(std::string_view groupName) -> std::optional<Token>;
 
-        auto validateConstraints() -> void;
-
         [[nodiscard]] auto getConfigImpl() -> ContextConfig& override;
 
         [[nodiscard]] auto getConfigImpl() const -> const ContextConfig& override;
@@ -230,13 +230,17 @@ inline auto Parser::getAnalysisErrors() const -> const ErrorGroup& {
     return m_analysisErrors;
 }
 
+inline auto Parser::getConstraintErrors() const -> const ErrorGroup& {
+    return m_constraintErrors;
+}
+
 inline auto Parser::hasErrors() const -> bool {
     return
         m_scanner.hasErrors() ||
         m_validationErrors.hasErrors() ||
         m_syntaxErrors.hasErrors() ||
         m_analysisErrors.hasErrors() ||
-        !m_constraintErrors.empty();
+        m_constraintErrors.hasErrors();
 }
 
 inline auto Parser::getHelpMessage(const size_t maxLineWidth) const -> std::string {
@@ -265,10 +269,9 @@ inline auto Parser::printErrors() const -> void {
         m_analysisErrors.printErrors();
         return;
     }
-    if (!m_constraintErrors.empty()) {
-        for (const auto& err : m_constraintErrors) {
-            std::cout << err << "\n";
-        }
+    if (m_constraintErrors.hasErrors()) {
+        m_constraintErrors.printErrors();
+        return;
     }
 }
 
@@ -297,9 +300,9 @@ inline auto Parser::parse(const std::string_view str) -> bool {
     if (m_syntaxErrors.hasErrors()) {
         return false;
     }
-
     ast.analyze(*this, *m_context);
-    validateConstraints();
+
+    m_constraints->validate(*m_context, m_constraintErrors);
     return !hasErrors();
 }
 
@@ -748,10 +751,6 @@ inline auto Parser::getDoubleDashInScope(const std::string_view groupName) -> st
         return {doubleDash};
     }
     return std::nullopt;
-}
-
-inline auto Parser::validateConstraints() -> void {
-    m_constraints->validate(*m_context, m_constraintErrors);
 }
 
 template<typename Left, typename Right> requires

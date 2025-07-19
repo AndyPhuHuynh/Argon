@@ -123,9 +123,7 @@ inline auto HelpMessage::indent(const size_t leadingSpaces) {
 // Prints the usage header and help messages for all options and positionals
 inline auto HelpMessage::appendHeader(const Context *context) -> void {
     const auto inputHint = getContextInputHint(context, "[options]");
-
-    m_message << "Usage:" << inputHint << "\n\n"
-        << "Options:\n" << std::string(m_maxLineWidth, '-') << "\n";
+    m_message << "Usage:" << inputHint << "\n\n" << std::string(m_maxLineWidth, '-') << "\n";
 }
 
 // Gets the help message for all options and positionals
@@ -250,7 +248,7 @@ inline auto HelpMessage::appendDescription(
         }
     }
 
-    const size_t maxDescLength = m_maxLineWidth - m_maxFlagWidthBeforeWrapping;
+    const size_t maxDescLength = m_maxLineWidth - m_maxFlagWidthBeforeWrapping - leadingSpaces;
     const std::vector<std::string> sections = wrapString(description, maxDescLength);
 
     constexpr size_t semicolonLen = 1;

@@ -8,7 +8,7 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(Catch2)
 
 set (SOURCE_FILES
-        ${CMAKE_CURRENT_SOURCE_DIR}/AttributesTest.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/ConstraintsTest.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/ErrorTests.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/ScannerTest.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/OptionsTest.cpp

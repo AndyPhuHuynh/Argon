@@ -75,7 +75,7 @@ public:
 
     auto validateSetup(const Context& rootContext, ErrorGroup& validationErrors) -> void;
 
-    auto validate(const Context& rootContext, std::vector<std::string>& errorMsgs) const -> void;
+    auto validate(const Context& rootContext, ErrorGroup& constraintErrors) const -> void;
 
 private:
     std::vector<Requirement> m_requiredFlags;
@@ -94,13 +94,13 @@ private:
 
     auto validateDependenciesSetup(ErrorGroup& validationErrors) const -> void;
 
-    static auto checkMultiOptionStdArray    (const OptionMap& setOptions, std::vector<std::string>& errorMsgs) -> void;
+    static auto checkMultiOptionStdArray    (const OptionMap& setOptions, ErrorGroup& constraintErrors) -> void;
 
-    auto checkRequiredFlags                 (const OptionMap& setOptions, std::vector<std::string>& errorMsgs) const -> void;
+    auto checkRequiredFlags                 (const OptionMap& setOptions, ErrorGroup& constraintErrors) const -> void;
 
-    auto checkMutuallyExclusive             (const OptionMap& setOptions, std::vector<std::string>& errorMsgs) const -> void;
+    auto checkMutuallyExclusive             (const OptionMap& setOptions, ErrorGroup& constraintErrors) const -> void;
 
-    auto checkDependentFlags                (const OptionMap& setOptions, std::vector<std::string>& errorMsgs) const -> void;
+    auto checkDependentFlags                (const OptionMap& setOptions, ErrorGroup& constraintErrors) const -> void;
 };
 
 } // End namespace Argon
@@ -248,13 +248,12 @@ inline auto Constraints::validateSetup(const Context& rootContext, ErrorGroup& v
     validateDependenciesSetup(validationErrors);
 }
 
-inline auto Constraints::validate(const Context& rootContext, std::vector<std::string>& errorMsgs) const -> void {
+inline auto Constraints::validate(const Context& rootContext, ErrorGroup& constraintErrors) const -> void {
     const auto setOptions = rootContext.collectAllSetOptions();
-
-    checkMultiOptionStdArray(setOptions, errorMsgs);
-    checkRequiredFlags      (setOptions, errorMsgs);
-    checkMutuallyExclusive  (setOptions, errorMsgs);
-    checkDependentFlags     (setOptions, errorMsgs);
+    checkMultiOptionStdArray(setOptions, constraintErrors);
+    checkRequiredFlags      (setOptions, constraintErrors);
+    checkMutuallyExclusive  (setOptions, constraintErrors);
+    checkDependentFlags     (setOptions, constraintErrors);
 }
 
 inline auto Constraints::resolveAliases(const std::vector<FlagPathWithAlias>& allFlags, ErrorGroup& validationErrors) -> void {
@@ -337,35 +336,37 @@ inline auto Constraints::validateDependenciesSetup(ErrorGroup& validationErrors)
     }
 }
 
-inline auto Constraints::checkMultiOptionStdArray(const OptionMap& setOptions, std::vector<std::string>& errorMsgs) -> void {
+inline auto Constraints::checkMultiOptionStdArray(const OptionMap& setOptions, ErrorGroup& constraintErrors) -> void {
     for (const auto& [flag, option] : setOptions) {
         const auto multiOption = dynamic_cast<const IArrayCapacity*>(option);
         if (multiOption == nullptr) continue;
 
         if (!multiOption->isAtMaxCapacity()) {
-            errorMsgs.emplace_back(std::format(
-                "Flag '{}' must have exactly {} values specified",
-                flag.getString(), multiOption->getMaxSize()));
+            constraintErrors.addErrorMessage(
+                std::format(
+                    "Flag '{}' must have exactly {} values specified",
+                    flag.getString(), multiOption->getMaxSize()),
+                -1, ErrorType::Constraint_MultiOptionCount);
         }
     }
 }
 
-inline auto Constraints::checkRequiredFlags(const OptionMap& setOptions, std::vector<std::string>& errorMsgs) const -> void {
+inline auto Constraints::checkRequiredFlags(const OptionMap& setOptions, ErrorGroup& constraintErrors) const -> void {
     for (const auto& requirement : m_requiredFlags) {
         if (detail::containsFlagPath(setOptions, requirement.flagPath)) {
             continue;
         }
         if (requirement.errorMsg.empty()) {
-            errorMsgs.emplace_back(std::format(
-                "Flag '{}' is a required flag and must be set",
-                requirement.flagPath.getString()));
+            constraintErrors.addErrorMessage(
+                std::format(R"(Flag "{}" is a required flag and must be set)", requirement.flagPath.getString()),
+                -1, ErrorType::Constraint_RequiredFlag);
         } else {
-            errorMsgs.emplace_back(requirement.errorMsg);
+            constraintErrors.addErrorMessage(requirement.errorMsg, -1, ErrorType::Constraint_RequiredFlag);
         }
     }
 }
 
-inline auto Constraints::checkMutuallyExclusive(const OptionMap& setOptions, std::vector<std::string>& errorMsgs) const -> void {
+inline auto Constraints::checkMutuallyExclusive(const OptionMap& setOptions, ErrorGroup& constraintErrors) const -> void {
     std::vector<std::string> errorFlags;
     for (auto& [flagToCheck, exclusiveFlags, customErr, genMsg] : m_mutuallyExclusiveFlags) {
         errorFlags.clear();
@@ -385,23 +386,23 @@ inline auto Constraints::checkMutuallyExclusive(const OptionMap& setOptions, std
             continue;
         }
         if (!customErr.empty()) {
-            errorMsgs.emplace_back(customErr);
+            constraintErrors.addErrorMessage(customErr, -1, ErrorType::Constraint_MutuallyExclusive);
         } else if (genMsg != nullptr) {
-            errorMsgs.emplace_back(genMsg(errorFlags));
+            constraintErrors.addErrorMessage(genMsg(errorFlags), -1, ErrorType::Constraint_MutuallyExclusive);
         } else {
-            auto& msg = errorMsgs.emplace_back();
-            msg += std::format("Flag '{}' is mutually exclusive with flags: ", flag->getString());
+            std::string msg = std::format(R"(Flag "{}" is mutually exclusive with flags: )", flag->getString());
             for (size_t i = 0; i < errorFlags.size(); i++) {
-                msg += std::format("'{}'", errorFlags[i]);
+                msg += std::format(R"("{}")", errorFlags[i]);
                 if (i != errorFlags.size() - 1) {
                     msg += ", ";
                 }
             }
+            constraintErrors.addErrorMessage(msg, -1, ErrorType::Constraint_MutuallyExclusive);
         }
     }
 }
 
-inline auto Constraints::checkDependentFlags(const OptionMap& setOptions, std::vector<std::string>& errorMsgs) const -> void {
+inline auto Constraints::checkDependentFlags(const OptionMap& setOptions, ErrorGroup& constraintErrors) const -> void {
     std::vector<std::string> errorFlags;
     for (auto& [flagToCheck, dependentFlags, customErr, genMsg] : m_dependentFlags) {
         errorFlags.clear();
@@ -421,18 +422,18 @@ inline auto Constraints::checkDependentFlags(const OptionMap& setOptions, std::v
             continue;
         }
         if (!customErr.empty()) {
-            errorMsgs.emplace_back(customErr);
+            constraintErrors.addErrorMessage(customErr, -1, ErrorType::Constraint_DependentOption);
         } else if (genMsg != nullptr) {
-            errorMsgs.emplace_back(genMsg(errorFlags));
+            constraintErrors.addErrorMessage(genMsg(errorFlags), -1, ErrorType::Constraint_DependentOption);
         } else {
-            auto& msg = errorMsgs.emplace_back();
-            msg += std::format("Flag '{}' must be set with flags: ", flag->getString());
+            std::string msg = std::format(R"(Flag "{}" must be set with flags: )", flag->getString());
             for (size_t i = 0; i < errorFlags.size(); i++) {
-                msg += std::format("'{}'", errorFlags[i]);
+                msg += std::format(R"("{}")", errorFlags[i]);
                 if (i != errorFlags.size() - 1) {
                     msg += ", ";
                 }
             }
+            constraintErrors.addErrorMessage(msg, -1, ErrorType::Constraint_DependentOption);
         }
     }
 }

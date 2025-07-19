@@ -80,7 +80,7 @@ TEST_CASE("Add default dashes") {
     // CHECK(y == 4);
 }
 
-TEST_CASE("Duplicate requirement", "[constraints][duplicate]") {
+TEST_CASE("Duplicate requirement", "[constraints][requirement][error]") {
     auto parser = Option<int>()[{"--xcoord", "--xcoordinate", "-x"}]
                 | Option<int>()[{"--ycoord", "--ycoordinate", "-y"}]
                 | (
@@ -143,7 +143,7 @@ TEST_CASE("Duplicate requirement", "[constraints][duplicate]") {
     }
 }
 
-TEST_CASE("Mutual exclusion cycle", "[constraints][mutual-exclusion]") {
+TEST_CASE("Mutual exclusion cycle", "[constraints][mutual-exclusion][error]") {
     auto parser = Option<int>()[{"--xcoord", "--xcoordinate", "-x"}]
                 | Option<int>()[{"--ycoord", "--ycoordinate", "-y"}]
                 | (
@@ -183,7 +183,7 @@ TEST_CASE("Mutual exclusion cycle", "[constraints][mutual-exclusion]") {
     }
 }
 
-TEST_CASE("Dependent cycle", "[constraints][dependent]") {
+TEST_CASE("Dependent cycle", "[constraints][dependent][error]") {
     auto parser = Option<int>()[{"--xcoord", "--xcoordinate", "-x"}]
                 | Option<int>()[{"--ycoord", "--ycoordinate", "-y"}]
                 | (
@@ -220,6 +220,123 @@ TEST_CASE("Dependent cycle", "[constraints][dependent]") {
         const auto& errors = CheckGroup(parser.getValidationErrors(), "Validation Errors", -1, -1, 2);
         CheckMessage(RequireMsg(errors.getErrors()[0]), {"--group > --xcoord"} ,-1, ErrorType::Validation_DependentCycle);
         CheckMessage(RequireMsg(errors.getErrors()[1]), {"--group > --ycoord"} ,-1, ErrorType::Validation_DependentCycle);
+    }
+}
+
+TEST_CASE("Required options", "[constraints][requirement]") {
+    auto parser = Option<int>()[{"--xcoord", "-x"}]
+                | Option<int>()[{"--ycoord", "-y"}]
+                |  (
+                    OptionGroup()[{"--group", "-g"}]
+                    + Option<int>()[{"--xcoord", "-x"}]
+                    + Option<int>()[{"--ycoord", "-y"}]
+                    + (
+                        OptionGroup()[{"--group2", "-g2"}]
+                        + Option<int>()[{"--xcoord", "-x"}]
+                        + Option<int>()[{"--ycoord", "-y"}]
+                    )
+                );
+
+    SECTION("Top level missing both") {
+        parser.constraints().require({"-x"}).require({"--ycoord"});
+        parser.parse("--group [-x 10 -y 20]");
+        CHECK(parser.hasErrors());
+        const auto& errors = CheckGroup(parser.getConstraintErrors(), "Constraint Errors", -1, -1, 2);
+        CheckMessage(RequireMsg(errors.getErrors()[0]), {"--xcoord"}, -1, ErrorType::Constraint_RequiredFlag);
+        CheckMessage(RequireMsg(errors.getErrors()[1]), {"--ycoord"}, -1, ErrorType::Constraint_RequiredFlag);
+    }
+
+    SECTION("Top level missing x") {
+        parser.constraints().require({"-x"}).require({"--ycoord"});
+        parser.parse("-y 20");
+        CHECK(parser.hasErrors());
+        const auto& errors = CheckGroup(parser.getConstraintErrors(), "Constraint Errors", -1, -1, 1);
+        CheckMessage(RequireMsg(errors.getErrors()[0]), {"--xcoord"}, -1, ErrorType::Constraint_RequiredFlag);
+    }
+
+    SECTION("Top level missing y") {
+        parser.constraints().require({"-x"}).require({"--ycoord"});
+        parser.parse("-x 20");
+        CHECK(parser.hasErrors());
+        const auto& errors = CheckGroup(parser.getConstraintErrors(), "Constraint Errors", -1, -1, 1);
+        CheckMessage(RequireMsg(errors.getErrors()[0]), {"--ycoord"}, -1, ErrorType::Constraint_RequiredFlag);
+    }
+
+    SECTION("Nested one level missing all") {
+        parser.constraints()
+            .require({"-x"}).require({"--ycoord"})
+            .require({"-g", "-x"}).require({"--group", "-y"});
+        parser.parse("");
+        CHECK(parser.hasErrors());
+        const auto& errors = CheckGroup(parser.getConstraintErrors(), "Constraint Errors", -1, -1, 4);
+        CheckMessage(RequireMsg(errors.getErrors()[0]), {"--xcoord"}, -1, ErrorType::Constraint_RequiredFlag);
+        CheckMessage(RequireMsg(errors.getErrors()[1]), {"--ycoord"}, -1, ErrorType::Constraint_RequiredFlag);
+        CheckMessage(RequireMsg(errors.getErrors()[2]), {"--group", "--xcoord"}, -1, ErrorType::Constraint_RequiredFlag);
+        CheckMessage(RequireMsg(errors.getErrors()[3]), {"--group", "--ycoord"}, -1, ErrorType::Constraint_RequiredFlag);
+    }
+
+    SECTION("Nested one level missing x") {
+        parser.constraints()
+            .require({"-x"}).require({"--ycoord"})
+            .require({"-g", "-x"}).require({"--group", "-y"});
+        parser.parse("-y 20 --group [-y 20]");
+        CHECK(parser.hasErrors());
+        const auto& errors = CheckGroup(parser.getConstraintErrors(), "Constraint Errors", -1, -1, 2);
+        CheckMessage(RequireMsg(errors.getErrors()[0]), {"--xcoord"}, -1, ErrorType::Constraint_RequiredFlag);
+        CheckMessage(RequireMsg(errors.getErrors()[1]), {"--group", "--xcoord"}, -1, ErrorType::Constraint_RequiredFlag);
+    }
+
+    SECTION("Nested one level missing y") {
+        parser.constraints()
+            .require({"-x"}).require({"--ycoord"})
+            .require({"-g", "-x"}).require({"--group", "-y"});
+        parser.parse("-x 20 --group [-x 20]");
+        CHECK(parser.hasErrors());
+        const auto& errors = CheckGroup(parser.getConstraintErrors(), "Constraint Errors", -1, -1, 2);
+        CheckMessage(RequireMsg(errors.getErrors()[0]), {"--ycoord"}, -1, ErrorType::Constraint_RequiredFlag);
+        CheckMessage(RequireMsg(errors.getErrors()[1]), {"--group", "--ycoord"}, -1, ErrorType::Constraint_RequiredFlag);
+    }
+
+    SECTION("Nested two levels missing all") {
+        parser.constraints()
+            .require({"-x"}).require({"--ycoord"})
+            .require({"-g", "-x"}).require({"--group", "-y"})
+            .require({"-g", "-g2", "-x"}).require({"--group", "--group2", "-y"});
+        parser.parse("");
+        CHECK(parser.hasErrors());
+        const auto& errors = CheckGroup(parser.getConstraintErrors(), "Constraint Errors", -1, -1, 6);
+        CheckMessage(RequireMsg(errors.getErrors()[0]), {"--xcoord"}, -1, ErrorType::Constraint_RequiredFlag);
+        CheckMessage(RequireMsg(errors.getErrors()[1]), {"--ycoord"}, -1, ErrorType::Constraint_RequiredFlag);
+        CheckMessage(RequireMsg(errors.getErrors()[2]), {"--group", "--xcoord"}, -1, ErrorType::Constraint_RequiredFlag);
+        CheckMessage(RequireMsg(errors.getErrors()[3]), {"--group", "--ycoord"}, -1, ErrorType::Constraint_RequiredFlag);
+        CheckMessage(RequireMsg(errors.getErrors()[4]), {"--group", "--group2", "--xcoord"}, -1, ErrorType::Constraint_RequiredFlag);
+        CheckMessage(RequireMsg(errors.getErrors()[5]), {"--group", "--group2", "--ycoord"}, -1, ErrorType::Constraint_RequiredFlag);
+    }
+
+    SECTION("Nested two levels missing x") {
+        parser.constraints()
+            .require({"-x"}).require({"--ycoord"})
+            .require({"-g", "-x"}).require({"--group", "-y"})
+            .require({"-g", "-g2", "-x"}).require({"--group", "--group2", "-y"});
+        parser.parse("-y 20 --group [-y 20 --group2 [-y 20]]");
+        CHECK(parser.hasErrors());
+        const auto& errors = CheckGroup(parser.getConstraintErrors(), "Constraint Errors", -1, -1, 3);
+        CheckMessage(RequireMsg(errors.getErrors()[0]), {"--xcoord"}, -1, ErrorType::Constraint_RequiredFlag);
+        CheckMessage(RequireMsg(errors.getErrors()[1]), {"--group", "--xcoord"}, -1, ErrorType::Constraint_RequiredFlag);
+        CheckMessage(RequireMsg(errors.getErrors()[2]), {"--group", "--group2", "--xcoord"}, -1, ErrorType::Constraint_RequiredFlag);
+    }
+
+    SECTION("Nested two levels missing y") {
+        parser.constraints()
+            .require({"-x"}).require({"--ycoord"})
+            .require({"-g", "-x"}).require({"--group", "-y"})
+            .require({"-g", "-g2", "-x"}).require({"--group", "--group2", "-y"});
+        parser.parse("-x 20 --group [-x 20 --group2 [-x 20]]");
+        CHECK(parser.hasErrors());
+        const auto& errors = CheckGroup(parser.getConstraintErrors(), "Constraint Errors", -1, -1, 3);
+        CheckMessage(RequireMsg(errors.getErrors()[0]), {"--ycoord"}, -1, ErrorType::Constraint_RequiredFlag);
+        CheckMessage(RequireMsg(errors.getErrors()[1]), {"--group", "--ycoord"}, -1, ErrorType::Constraint_RequiredFlag);
+        CheckMessage(RequireMsg(errors.getErrors()[2]), {"--group", "--group2", "--ycoord"}, -1, ErrorType::Constraint_RequiredFlag);
     }
 }
 

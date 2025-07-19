@@ -223,7 +223,7 @@ TEST_CASE("Dependent cycle", "[constraints][dependent]") {
     }
 }
 
-TEST_CASE("Help message 2", "[help]") {
+TEST_CASE("Help message 2", "[help][test]") {
     const auto parser =
         Option<int>()["--xcoord"]["-x"]("<int>", "x coordinate of the location. This is a really long description to test how overflow works :D. Wow this is a very amazing feature.")
         | Option<int>()["--ycoord"]["-y"]("<int>", "y coordinate of the location ycoordinateofthelocation ycoordinateofthelocationycoordinateofthelocation")
@@ -250,6 +250,13 @@ TEST_CASE("Help message 2", "[help]") {
             )
         )
         | MultiOption<std::vector<int>>()["--courseids"]("<ids...>", "Specify a list of course ids ");
+
+    parser.constraints()
+        .require({"--xcoord"}).require({"--ycoord"}).require({"--zcoord"})
+        .require({"--student", "--name"}).require({"--student", "--age"})
+        .mutuallyExclusive({"--student2", "--name"}, {FlagPath{"--student2", "--age"}, FlagPath({"--student2" , "--classes", "--minor"})})
+        .dependsOn({"--student", "--name"}, {FlagPath{"--student", "--classes", "--major"}, FlagPath{"--student", "--classes", "--minor"}});
+
     const auto msg = parser.getHelpMessage();
     std::cout << msg << "\n\n\n";
 }

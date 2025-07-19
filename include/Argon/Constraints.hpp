@@ -10,92 +10,113 @@
 #include "Flag.hpp"
 
 namespace Argon {
-    class IOption;
-    class Context;
-    using OptionMap = std::unordered_map<FlagPathWithAlias, const IOption*>;
-    using GenerateConstraintErrorMsgFn = std::function<std::string(std::vector<std::string>)>;
 
-    struct Requirement {
-        FlagPathWithAlias flagPath;
-        std::string errorMsg;
+class IOption;
+class Context;
+using OptionMap = std::unordered_map<FlagPathWithAlias, const IOption*>;
+using GenerateConstraintErrorMsgFn = std::function<std::string(std::vector<std::string>)>;
 
-        Requirement() = default;
-        explicit Requirement(const FlagPath& flagPath);
-        Requirement(const FlagPath& flagPath, std::string_view errorMsg);
-    };
-
-    struct MutuallyExclusive {
-        FlagPathWithAlias flagPath;
-        std::vector<FlagPathWithAlias> exclusives;
-        std::string errorMsg;
-        GenerateConstraintErrorMsgFn genErrorMsg;
-
-        MutuallyExclusive() = default;
-        MutuallyExclusive(const FlagPath& flagPath, std::initializer_list<FlagPath> exclusives);
-        MutuallyExclusive(const FlagPath& flagPath, std::initializer_list<FlagPath> exclusives, std::string_view errorMsg);
-        MutuallyExclusive(const FlagPath& flagPath, std::initializer_list<FlagPath> exclusives,
-            GenerateConstraintErrorMsgFn  genErrorMsg);
-    };
-
-    struct DependentOptions {
-        FlagPathWithAlias flagPath;
-        std::vector<FlagPathWithAlias> dependents;
-        std::string errorMsg;
-        GenerateConstraintErrorMsgFn genErrorMsg;
-
-        DependentOptions() = default;
-        DependentOptions(const FlagPath& flagPath, std::initializer_list<FlagPath> dependents);
-        DependentOptions(const FlagPath& flagPath, std::initializer_list<FlagPath> dependents, std::string_view errorMsg);
-        DependentOptions(const FlagPath& flagPath, std::initializer_list<FlagPath> dependents,
-            GenerateConstraintErrorMsgFn  genErrorMsg);
-    };
-
-    class Constraints {
-    public:
-        auto require(const FlagPath& flagPath) -> Constraints&;
-        auto require(const FlagPath& flagPath, std::string_view errorMsg) -> Constraints&;
-
-        auto mutuallyExclusive(const FlagPath& flagPath, std::initializer_list<FlagPath> exclusiveFlags) -> Constraints&;
-        auto mutuallyExclusive(const FlagPath& flagPath, std::initializer_list<FlagPath> exclusiveFlags,
-            std::string_view errorMsg) -> Constraints&;
-        auto mutuallyExclusive(const FlagPath& flagPath, std::initializer_list<FlagPath> exclusiveFlags,
-            const GenerateConstraintErrorMsgFn& errorFn) -> Constraints&;
-
-        auto dependsOn(const FlagPath& flagPath, std::initializer_list<FlagPath> dependentFlags) -> Constraints&;
-        auto dependsOn(const FlagPath& flagPath, std::initializer_list<FlagPath> dependentFlags,
-                       std::string_view errorMsg) -> Constraints&;
-        auto dependsOn(const FlagPath& flagPath, std::initializer_list<FlagPath> dependentFlags,
-            const GenerateConstraintErrorMsgFn& errorFn) -> Constraints&;
-
-        auto validateSetup(const Context& rootContext, ErrorGroup& validationErrors) -> void;
-
-        auto validate(const Context& rootContext, std::vector<std::string>& errorMsgs) const -> void;
-
-    private:
-        std::vector<Requirement> m_requiredFlags;
-        std::vector<MutuallyExclusive> m_mutuallyExclusiveFlags;
-        std::vector<DependentOptions> m_dependentFlags;
-
-        friend class Parser;
-        Constraints() = default;
-
-        auto resolveAliases(const std::vector<FlagPathWithAlias>& allFlags, ErrorGroup& validationErrors) -> void;
-
-        auto validateRequirementSetup(ErrorGroup& validationErrors) const -> void;
-
-        auto validateMutuallyExclusiveSetup(ErrorGroup& validationErrors) const -> void;
-
-        auto validateDependenciesSetup(ErrorGroup& validationErrors) const -> void;
-
-        static auto checkMultiOptionStdArray    (const OptionMap& setOptions, std::vector<std::string>& errorMsgs) -> void;
-
-        auto checkRequiredFlags                 (const OptionMap& setOptions, std::vector<std::string>& errorMsgs) const -> void;
-
-        auto checkMutuallyExclusive             (const OptionMap& setOptions, std::vector<std::string>& errorMsgs) const -> void;
-
-        auto checkDependentFlags                (const OptionMap& setOptions, std::vector<std::string>& errorMsgs) const -> void;
-    };
+class Parser;
+namespace detail {
+    class ConstraintsQuery;
 }
+
+struct Requirement {
+    FlagPathWithAlias flagPath;
+    std::string errorMsg;
+
+    Requirement() = default;
+    explicit Requirement(const FlagPath& flagPath);
+    Requirement(const FlagPath& flagPath, std::string_view errorMsg);
+};
+
+struct MutuallyExclusive {
+    FlagPathWithAlias flagPath;
+    std::vector<FlagPathWithAlias> exclusives;
+    std::string errorMsg;
+    GenerateConstraintErrorMsgFn genErrorMsg;
+
+    MutuallyExclusive() = default;
+    MutuallyExclusive(const FlagPath& flagPath, std::initializer_list<FlagPath> exclusives);
+    MutuallyExclusive(const FlagPath& flagPath, std::initializer_list<FlagPath> exclusives, std::string_view errorMsg);
+    MutuallyExclusive(const FlagPath& flagPath, std::initializer_list<FlagPath> exclusives,
+        GenerateConstraintErrorMsgFn  genErrorMsg);
+};
+
+struct DependentOptions {
+    FlagPathWithAlias flagPath;
+    std::vector<FlagPathWithAlias> dependents;
+    std::string errorMsg;
+    GenerateConstraintErrorMsgFn genErrorMsg;
+
+    DependentOptions() = default;
+    DependentOptions(const FlagPath& flagPath, std::initializer_list<FlagPath> dependents);
+    DependentOptions(const FlagPath& flagPath, std::initializer_list<FlagPath> dependents, std::string_view errorMsg);
+    DependentOptions(const FlagPath& flagPath, std::initializer_list<FlagPath> dependents,
+        GenerateConstraintErrorMsgFn  genErrorMsg);
+};
+
+class Constraints {
+public:
+    auto require(const FlagPath& flagPath) -> Constraints&;
+    auto require(const FlagPath& flagPath, std::string_view errorMsg) -> Constraints&;
+
+    auto mutuallyExclusive(const FlagPath& flagPath, std::initializer_list<FlagPath> exclusiveFlags) -> Constraints&;
+    auto mutuallyExclusive(const FlagPath& flagPath, std::initializer_list<FlagPath> exclusiveFlags,
+        std::string_view errorMsg) -> Constraints&;
+    auto mutuallyExclusive(const FlagPath& flagPath, std::initializer_list<FlagPath> exclusiveFlags,
+        const GenerateConstraintErrorMsgFn& errorFn) -> Constraints&;
+
+    auto dependsOn(const FlagPath& flagPath, std::initializer_list<FlagPath> dependentFlags) -> Constraints&;
+    auto dependsOn(const FlagPath& flagPath, std::initializer_list<FlagPath> dependentFlags,
+                   std::string_view errorMsg) -> Constraints&;
+    auto dependsOn(const FlagPath& flagPath, std::initializer_list<FlagPath> dependentFlags,
+        const GenerateConstraintErrorMsgFn& errorFn) -> Constraints&;
+
+    auto validateSetup(const Context& rootContext, ErrorGroup& validationErrors) -> void;
+
+    auto validate(const Context& rootContext, std::vector<std::string>& errorMsgs) const -> void;
+
+private:
+    std::vector<Requirement> m_requiredFlags;
+    std::vector<MutuallyExclusive> m_mutuallyExclusiveFlags;
+    std::vector<DependentOptions> m_dependentFlags;
+
+    friend class Parser;
+    friend class detail::ConstraintsQuery;
+    Constraints() = default;
+
+    auto resolveAliases(const std::vector<FlagPathWithAlias>& allFlags, ErrorGroup& validationErrors) -> void;
+
+    auto validateRequirementSetup(ErrorGroup& validationErrors) const -> void;
+
+    auto validateMutuallyExclusiveSetup(ErrorGroup& validationErrors) const -> void;
+
+    auto validateDependenciesSetup(ErrorGroup& validationErrors) const -> void;
+
+    static auto checkMultiOptionStdArray    (const OptionMap& setOptions, std::vector<std::string>& errorMsgs) -> void;
+
+    auto checkRequiredFlags                 (const OptionMap& setOptions, std::vector<std::string>& errorMsgs) const -> void;
+
+    auto checkMutuallyExclusive             (const OptionMap& setOptions, std::vector<std::string>& errorMsgs) const -> void;
+
+    auto checkDependentFlags                (const OptionMap& setOptions, std::vector<std::string>& errorMsgs) const -> void;
+};
+
+} // End namespace Argon
+
+namespace Argon::detail {
+
+class ConstraintsQuery {
+public:
+    static auto containsRequirement(const Constraints& constraints, const FlagPath& flagPath) -> bool ;
+
+    static auto containsMutuallyExclusive(const Constraints& constraints, const FlagPath& flagPath) -> std::optional<MutuallyExclusive>;
+
+    static auto containsDependentOption(const Constraints& constraints, const FlagPath& flagPath) -> std::optional<DependentOptions>;
+};
+
+} // End namespace Argon::detail
 
 //---------------------------------------------------Free Functions-----------------------------------------------------
 
@@ -416,5 +437,33 @@ inline auto Constraints::checkDependentFlags(const OptionMap& setOptions, std::v
     }
 }
 } // End namespace Argon
+
+namespace Argon::detail {
+
+inline auto ConstraintsQuery::containsRequirement(const Constraints& constraints, const FlagPath& flagPath) -> bool {
+    return std::ranges::any_of(constraints.m_requiredFlags, [&](const Requirement& req) {
+        return isAlias(req.flagPath, flagPath);
+    });
+}
+
+inline auto ConstraintsQuery::containsMutuallyExclusive(
+    const Constraints& constraints, const FlagPath& flagPath
+) -> std::optional<MutuallyExclusive> {
+    const auto it = std::ranges::find_if(constraints.m_mutuallyExclusiveFlags, [&](const MutuallyExclusive& me) {
+        return isAlias(me.flagPath, flagPath);
+    });
+    return it == constraints.m_mutuallyExclusiveFlags.end() ? std::nullopt : std::optional(*it);
+}
+
+inline auto ConstraintsQuery::containsDependentOption(
+    const Constraints& constraints, const FlagPath& flagPath
+) -> std::optional<DependentOptions> {
+    const auto it = std::ranges::find_if(constraints.m_dependentFlags, [&](const DependentOptions& dep) {
+            return isAlias(dep.flagPath, flagPath);
+        });
+    return it == constraints.m_dependentFlags.end() ? std::nullopt : std::optional(*it);
+}
+
+} // End namespace Argon::detail
 
 #endif

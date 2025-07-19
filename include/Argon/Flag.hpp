@@ -165,7 +165,7 @@ inline auto isAlias(const Flag& flag1, const Flag& flag2) -> bool {
 inline auto isAlias(const FlagPathWithAlias& flagPathWithAlias, const FlagPath& flagPath) -> bool {
     if (flagPathWithAlias.groupPath.size() != flagPath.groupPath.size()) return false;
     for (size_t i = 0; i < flagPath.groupPath.size(); i++) {
-        if (!flagPathWithAlias.groupPath[i].containsFlag(flagPath.flag)) return false;
+        if (!flagPathWithAlias.groupPath[i].containsFlag(flagPath.groupPath[i])) return false;
     }
     return flagPathWithAlias.flag.containsFlag(flagPath.flag);
 }

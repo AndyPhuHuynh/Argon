@@ -42,7 +42,7 @@ private:
 
     void appendDescription(size_t leadingSpaces, const IOption *option, size_t nameLen, size_t inputHintLen, FlagPath groupPath);
 
-    auto appendIOption(size_t leadingSpaces, const IOption *option, FlagPath groupPath) -> void;
+    auto appendIOption(size_t leadingSpaces, const IOption *option, const FlagPath& groupPath) -> void;
 };
 
 inline auto getOptionName(const IOption *option) -> std::string {
@@ -221,6 +221,35 @@ inline auto HelpMessage::appendDescription(
 ) -> void {
     std::string description = option->getDescription();
 
+    if (const auto flag = dynamic_cast<const IFlag *>(option); flag != nullptr) {
+        groupPath.extendPath(flag->getFlag().mainFlag);
+        if (ConstraintsQuery::containsRequirement(*m_constraints, groupPath)) {
+            description += " (required)";
+        }
+        if (const auto opt = ConstraintsQuery::containsMutuallyExclusive(*m_constraints, groupPath)) {
+            const auto& me = opt.value();
+            description += " (mutually exclusive with: ";
+            for (size_t i = 0; i < me.exclusives.size(); i++) {
+                if (i != 0) {
+                    description += ", ";
+                }
+                description += std::format(R"("{}")", me.exclusives[i].getString());
+            }
+            description += ")";
+        }
+        if (const auto opt = ConstraintsQuery::containsDependentOption(*m_constraints, groupPath)) {
+            const auto& dep = opt.value();
+            description += " (requires: ";
+            for (size_t i = 0; i < dep.dependents.size(); i++) {
+                if (i != 0) {
+                    description += ", ";
+                }
+                description += std::format(R"("{}")", dep.dependents[i].getString());
+            }
+            description += ")";
+        }
+    }
+
     const size_t maxDescLength = m_maxLineWidth - m_maxFlagWidthBeforeWrapping;
     const std::vector<std::string> sections = wrapString(description, maxDescLength);
 
@@ -239,11 +268,10 @@ inline auto HelpMessage::appendDescription(
 }
 
 // Gets a help message for an option/positional
-inline auto HelpMessage::appendIOption(size_t leadingSpaces, const IOption *option, FlagPath groupPath) -> void {
+inline auto HelpMessage::appendIOption(size_t leadingSpaces, const IOption *option, const FlagPath& groupPath) -> void {
     leadingSpaces += m_nameIndent;
     const size_t nameLen = appendName(leadingSpaces, option);
     const size_t inputHintLen = appendInputHint(leadingSpaces + nameLen, nameLen, option);
-
     appendDescription(leadingSpaces, option, nameLen, inputHintLen, groupPath);
 }
 
